@@ -1,6 +1,21 @@
 import XCTest
 
 final class PlanningUITests: XCTestCase {
+    func testTeamRankingCardOpensWithoutAddingBottomTab() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--rest-day-ui-test"]
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["我的"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.tabBars.buttons["组团打卡"].exists)
+        let card = app.buttons["today-team-card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+        for _ in 0..<3 where !card.isHittable { app.swipeUp() }
+        card.tap()
+        XCTAssertTrue(app.navigationBars["组团打卡"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["登录云端账号后可以创建或加入团队。"].exists)
+    }
     func testTodayShowsScheduledRestInsteadOfEmptyPlanPrompt() {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
@@ -22,16 +37,16 @@ final class PlanningUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["胸 + 三头"].waitForExistence(timeout: 6))
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "已有训练模板安排到今天"; attachment.lifetime = .keepAlways; add(attachment)
     }
-    func testAccountHasSixEntrancesAndProfileMetricsAreInside() {
+    func testAccountEntrancesAndProfileMetricsAreInside() {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
         app.launchArguments = ["--planning-ui-test"]; app.launch()
         app.tabBars.buttons["我的"].tap()
-        for id in ["account-profile", "account-health", "account-images", "account-ai", "account-sync", "account-data"] {
+        for id in ["account-profile", "account-teams", "account-health", "account-images", "account-ai", "account-sync", "account-data"] {
             XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 5), "Missing \(id)")
         }
         XCTAssertFalse(app.staticTexts["BMI"].exists)
-        let menu = XCTAttachment(screenshot: app.screenshot()); menu.name = "我的六个入口"; menu.lifetime = .keepAlways; add(menu)
+        let menu = XCTAttachment(screenshot: app.screenshot()); menu.name = "我的入口"; menu.lifetime = .keepAlways; add(menu)
         app.buttons["account-profile"].tap()
         XCTAssertTrue(app.navigationBars["我的健康档案"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["BMI"].exists)

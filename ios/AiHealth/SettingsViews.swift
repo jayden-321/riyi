@@ -57,6 +57,7 @@ struct AccountView: View {
                     }.accessibilityIdentifier("account-reauth")
                 }
                 NavigationLink { profilePage } label: { Label("我的健康档案", systemImage: "person.crop.circle") }.accessibilityIdentifier("account-profile")
+                NavigationLink { TeamHubView(store: store).id(store.scope) } label: { Label("组团打卡", systemImage: "person.3.sequence.fill") }.accessibilityIdentifier("account-teams")
                 NavigationLink { healthPage } label: { Label("Apple 健康", systemImage: "heart.text.clipboard") }.accessibilityIdentifier("account-health")
                 NavigationLink { imagesPage } label: { Label("动作图片", systemImage: "figure.strengthtraining.traditional") }.accessibilityIdentifier("account-images")
                 NavigationLink { aiPage } label: { Label("AI 分析", systemImage: "sparkles") }.accessibilityIdentifier("account-ai")
@@ -322,7 +323,7 @@ struct DeleteAccountView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Text("删除账号将删除服务器中的训练、健康样本、报告和当前设备的账号记录，无法恢复。不会删除 Apple 健康中的原始数据。")
+                Text("删除账号将删除服务器中的训练、健康样本、报告和当前设备的账号记录；你创建的团队也会解散，其他团队中的排名会移除。无法恢复。不会删除 Apple 健康中的原始数据。")
                 AccountSecureField(placeholder: "输入当前账号密码", text: $password).frame(height: 36)
                 Button("永久删除", role: .destructive) { dismissInputKeyboard(); confirm = true }.disabled(password.isEmpty)
             }.navigationTitle("删除账号").toolbar { Button("取消") { dismiss() } }

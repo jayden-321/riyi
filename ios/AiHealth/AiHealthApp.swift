@@ -197,6 +197,7 @@ struct Surface<Content: View>: View {
 struct TodayView: View {
     let health: HealthSync
     @Bindable var store: AppStore; @State private var feedback = false
+    @State private var teamRefreshRevision = 0
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
     var body: some View {
         NavigationStack {
@@ -224,6 +225,7 @@ struct TodayView: View {
                             } else { Text("从一份训练计划开始").font(.title3.bold()); Text("在「训练」中登记动作和计划组。").foregroundStyle(.secondary) }
                         }
                     }
+                    TodayTeamCard(store: store, refreshRevision: teamRefreshRevision)
                     LazyVGrid(columns: columns, spacing: 12) {
                         metric("最近体重", key: "body_mass", unit: "kg", icon: "scalemass")
                         NavigationLink {
@@ -258,7 +260,7 @@ struct TodayView: View {
                     Text(store.isDemo ? "数据保存在本机" : "待同步 \(store.pendingCount) 项 · 冲突 \(store.conflicts.count) 项").font(.caption).foregroundStyle(.secondary)
                 }.padding(20)
             }.background(Theme.cream).navigationTitle("今天").navigationBarTitleDisplayMode(.inline)
-                .refreshable { await health.refreshSleep(invalidateCache: true); if !store.settings.healthConsent { await store.synchronize(showErrors: false) } }
+                .refreshable { await health.refreshSleep(invalidateCache: true); if !store.settings.healthConsent { await store.synchronize(showErrors: false) }; teamRefreshRevision += 1 }
                 .sheet(isPresented: $feedback) { CheckinView(store: store) }
         }
     }
