@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDisplayName</key><string>日益</string>
+<key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+<key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+<key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
+<key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+<key>WKApplication</key><true/>
+<key>WKCompanionAppBundleIdentifier</key><string>com.aijiankang.ios</string>
+<key>WKBackgroundModes</key><array><string>workout-processing</string></array>
+<key>NSHealthShareUsageDescription</key><string>读取训练期间心率，显示实时心率并关联训练组；云端上传需在手机另行同意。</string>
+<key>NSHealthUpdateUsageDescription</key><string>保存你开启的力量训练及活动能量到 Apple 健康。</string>
+</dict></plist>

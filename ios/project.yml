@@ -1,0 +1,76 @@
+name: AiHealth
+options:
+  bundleIdPrefix: com.aijiankang
+  deploymentTarget:
+    iOS: '18.0'
+    watchOS: '11.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    TARGETED_DEVICE_FAMILY: '1'
+    CODE_SIGN_STYLE: Automatic
+    DEFAULT_SERVER_URL: https://health.qyos.top
+targets:
+  AiHealth:
+    type: application
+    platform: iOS
+    sources:
+      - path: AiHealth
+      - path: CompanionShared
+      - path: ../backend/internal/app/exercise_guides.json
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aijiankang.ios
+        INFOPLIST_FILE: AiHealth/Info.plist
+        CODE_SIGN_ENTITLEMENTS: AiHealth/AiHealth.entitlements
+        MARKETING_VERSION: '0.1.0'
+        CURRENT_PROJECT_VERSION: '15'
+    dependencies:
+      - target: AiHealthWatch
+    scheme:
+      testTargets: [AiHealthTests, AiHealthUITests]
+  AiHealthTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [AiHealthTests]
+    dependencies:
+      - target: AiHealth
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+  AiHealthUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [AiHealthUITests]
+    dependencies:
+      - target: AiHealth
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+  AiHealthWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: AiHealthWatch
+      - path: CompanionShared
+      - path: AiHealth/Models.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aijiankang.ios.watchkitapp
+        TARGETED_DEVICE_FAMILY: '4'
+        INFOPLIST_FILE: AiHealthWatch/Info.plist
+        CODE_SIGN_ENTITLEMENTS: AiHealthWatch/AiHealthWatch.entitlements
+        MARKETING_VERSION: '0.1.0'
+        CURRENT_PROJECT_VERSION: '15'
+    scheme:
+      testTargets: [AiHealthWatchUITests]
+  AiHealthWatchUITests:
+    type: bundle.ui-testing
+    platform: watchOS
+    sources: [AiHealthWatchUITests]
+    dependencies:
+      - target: AiHealthWatch
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES

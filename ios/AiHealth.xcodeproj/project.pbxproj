@@ -1,0 +1,887 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		031FA2747ED183D2BBCE4EFB /* SleepHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 038C997F06CF52CB00A9D4FE /* SleepHistoryTests.swift */; };
+		05E167C64733A929DD0D1B30 /* SleepUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9AE43CDFE004E98FC1CFBEC /* SleepUITests.swift */; };
+		156E251B6FA6E8A30DFA4EF7 /* LocalHealthOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64EE0D95C718E4169DB6614 /* LocalHealthOverview.swift */; };
+		192006B30EE5619C4592B659 /* CompanionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1124A1C6FD4DECF440184A2 /* CompanionTests.swift */; };
+		1964276DB74BCBBD56398F52 /* HealthSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94B33C9B2B8D2C9642EC71FF /* HealthSync.swift */; };
+		28620CBFFF387E6CDA4C0E89 /* PlanningViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAF1252F16A15B2382C89110 /* PlanningViews.swift */; };
+		29A4695DBB8ABF4BF0095FB5 /* AiHealthWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14AF61781D5D4117D6D6494 /* AiHealthWatchApp.swift */; };
+		2BCF6F2E815681AE645A8FE9 /* PlanningUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C49BF4F39BC7466EE052104 /* PlanningUITests.swift */; };
+		38FB9BD02DDDD18EE1C51A28 /* ExerciseMediaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09B992421699A159668F8E68 /* ExerciseMediaTests.swift */; };
+		3D10E5B809862C7CF79B75BF /* ExerciseGuideViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E440E405C56FD4F8906A5816 /* ExerciseGuideViews.swift */; };
+		3D6FEEE35286110B99C42994 /* ExerciseLibraryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B9974C55046DA72DB6486C1 /* ExerciseLibraryUITests.swift */; };
+		43633137F0768E82BFE458AD /* CompanionPhone.swift in Sources */ = {isa = PBXBuildFile; fileRef = 402FAE24C66EB9DECA80454E /* CompanionPhone.swift */; };
+		49D789D7954008C049999A27 /* Coach.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25F2DD88F764B0EAFF1DD4D2 /* Coach.swift */; };
+		4B6625116E878A3FA51CFC77 /* WatchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E6A394C65D5696D29A99187 /* WatchStore.swift */; };
+		4DF3E79D2C1A061B40B8CF43 /* CompanionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */; };
+		51617E80179DF2CEEEB26B12 /* AiHealthWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 51505ECEC9315A197D1C58BE /* AiHealthWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		68FE672D73BA32D25B81F8AA /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FA5CC3978A4CB93EA0D638 /* AppStore.swift */; };
+		6B8B47B5AAFE0A12283D889A /* AiHealthApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5361C78C93164D03CFFB85 /* AiHealthApp.swift */; };
+		73F0149E936821717C968016 /* Planning.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBF2824D9B1582D007E9FCA6 /* Planning.swift */; };
+		7835511B8FDFF3739A6992BF /* HealthUploadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEE696821CE928BDDA713965 /* HealthUploadTests.swift */; };
+		7FCF3D16249FFFE6CEA32BCC /* DeleteMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1369354AA1CA23722AF79C21 /* DeleteMigrationTests.swift */; };
+		80071F1B3F8FF30F8B5444C4 /* exercise_guides.json in Resources */ = {isa = PBXBuildFile; fileRef = 20744C85F59A9D56BE9D3145 /* exercise_guides.json */; };
+		8098D1355E8A56D316CF42EC /* CompanionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF8430B982E232AE4515119 /* CompanionTransport.swift */; };
+		83AB77DAAAB24D468C01543B /* WatchStartUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 869A20FD18F1C9B309AC4488 /* WatchStartUITests.swift */; };
+		83BF61B4B5EF604CBDC37613 /* AccountSecureField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E6A28E9E05C890D1C236C7A /* AccountSecureField.swift */; };
+		8469FEF74811ECF8E1DFDFD1 /* CompanionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF8430B982E232AE4515119 /* CompanionTransport.swift */; };
+		862AA4DE454CE1A5021C93DD /* FlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8026F17243757F2553336799 /* FlowTests.swift */; };
+		880615A684BF4747F393CDF8 /* ExerciseMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AE6867E87F3D952849EA52F /* ExerciseMedia.swift */; };
+		92C967284C85B4E7D53BFD0F /* ModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E1BAFF4B9B6762D9E630432 /* ModelsTests.swift */; };
+		9B3530294CFF1B5F5CAC1A43 /* PlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8277DB1031D95EAB0D347A9E /* PlanningTests.swift */; };
+		A41F66A74BCB0A19DE1C0B54 /* HealthStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A960B5ECBF186BA921FBC6 /* HealthStorage.swift */; };
+		A817353DB98C90471DCECD35 /* SleepViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5464433470A7DCEEF427D12 /* SleepViews.swift */; };
+		ABA8E975DF43F7A3148CE63B /* TrainingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C732C1B3FA196A7631B3F9 /* TrainingViews.swift */; };
+		B120E2080753EF23E222548E /* CoachViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD0DBAEE2FCA3196B33A581 /* CoachViews.swift */; };
+		B4031A194B628B11BA9D2C61 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D5F3350DF5A906DE4EF153 /* Models.swift */; };
+		B6F9EC96975E63F5E0A35B6C /* Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2AD30CA089D6595B9AF8A3 /* Notifications.swift */; };
+		C43C9A7146BEC87E3631A2DA /* SettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25271E82167028CD9B08B47 /* SettingsViews.swift */; };
+		CC85AF3180687BBB8C30FA90 /* SleepRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15EA2FE52925D0A6C8A22B3C /* SleepRegressionTests.swift */; };
+		CE885F5BB92F000D76F80CBC /* CompanionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */; };
+		CEA7EF53A5203551D6F24787 /* WatchWorkoutHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B5798D0570BFA1F64E3313C /* WatchWorkoutHealth.swift */; };
+		E4451F1BD19276A5751C123C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D5F3350DF5A906DE4EF153 /* Models.swift */; };
+		EE354A7008E88A43DF481269 /* Network.swift in Sources */ = {isa = PBXBuildFile; fileRef = C624F46302C82B541804BF7A /* Network.swift */; };
+		F14AE43EA256A84025BAB3CE /* SleepHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64CB95C8BEF3F56CF69284F /* SleepHistory.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		34B5054B1E58D89E29CECB6F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 52A425D7B1A9F6B8D696DEA0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 122A5092071A628F408C6DF4;
+			remoteInfo = AiHealth;
+		};
+		4C8B22A7F42DEB16FC8F196F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 52A425D7B1A9F6B8D696DEA0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ECBCF57F50E9AC5197DBB791;
+			remoteInfo = AiHealthWatch;
+		};
+		85C9ECD906C9FF766843BCB0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 52A425D7B1A9F6B8D696DEA0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 122A5092071A628F408C6DF4;
+			remoteInfo = AiHealth;
+		};
+		AA52B295ED5B916A42742270 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 52A425D7B1A9F6B8D696DEA0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ECBCF57F50E9AC5197DBB791;
+			remoteInfo = AiHealthWatch;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		9866288D13D361F5165B278B /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				51617E80179DF2CEEEB26B12 /* AiHealthWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		038C997F06CF52CB00A9D4FE /* SleepHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepHistoryTests.swift; sourceTree = "<group>"; };
+		0440BF9CFAD46980C6622964 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		09B992421699A159668F8E68 /* ExerciseMediaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaTests.swift; sourceTree = "<group>"; };
+		0E1BAFF4B9B6762D9E630432 /* ModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsTests.swift; sourceTree = "<group>"; };
+		1218DB3F6D10EAC20A91A3F1 /* AiHealthTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AiHealthTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1369354AA1CA23722AF79C21 /* DeleteMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteMigrationTests.swift; sourceTree = "<group>"; };
+		15EA2FE52925D0A6C8A22B3C /* SleepRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepRegressionTests.swift; sourceTree = "<group>"; };
+		1E6A28E9E05C890D1C236C7A /* AccountSecureField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSecureField.swift; sourceTree = "<group>"; };
+		20744C85F59A9D56BE9D3145 /* exercise_guides.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = exercise_guides.json; sourceTree = "<group>"; };
+		21FD14DB3E9437D92392885C /* AiHealth.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AiHealth.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		25F2DD88F764B0EAFF1DD4D2 /* Coach.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Coach.swift; sourceTree = "<group>"; };
+		3AE6867E87F3D952849EA52F /* ExerciseMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMedia.swift; sourceTree = "<group>"; };
+		3DD0DBAEE2FCA3196B33A581 /* CoachViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachViews.swift; sourceTree = "<group>"; };
+		402FAE24C66EB9DECA80454E /* CompanionPhone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionPhone.swift; sourceTree = "<group>"; };
+		4C49BF4F39BC7466EE052104 /* PlanningUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningUITests.swift; sourceTree = "<group>"; };
+		51505ECEC9315A197D1C58BE /* AiHealthWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AiHealthWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B9974C55046DA72DB6486C1 /* ExerciseLibraryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibraryUITests.swift; sourceTree = "<group>"; };
+		5E6A394C65D5696D29A99187 /* WatchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchStore.swift; sourceTree = "<group>"; };
+		73FA5CC3978A4CB93EA0D638 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
+		7B5361C78C93164D03CFFB85 /* AiHealthApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiHealthApp.swift; sourceTree = "<group>"; };
+		8026F17243757F2553336799 /* FlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTests.swift; sourceTree = "<group>"; };
+		8277DB1031D95EAB0D347A9E /* PlanningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningTests.swift; sourceTree = "<group>"; };
+		84D5F3350DF5A906DE4EF153 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		869A20FD18F1C9B309AC4488 /* WatchStartUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchStartUITests.swift; sourceTree = "<group>"; };
+		8B5798D0570BFA1F64E3313C /* WatchWorkoutHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchWorkoutHealth.swift; sourceTree = "<group>"; };
+		91C732C1B3FA196A7631B3F9 /* TrainingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingViews.swift; sourceTree = "<group>"; };
+		94B33C9B2B8D2C9642EC71FF /* HealthSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSync.swift; sourceTree = "<group>"; };
+		A14AF61781D5D4117D6D6494 /* AiHealthWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiHealthWatchApp.swift; sourceTree = "<group>"; };
+		AAF1252F16A15B2382C89110 /* PlanningViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningViews.swift; sourceTree = "<group>"; };
+		AB0EC116C4358F9D2001C4A3 /* AiHealthWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AiHealthWatch.entitlements; sourceTree = "<group>"; };
+		AF2AD30CA089D6595B9AF8A3 /* Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
+		B1124A1C6FD4DECF440184A2 /* CompanionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionTests.swift; sourceTree = "<group>"; };
+		B17B5D22A287787C19FC64DB /* AiHealth.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AiHealth.entitlements; sourceTree = "<group>"; };
+		B1A960B5ECBF186BA921FBC6 /* HealthStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthStorage.swift; sourceTree = "<group>"; };
+		B25271E82167028CD9B08B47 /* SettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViews.swift; sourceTree = "<group>"; };
+		B9AE43CDFE004E98FC1CFBEC /* SleepUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepUITests.swift; sourceTree = "<group>"; };
+		C5464433470A7DCEEF427D12 /* SleepViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepViews.swift; sourceTree = "<group>"; };
+		C624F46302C82B541804BF7A /* Network.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Network.swift; sourceTree = "<group>"; };
+		CC185899F4BE5667C3B3BC10 /* AiHealthWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AiHealthWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCore.swift; sourceTree = "<group>"; };
+		DAE10DB05C6C4E8A60281ED4 /* AiHealthUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AiHealthUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DBF2824D9B1582D007E9FCA6 /* Planning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Planning.swift; sourceTree = "<group>"; };
+		E440E405C56FD4F8906A5816 /* ExerciseGuideViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseGuideViews.swift; sourceTree = "<group>"; };
+		E523E415461619FE53650740 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		F64CB95C8BEF3F56CF69284F /* SleepHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepHistory.swift; sourceTree = "<group>"; };
+		F64EE0D95C718E4169DB6614 /* LocalHealthOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHealthOverview.swift; sourceTree = "<group>"; };
+		FEE696821CE928BDDA713965 /* HealthUploadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthUploadTests.swift; sourceTree = "<group>"; };
+		FFF8430B982E232AE4515119 /* CompanionTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionTransport.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		16D2C959C5C13B55418F245B = {
+			isa = PBXGroup;
+			children = (
+				7ECCBF7BE655258A3EBEA9CC /* AiHealth */,
+				9FE09C27A1F9C80BE9500B3E /* AiHealthTests */,
+				9C3A8C7F709926F5B52BB78B /* AiHealthUITests */,
+				CBE3EC42D24DED24F7F655F9 /* AiHealthWatch */,
+				82A82ABD12F490EADA82552D /* AiHealthWatchUITests */,
+				C65B7D84838ADE53E1B73065 /* app */,
+				AAE2B9E1E3760019A92E2316 /* CompanionShared */,
+				4DA930C39E7EFE9FAC1754E1 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4DA930C39E7EFE9FAC1754E1 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				21FD14DB3E9437D92392885C /* AiHealth.app */,
+				1218DB3F6D10EAC20A91A3F1 /* AiHealthTests.xctest */,
+				DAE10DB05C6C4E8A60281ED4 /* AiHealthUITests.xctest */,
+				51505ECEC9315A197D1C58BE /* AiHealthWatch.app */,
+				CC185899F4BE5667C3B3BC10 /* AiHealthWatchUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		7ECCBF7BE655258A3EBEA9CC /* AiHealth */ = {
+			isa = PBXGroup;
+			children = (
+				1E6A28E9E05C890D1C236C7A /* AccountSecureField.swift */,
+				B17B5D22A287787C19FC64DB /* AiHealth.entitlements */,
+				7B5361C78C93164D03CFFB85 /* AiHealthApp.swift */,
+				73FA5CC3978A4CB93EA0D638 /* AppStore.swift */,
+				25F2DD88F764B0EAFF1DD4D2 /* Coach.swift */,
+				3DD0DBAEE2FCA3196B33A581 /* CoachViews.swift */,
+				402FAE24C66EB9DECA80454E /* CompanionPhone.swift */,
+				E440E405C56FD4F8906A5816 /* ExerciseGuideViews.swift */,
+				3AE6867E87F3D952849EA52F /* ExerciseMedia.swift */,
+				B1A960B5ECBF186BA921FBC6 /* HealthStorage.swift */,
+				94B33C9B2B8D2C9642EC71FF /* HealthSync.swift */,
+				0440BF9CFAD46980C6622964 /* Info.plist */,
+				F64EE0D95C718E4169DB6614 /* LocalHealthOverview.swift */,
+				84D5F3350DF5A906DE4EF153 /* Models.swift */,
+				C624F46302C82B541804BF7A /* Network.swift */,
+				AF2AD30CA089D6595B9AF8A3 /* Notifications.swift */,
+				DBF2824D9B1582D007E9FCA6 /* Planning.swift */,
+				AAF1252F16A15B2382C89110 /* PlanningViews.swift */,
+				B25271E82167028CD9B08B47 /* SettingsViews.swift */,
+				F64CB95C8BEF3F56CF69284F /* SleepHistory.swift */,
+				C5464433470A7DCEEF427D12 /* SleepViews.swift */,
+				91C732C1B3FA196A7631B3F9 /* TrainingViews.swift */,
+			);
+			path = AiHealth;
+			sourceTree = "<group>";
+		};
+		82A82ABD12F490EADA82552D /* AiHealthWatchUITests */ = {
+			isa = PBXGroup;
+			children = (
+				869A20FD18F1C9B309AC4488 /* WatchStartUITests.swift */,
+			);
+			path = AiHealthWatchUITests;
+			sourceTree = "<group>";
+		};
+		9C3A8C7F709926F5B52BB78B /* AiHealthUITests */ = {
+			isa = PBXGroup;
+			children = (
+				5B9974C55046DA72DB6486C1 /* ExerciseLibraryUITests.swift */,
+				8026F17243757F2553336799 /* FlowTests.swift */,
+				4C49BF4F39BC7466EE052104 /* PlanningUITests.swift */,
+				B9AE43CDFE004E98FC1CFBEC /* SleepUITests.swift */,
+			);
+			path = AiHealthUITests;
+			sourceTree = "<group>";
+		};
+		9FE09C27A1F9C80BE9500B3E /* AiHealthTests */ = {
+			isa = PBXGroup;
+			children = (
+				B1124A1C6FD4DECF440184A2 /* CompanionTests.swift */,
+				1369354AA1CA23722AF79C21 /* DeleteMigrationTests.swift */,
+				09B992421699A159668F8E68 /* ExerciseMediaTests.swift */,
+				FEE696821CE928BDDA713965 /* HealthUploadTests.swift */,
+				0E1BAFF4B9B6762D9E630432 /* ModelsTests.swift */,
+				8277DB1031D95EAB0D347A9E /* PlanningTests.swift */,
+				038C997F06CF52CB00A9D4FE /* SleepHistoryTests.swift */,
+				15EA2FE52925D0A6C8A22B3C /* SleepRegressionTests.swift */,
+			);
+			path = AiHealthTests;
+			sourceTree = "<group>";
+		};
+		AAE2B9E1E3760019A92E2316 /* CompanionShared */ = {
+			isa = PBXGroup;
+			children = (
+				CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */,
+				FFF8430B982E232AE4515119 /* CompanionTransport.swift */,
+			);
+			path = CompanionShared;
+			sourceTree = "<group>";
+		};
+		C65B7D84838ADE53E1B73065 /* app */ = {
+			isa = PBXGroup;
+			children = (
+				20744C85F59A9D56BE9D3145 /* exercise_guides.json */,
+			);
+			name = app;
+			path = ../backend/internal/app;
+			sourceTree = "<group>";
+		};
+		CBE3EC42D24DED24F7F655F9 /* AiHealthWatch */ = {
+			isa = PBXGroup;
+			children = (
+				AB0EC116C4358F9D2001C4A3 /* AiHealthWatch.entitlements */,
+				A14AF61781D5D4117D6D6494 /* AiHealthWatchApp.swift */,
+				E523E415461619FE53650740 /* Info.plist */,
+				5E6A394C65D5696D29A99187 /* WatchStore.swift */,
+				8B5798D0570BFA1F64E3313C /* WatchWorkoutHealth.swift */,
+			);
+			path = AiHealthWatch;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		122A5092071A628F408C6DF4 /* AiHealth */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 75E7F99283D16FFAD9EF9909 /* Build configuration list for PBXNativeTarget "AiHealth" */;
+			buildPhases = (
+				3488D1CC69AE9D37B2840ECA /* Sources */,
+				BE8FBC285803BE579039375D /* Resources */,
+				9866288D13D361F5165B278B /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D9F86A83C2F83CF7EBF7110F /* PBXTargetDependency */,
+			);
+			name = AiHealth;
+			packageProductDependencies = (
+			);
+			productName = AiHealth;
+			productReference = 21FD14DB3E9437D92392885C /* AiHealth.app */;
+			productType = "com.apple.product-type.application";
+		};
+		38715FF70304EF41FE4DE5D8 /* AiHealthUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F7BA9DC2D4483CCD359336A7 /* Build configuration list for PBXNativeTarget "AiHealthUITests" */;
+			buildPhases = (
+				DBF402443E788C3FDD048266 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0CE0A2DC1A5FC7182E8E4707 /* PBXTargetDependency */,
+			);
+			name = AiHealthUITests;
+			packageProductDependencies = (
+			);
+			productName = AiHealthUITests;
+			productReference = DAE10DB05C6C4E8A60281ED4 /* AiHealthUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		92587396F4065B0B97F0F15E /* AiHealthTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 96ABADC5F35822BEBD72B658 /* Build configuration list for PBXNativeTarget "AiHealthTests" */;
+			buildPhases = (
+				03A5692AE2CABABABA49BE88 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B7FFD5A9F1AB4D5B8F2F188D /* PBXTargetDependency */,
+			);
+			name = AiHealthTests;
+			packageProductDependencies = (
+			);
+			productName = AiHealthTests;
+			productReference = 1218DB3F6D10EAC20A91A3F1 /* AiHealthTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		BEC077AF2CABFA76EB2D46E9 /* AiHealthWatchUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 32E839460AC16E3DB8A9CFE1 /* Build configuration list for PBXNativeTarget "AiHealthWatchUITests" */;
+			buildPhases = (
+				CBCD26932A191FE3CD0D04CD /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				358CE96EE3096AED6CDCD82A /* PBXTargetDependency */,
+			);
+			name = AiHealthWatchUITests;
+			packageProductDependencies = (
+			);
+			productName = AiHealthWatchUITests;
+			productReference = CC185899F4BE5667C3B3BC10 /* AiHealthWatchUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		ECBCF57F50E9AC5197DBB791 /* AiHealthWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EC8E95AC868771108500C5CA /* Build configuration list for PBXNativeTarget "AiHealthWatch" */;
+			buildPhases = (
+				045C413B1A6EF8F43E81C2E1 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AiHealthWatch;
+			packageProductDependencies = (
+			);
+			productName = AiHealthWatch;
+			productReference = 51505ECEC9315A197D1C58BE /* AiHealthWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		52A425D7B1A9F6B8D696DEA0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					122A5092071A628F408C6DF4 = {
+						ProvisioningStyle = Automatic;
+					};
+					38715FF70304EF41FE4DE5D8 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 122A5092071A628F408C6DF4;
+					};
+					92587396F4065B0B97F0F15E = {
+						ProvisioningStyle = Automatic;
+					};
+					BEC077AF2CABFA76EB2D46E9 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = ECBCF57F50E9AC5197DBB791;
+					};
+					ECBCF57F50E9AC5197DBB791 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = AFDCFACDBFAF1260C3A88BF5 /* Build configuration list for PBXProject "AiHealth" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 16D2C959C5C13B55418F245B;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4DA930C39E7EFE9FAC1754E1 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				122A5092071A628F408C6DF4 /* AiHealth */,
+				92587396F4065B0B97F0F15E /* AiHealthTests */,
+				38715FF70304EF41FE4DE5D8 /* AiHealthUITests */,
+				ECBCF57F50E9AC5197DBB791 /* AiHealthWatch */,
+				BEC077AF2CABFA76EB2D46E9 /* AiHealthWatchUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		BE8FBC285803BE579039375D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				80071F1B3F8FF30F8B5444C4 /* exercise_guides.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		03A5692AE2CABABABA49BE88 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				192006B30EE5619C4592B659 /* CompanionTests.swift in Sources */,
+				7FCF3D16249FFFE6CEA32BCC /* DeleteMigrationTests.swift in Sources */,
+				38FB9BD02DDDD18EE1C51A28 /* ExerciseMediaTests.swift in Sources */,
+				7835511B8FDFF3739A6992BF /* HealthUploadTests.swift in Sources */,
+				92C967284C85B4E7D53BFD0F /* ModelsTests.swift in Sources */,
+				9B3530294CFF1B5F5CAC1A43 /* PlanningTests.swift in Sources */,
+				031FA2747ED183D2BBCE4EFB /* SleepHistoryTests.swift in Sources */,
+				CC85AF3180687BBB8C30FA90 /* SleepRegressionTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		045C413B1A6EF8F43E81C2E1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				29A4695DBB8ABF4BF0095FB5 /* AiHealthWatchApp.swift in Sources */,
+				4DF3E79D2C1A061B40B8CF43 /* CompanionCore.swift in Sources */,
+				8098D1355E8A56D316CF42EC /* CompanionTransport.swift in Sources */,
+				B4031A194B628B11BA9D2C61 /* Models.swift in Sources */,
+				4B6625116E878A3FA51CFC77 /* WatchStore.swift in Sources */,
+				CEA7EF53A5203551D6F24787 /* WatchWorkoutHealth.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3488D1CC69AE9D37B2840ECA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				83BF61B4B5EF604CBDC37613 /* AccountSecureField.swift in Sources */,
+				6B8B47B5AAFE0A12283D889A /* AiHealthApp.swift in Sources */,
+				68FE672D73BA32D25B81F8AA /* AppStore.swift in Sources */,
+				49D789D7954008C049999A27 /* Coach.swift in Sources */,
+				B120E2080753EF23E222548E /* CoachViews.swift in Sources */,
+				CE885F5BB92F000D76F80CBC /* CompanionCore.swift in Sources */,
+				43633137F0768E82BFE458AD /* CompanionPhone.swift in Sources */,
+				8469FEF74811ECF8E1DFDFD1 /* CompanionTransport.swift in Sources */,
+				3D10E5B809862C7CF79B75BF /* ExerciseGuideViews.swift in Sources */,
+				880615A684BF4747F393CDF8 /* ExerciseMedia.swift in Sources */,
+				A41F66A74BCB0A19DE1C0B54 /* HealthStorage.swift in Sources */,
+				1964276DB74BCBBD56398F52 /* HealthSync.swift in Sources */,
+				156E251B6FA6E8A30DFA4EF7 /* LocalHealthOverview.swift in Sources */,
+				E4451F1BD19276A5751C123C /* Models.swift in Sources */,
+				EE354A7008E88A43DF481269 /* Network.swift in Sources */,
+				B6F9EC96975E63F5E0A35B6C /* Notifications.swift in Sources */,
+				73F0149E936821717C968016 /* Planning.swift in Sources */,
+				28620CBFFF387E6CDA4C0E89 /* PlanningViews.swift in Sources */,
+				C43C9A7146BEC87E3631A2DA /* SettingsViews.swift in Sources */,
+				F14AE43EA256A84025BAB3CE /* SleepHistory.swift in Sources */,
+				A817353DB98C90471DCECD35 /* SleepViews.swift in Sources */,
+				ABA8E975DF43F7A3148CE63B /* TrainingViews.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CBCD26932A191FE3CD0D04CD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				83AB77DAAAB24D468C01543B /* WatchStartUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DBF402443E788C3FDD048266 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3D6FEEE35286110B99C42994 /* ExerciseLibraryUITests.swift in Sources */,
+				862AA4DE454CE1A5021C93DD /* FlowTests.swift in Sources */,
+				2BCF6F2E815681AE645A8FE9 /* PlanningUITests.swift in Sources */,
+				05E167C64733A929DD0D1B30 /* SleepUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0CE0A2DC1A5FC7182E8E4707 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 122A5092071A628F408C6DF4 /* AiHealth */;
+			targetProxy = 34B5054B1E58D89E29CECB6F /* PBXContainerItemProxy */;
+		};
+		358CE96EE3096AED6CDCD82A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ECBCF57F50E9AC5197DBB791 /* AiHealthWatch */;
+			targetProxy = 4C8B22A7F42DEB16FC8F196F /* PBXContainerItemProxy */;
+		};
+		B7FFD5A9F1AB4D5B8F2F188D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 122A5092071A628F408C6DF4 /* AiHealth */;
+			targetProxy = 85C9ECD906C9FF766843BCB0 /* PBXContainerItemProxy */;
+		};
+		D9F86A83C2F83CF7EBF7110F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ECBCF57F50E9AC5197DBB791 /* AiHealthWatch */;
+			targetProxy = AA52B295ED5B916A42742270 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0F7C7F163B57B8A16C8F495F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 15;
+				INFOPLIST_FILE = AiHealth/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.ios;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		17AD0BFC97381C2EAB781034 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 15;
+				INFOPLIST_FILE = AiHealth/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.ios;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		2CD7D2D2BD2A17FB33FC19CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEFAULT_SERVER_URL = "https://health.qyos.top";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Debug;
+		};
+		4DA3CCF188CB8D2F86F6E717 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
+				CURRENT_PROJECT_VERSION = 15;
+				INFOPLIST_FILE = AiHealthWatch/Info.plist;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.ios.watchkitapp;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Debug;
+		};
+		5069F278C05EEF3C746C1334 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthWatchUITests;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = AiHealthWatch;
+			};
+			name = Release;
+		};
+		58126360CE27AF8DDDA50246 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AiHealth.app/AiHealth";
+			};
+			name = Debug;
+		};
+		B7E36F8BE578975F78FB4B41 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEFAULT_SERVER_URL = "https://health.qyos.top";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Release;
+		};
+		BDAF5120DD446675102FE3FC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AiHealth;
+			};
+			name = Debug;
+		};
+		E43C2D0C70D4116F23887157 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AiHealth;
+			};
+			name = Release;
+		};
+		E7EB4F81486E7A152D8A0702 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
+				CURRENT_PROJECT_VERSION = 15;
+				INFOPLIST_FILE = AiHealthWatch/Info.plist;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.ios.watchkitapp;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Release;
+		};
+		EA1C756C360BB5BEE28B922E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AiHealth.app/AiHealth";
+			};
+			name = Release;
+		};
+		EF59A7263B7B00A22D608D45 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthWatchUITests;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = AiHealthWatch;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		32E839460AC16E3DB8A9CFE1 /* Build configuration list for PBXNativeTarget "AiHealthWatchUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EF59A7263B7B00A22D608D45 /* Debug */,
+				5069F278C05EEF3C746C1334 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		75E7F99283D16FFAD9EF9909 /* Build configuration list for PBXNativeTarget "AiHealth" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				17AD0BFC97381C2EAB781034 /* Debug */,
+				0F7C7F163B57B8A16C8F495F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		96ABADC5F35822BEBD72B658 /* Build configuration list for PBXNativeTarget "AiHealthTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				58126360CE27AF8DDDA50246 /* Debug */,
+				EA1C756C360BB5BEE28B922E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AFDCFACDBFAF1260C3A88BF5 /* Build configuration list for PBXProject "AiHealth" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2CD7D2D2BD2A17FB33FC19CD /* Debug */,
+				B7E36F8BE578975F78FB4B41 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		EC8E95AC868771108500C5CA /* Build configuration list for PBXNativeTarget "AiHealthWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4DA3CCF188CB8D2F86F6E717 /* Debug */,
+				E7EB4F81486E7A152D8A0702 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F7BA9DC2D4483CCD359336A7 /* Build configuration list for PBXNativeTarget "AiHealthUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BDAF5120DD446675102FE3FC /* Debug */,
+				E43C2D0C70D4116F23887157 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 52A425D7B1A9F6B8D696DEA0 /* Project object */;
+}
