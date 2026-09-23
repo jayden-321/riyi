@@ -213,9 +213,7 @@ struct FoodPackageReviewView: View {
         packageAmount = extraction?.packageAmount ?? 0; packageUnit = extraction?.packageUnit ?? "g"
         count = extraction?.unitsPerPackage ?? 0
         let recognized = extraction?.servingUnit?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if name.contains("午餐肉"), count > 1, (recognized.isEmpty || ["只", "包", "件"].contains(recognized)) {
-            servingUnit = "片"
-        } else { servingUnit = recognized.isEmpty ? "只" : recognized }
+        servingUnit = recognized.isEmpty ? "件" : recognized
         energy = extraction?.energyPer100 ?? 0; energyUnit = extraction?.energyUnit ?? "kJ"
     }
     private func save() {
@@ -362,12 +360,21 @@ struct FoodImportView: View {
     @State private var results: [SharedFood] = []
     @State private var busy = false
     @State private var error: String?
+    @State private var searched = false
+    @State private var searchedQuery = ""
+    @State private var hasMore = false
+    @State private var nextOffset = 0
     var body: some View {
         NavigationStack {
             List {
-                Section { TextField("搜索商品名或分享码", text: $query).textInputAutocapitalization(.never); Button(busy ? "搜索中…" : "搜索") { Task { await search() } }.disabled(query.trimmingCharacters(in: .whitespaces).count < 2 || busy) }
+                Section {
+                    TextField("商品名或分享码；留空查看全部", text: $query).textInputAutocapitalization(.never)
+                        .onChange(of: query) { _, _ in results = []; hasMore = false; searched = false; nextOffset = 0 }
+                    Button(busy ? "搜索中…" : "搜索") { Task { await search() } }
+                        .disabled(busy || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && query.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                }
                 Section("已分享的商品") {
-                    if results.isEmpty { Text("输入商品名或朋友给的分享码").foregroundStyle(.secondary) }
+                    if results.isEmpty { Text(searched ? "没有找到可导入的商品" : "留空点搜索可浏览全部可搜索商品；私有商品请输入分享码").foregroundStyle(.secondary) }
                     ForEach(results) { item in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(item.product.brand.isEmpty ? item.product.name : "\(item.product.brand) · \(item.product.name)").font(.headline)
@@ -376,6 +383,7 @@ struct FoodImportView: View {
                             Button("核对一致，导入常用") { Task { await importItem(item) } }
                         }
                     }
+                    if hasMore { Button("加载更多") { Task { await loadMore() } }.disabled(busy) }
                 }
                 Section { Text("导入前请确认品牌、规格和营养表相同。朋友的饮食记录不会导入。").font(.caption).foregroundStyle(.secondary) }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
@@ -384,8 +392,26 @@ struct FoodImportView: View {
     }
     private func search() async {
         busy = true; error = nil; defer { busy = false }
-        do { results = try await store.searchSharedFoods(query.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        do {
+            let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            let page = try await store.searchSharedFoods(clean)
+            guard query.trimmingCharacters(in: .whitespacesAndNewlines) == clean else { return }
+            results = page.items; hasMore = page.hasMore; nextOffset = page.items.count
+            searchedQuery = clean; searched = true
+        }
         catch { self.error = error.localizedDescription }
+    }
+    private func loadMore() async {
+        guard hasMore else { return }
+        busy = true; error = nil; defer { busy = false }
+        do {
+            let page = try await store.searchSharedFoods(searchedQuery, offset: nextOffset)
+            guard query.trimmingCharacters(in: .whitespacesAndNewlines) == searchedQuery else { return }
+            nextOffset += page.items.count
+            let known = Set(results.map(\.code))
+            results.append(contentsOf: page.items.filter { !known.contains($0.code) })
+            hasMore = page.hasMore
+        } catch { self.error = error.localizedDescription }
     }
     private func importItem(_ item: SharedFood) async {
         do { _ = try await store.importSharedFood(item); dismiss() }

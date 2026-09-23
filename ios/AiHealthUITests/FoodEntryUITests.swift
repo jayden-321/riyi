@@ -1,6 +1,19 @@
 import XCTest
 
 final class FoodEntryUITests: XCTestCase {
+    func testImportCanSearchWithEmptyText() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--food-share-ui-test"]
+        app.launch()
+        app.buttons["常用"].tap()
+        app.buttons["导入"].tap()
+        XCTAssertTrue(app.navigationBars["导入商品"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["商品名或分享码；留空查看全部"].exists)
+        XCTAssertTrue(app.buttons["搜索"].isEnabled)
+    }
+
     func testPackageSaveAutomaticallyOpensShareAndShowsBrand() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -72,6 +85,7 @@ final class FoodEntryUITests: XCTestCase {
         fill("商品名称", "非遗黑猪肉老面小笼包")
         fill("整包净含量", "500")
         fill("数量", "20")
+        fill("数量单位", "只")
         fill("每 100 克/毫升能量", "992")
         XCTAssertTrue(app.staticTexts["平均每只约 25 克"].waitForExistence(timeout: 5))
         app.buttons["保存到常用"].tap()

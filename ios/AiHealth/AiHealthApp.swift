@@ -213,8 +213,14 @@ struct TodayView: View {
                                 Text(w.name).font(.title.bold()); Text("已完成 \(w.completedSets) / \(w.totalSets) 组").foregroundStyle(.secondary)
                                 NavigationLink("继续训练") { WorkoutView(store: store, workout: w) }.buttonStyle(.borderedProminent)
                             } else if let (_, scheduled) = store.scheduled("training", date: DayKey.string(Date(), zone: store.settings.timezone)), scheduled.rest {
-                                Text("今天是休息日").font(.title.bold())
-                                Text("训练日历已安排休息，今天没有训练组。按计划恢复即可。").foregroundStyle(.secondary)
+                                if let activity = scheduled.recoveryActivity, !activity.isEmpty {
+                                    Text(activity).font(.title.bold())
+                                    Text("力量训练休息日 · 今日恢复活动").foregroundStyle(.secondary)
+                                } else {
+                                    Text("今天是休息日").font(.title.bold())
+                                    Text("训练日历已安排休息，今天没有训练组。按计划恢复即可。").foregroundStyle(.secondary)
+                                }
+                                NavigationLink("查看／调整今天安排") { ScheduledRestDayView(store: store, date: scheduled.date) }.buttonStyle(.bordered)
                             } else if let p = store.todayPlan, let d = p.days.first {
                                 Text(d.name).font(.title.bold()); Text("\(d.exercises.count) 个动作 · \(d.exercises.reduce(0) { $0 + $1.sets.count }) 组计划").foregroundStyle(.secondary)
                                 Button("开始训练") { store.start(plan: p, day: d) }.buttonStyle(.borderedProminent)

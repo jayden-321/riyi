@@ -68,6 +68,8 @@ struct SharedFood: Decodable, Identifiable {
     var id: String { code }
 }
 
+struct SharedFoodPage: Decodable { var items: [SharedFood]; var hasMore: Bool }
+
 struct FoodShareStatus: Decodable { var code: String; var searchable: Bool }
 
 extension AppStore {
@@ -103,12 +105,10 @@ extension AppStore {
         return try Wire.read(await network.request("/v1/foods/estimate-text", method: "POST", body: Wire.data(Request(description: description)), timeout: 85))
     }
 
-    func searchSharedFoods(_ query: String) async throws -> [SharedFood] {
+    func searchSharedFoods(_ query: String, offset: Int = 0) async throws -> SharedFoodPage {
         guard !isDemo else { throw AppError.message("云端商品搜索需要登录账号") }
-        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) else { return [] }
-        struct Results: Decodable { var items: [SharedFood] }
-        let result: Results = try Wire.read(await network.request("/v1/foods/shared?q=\(encoded)"))
-        return result.items
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) else { throw AppError.message("商品搜索词无法编码") }
+        return try Wire.read(await network.request("/v1/foods/shared?q=\(encoded)&offset=\(offset)"))
     }
 
     func shareFood(_ product: FoodProduct, searchable: Bool) async throws -> String {

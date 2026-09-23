@@ -68,7 +68,14 @@ struct TrainingCalendarView: View {
                 if let active = store.activeWorkout { Section("正在训练") { NavigationLink("\(active.name) · 继续训练") { WorkoutView(store: store,workout: active) } } }
                 Section(store.calendarKey) {
                     if let (_,day) = store.scheduled("training",date: store.calendarKey) {
-                        if day.rest { Label("已安排休息日",systemImage: "leaf") }
+                        if day.rest {
+                            NavigationLink { ScheduledRestDayView(store: store, date: day.date) } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Label(day.recoveryActivity?.isEmpty == false ? day.recoveryActivity! : "已安排休息日", systemImage: "leaf")
+                                    if day.recoveryActivity?.isEmpty == false { Text("力量训练休息日 · 恢复活动").font(.caption).foregroundStyle(.secondary) }
+                                }
+                            }.accessibilityIdentifier("scheduled-rest-day")
+                        }
                         else if let plan = day.plan { NavigationLink { ScheduledTrainingView(store: store,plan: plan,date: day.date) } label: { VStack(alignment: .leading,spacing: 4) { Text(plan.days.first?.name ?? plan.name).font(.headline); Text("计划 · 点击查看动作和训练组").font(.caption).foregroundStyle(.secondary) } } }
                     } else if let legacy = store.plans.first(where: { $0.scheduledDate == store.calendarKey }), legacy.days.count == 1 {
                         NavigationLink { ScheduledTrainingView(store: store, plan: legacy, date: store.calendarKey) } label: { Text(legacy.days[0].name) }
@@ -83,8 +90,52 @@ struct TrainingCalendarView: View {
         }
     }
 }
+struct ScheduledRestDayView: View {
+    @Bindable var store: AppStore
+    let date: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var activity = ""
+    @State private var selectedPlan: Plan?
+    @State private var confirmDelete = false
+    var body: some View {
+        List {
+            Section("\(date) · 力量训练休息日") {
+                TextField("恢复活动，例如饭后散步", text: $activity, axis: .vertical)
+                    .accessibilityIdentifier("rest-recovery-activity")
+                Button("保存恢复活动") { if store.setRestDayRecovery(on: date, activity: activity) { dismiss() } }
+                    .disabled(activity.count > 240)
+                Text("散步等轻活动会显示在今天；这一天仍是力量训练休息日。").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("改为力量训练") {
+                if store.plans.isEmpty {
+                    Button("请 AI 教练安排力量训练") {
+                        store.coachPromptDraft = "请把 \(date) 的休息日改为力量训练日；先确认我的恢复状态，再给出可采用的具体训练安排。"
+                        store.selectedTab = "coach"; dismiss()
+                    }
+                } else {
+                    ForEach(store.plans) { plan in
+                        Button("选用 \(plan.name)") { selectedPlan = plan }
+                    }
+                }
+            }
+            Section {
+                Button("删除今天的休息安排", role: .destructive) { confirmDelete = true }
+            }
+        }.navigationTitle("调整今天安排")
+            .onAppear { activity = store.scheduled("training", date: date)?.1.recoveryActivity ?? "" }
+            .confirmationDialog("删除 \(date) 的休息安排？", isPresented: $confirmDelete) {
+                Button("删除当天安排", role: .destructive) { if store.deleteRestDay(on: date) { dismiss() } }
+            } message: { Text("只删除这一天的日历安排，已有实际训练记录保留。") }
+            .sheet(item: $selectedPlan) { plan in
+                TemplateScheduleView(store: store, plan: plan, initialDate: DayKey.date(date, zone: store.settings.timezone), replaceExisting: true)
+                    .onDisappear { if store.scheduled("training", date: date)?.1.rest == false { dismiss() } }
+            }
+    }
+}
 struct TemplateScheduleView: View {
     @Bindable var store: AppStore; let plan: Plan
+    var initialDate: Date? = nil
+    var replaceExisting = false
     @Environment(\.dismiss) private var dismiss
     @State private var dates: [Date] = []
     @State private var chosen: Set<Int> = []
@@ -137,7 +188,8 @@ struct TemplateScheduleView: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() }.disabled(busy) } }
             .onAppear {
                 guard dates.isEmpty else { return }
-                dates = Array(repeating: store.calendarDate, count: plan.days.count)
+                dates = Array(repeating: initialDate ?? store.calendarDate, count: plan.days.count)
+                replace = replaceExisting
                 let completed = Set(store.workouts.filter { $0.planId == plan.id && $0.status == "completed" }.compactMap { workout in
                     workout.planDayId ?? plan.days.first(where: { $0.name == workout.name })?.id
                 })
@@ -355,6 +407,7 @@ struct CyclePreviewView: View {
     @State private var requestID = newID()
     private var selected: PlanningCycle { var c = cycle; c.days.removeAll { excluded.contains($0.id) }; return c }
     private var duplicateDates: Bool { Set(cycle.days.map(\.date)).count != cycle.days.count }
+    private var invalidRecovery: Bool { cycle.days.contains { ($0.recoveryActivity?.count ?? 0) > 240 || $0.recoveryActivity.map { !$0.isEmpty && $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } == true } }
     private var payloadRevision: String { (try? Wire.data(cycle).base64EncodedString()) ?? "" }
     var body: some View {
         NavigationStack { Form {
@@ -370,7 +423,10 @@ struct CyclePreviewView: View {
                     if store.scheduled(cycle.kind,date: day.date) != nil { Text("这一天已有安排").font(.caption).foregroundStyle(.orange) }
                     DatePicker("安排日期",selection: Binding(get: { DayKey.date(day.date,zone: cycle.timezone) ?? Date() },set: { day.date = DayKey.string($0,zone: cycle.timezone); updateRange() }),displayedComponents: .date)
                     if cycle.kind == "training" {
-                        if day.rest { Label("休息日",systemImage: "leaf") }
+                        if day.rest {
+                            Label("力量训练休息日",systemImage: "leaf")
+                            TextField("恢复活动（可选）", text: Binding(get: { day.recoveryActivity ?? "" }, set: { day.recoveryActivity = $0.isEmpty ? nil : $0 }), axis: .vertical)
+                        }
                         else if let plan = day.plan, let d = plan.days.first { Text(d.name).font(.headline); ForEach(d.exercises) { e in NavigationLink { ExerciseGuideView(store: store,exerciseId: e.exerciseId,name: e.name) } label: { Text("\(e.name) · \(e.sets.count) 组") } } }
                     } else {
                         ForEach($day.meals) { $meal in DisclosureGroup(meal.name) { TextField("餐次名称",text: $meal.name); TextField("食物与份量",text: Binding(get: { meal.foods.joined(separator: "、") },set: { meal.foods = [$0] }),axis: .vertical); Text(meal.preparation).font(.footnote); ForEach(Array(meal.alternatives.enumerated()),id: \.offset) { _,text in Text(text).font(.caption) } } }
@@ -379,8 +435,9 @@ struct CyclePreviewView: View {
             }
             Section("遇到已有安排") { Toggle("替换可修改的计划",isOn: $replace); Text("关闭时只填空白日期。替换保留实际饮食记录；已开始或已结束的训练日期始终保留。整批采用在服务器一次完成。").font(.caption).foregroundStyle(.secondary) }
             if duplicateDates { Section { Text("有重复日期，请调整后再采用。").foregroundStyle(.red) } }
+            if invalidRecovery { Section { Text("恢复活动最多 240 字，不能只填空格。").foregroundStyle(.red) } }
             if let message { Section { Text(message).foregroundStyle(.red) } }
-            Section { Button(busy ? "正在采用…" : "采用所选 \(selected.days.count) 天") { Task { busy = true; defer { busy = false }; do { let result = try await store.adoptCycle(selected,replace: replace,requestId: requestID); dismiss(); store.error = result } catch { message = error.localizedDescription } } }.disabled(busy || selected.days.isEmpty || duplicateDates || cycle.name.isEmpty).accessibilityIdentifier("adopt-cycle") }
+            Section { Button(busy ? "正在采用…" : "采用所选 \(selected.days.count) 天") { Task { busy = true; defer { busy = false }; do { let result = try await store.adoptCycle(selected,replace: replace,requestId: requestID); dismiss(); store.error = result } catch { message = error.localizedDescription } } }.disabled(busy || selected.days.isEmpty || duplicateDates || invalidRecovery || cycle.name.isEmpty).accessibilityIdentifier("adopt-cycle") }
         }.navigationTitle("计划预览").toolbar { ToolbarItem(placement: .cancellationAction) { Button("继续沟通") { dismiss() }.disabled(busy) } }.interactiveDismissDisabled(busy).onChange(of: payloadRevision) { _,_ in requestID = newID() }.onChange(of: replace) { _,_ in requestID = newID() } }
     }
     private func updateRange() { cycle.startDate = cycle.days.map(\.date).min() ?? cycle.startDate; cycle.endDate = cycle.days.map(\.date).max() ?? cycle.endDate }

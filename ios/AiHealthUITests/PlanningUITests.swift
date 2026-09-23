@@ -1,6 +1,25 @@
 import XCTest
 
 final class PlanningUITests: XCTestCase {
+    func testRestDayCanShowRecoveryActivityAndBeDeleted() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--rest-day-ui-test"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["今天是休息日"].waitForExistence(timeout: 10))
+        app.buttons["查看／调整今天安排"].tap()
+        let activity = app.descendants(matching: .any)["rest-recovery-activity"]
+        XCTAssertTrue(activity.waitForExistence(timeout: 5))
+        activity.tap(); activity.typeText("饭后散步")
+        app.buttons["保存恢复活动"].tap()
+        XCTAssertTrue(app.staticTexts["饭后散步"].waitForExistence(timeout: 5))
+        app.buttons["查看／调整今天安排"].tap()
+        app.buttons["删除今天的休息安排"].tap()
+        app.buttons["删除当天安排"].tap()
+        XCTAssertFalse(app.staticTexts["今天是休息日"].exists)
+    }
+
     func testTeamRankingCardOpensWithoutAddingBottomTab() {
         continueAfterFailure = false
         let app = XCUIApplication()

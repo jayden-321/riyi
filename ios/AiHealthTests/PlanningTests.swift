@@ -3,6 +3,21 @@ import SwiftData
 @testable import AiHealth
 
 final class PlanningTests: XCTestCase {
+    @MainActor func testRecoveryActivityAndDeletingOneRestDayPreserveOtherDates() throws {
+        let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: db); store.scope = "local-demo"; store.reload()
+        let first = CycleDay(date: "2026-09-23", rest: true)
+        let second = CycleDay(date: "2026-09-24", rest: true)
+        let cycle = PlanningCycle(name: "休息与恢复", kind: "training", startDate: first.date, endDate: second.date, timezone: "Asia/Shanghai", days: [first, second])
+        XCTAssertTrue(store.save(cycle, kind: "cycle", id: cycle.id))
+        XCTAssertTrue(store.setRestDayRecovery(on: first.date, activity: "饭后散步"))
+        XCTAssertEqual(store.scheduled("training", date: first.date)?.1.recoveryActivity, "饭后散步")
+        XCTAssertTrue(store.deleteRestDay(on: first.date))
+        XCTAssertNil(store.scheduled("training", date: first.date))
+        XCTAssertNotNil(store.scheduled("training", date: second.date))
+        XCTAssertTrue(store.deleteRestDay(on: second.date))
+        XCTAssertTrue(store.cycles.isEmpty)
+    }
     func testLabelCaloriesUnknownAndFuture() {
         var log = MealLog(description: "蛋糕40克",eatenAt: Date().addingTimeInterval(-60),energyMethod: "label",grams: 40,kcalPer100: 250)
         log.calculateEnergy(); XCTAssertEqual(log.energyKcal,100); XCTAssertTrue(log.valid)

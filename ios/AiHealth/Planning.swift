@@ -18,7 +18,7 @@ struct NutritionMeal: Codable, Identifiable {
     var id = newID(); var slot = "snack"; var name: String; var foods: [String]; var preparation: String; var alternatives: [String]
 }
 struct CycleDay: Codable, Identifiable {
-    var id = newID(); var date: String; var rest = false; var plan: Plan?; var meals: [NutritionMeal] = []
+    var id = newID(); var date: String; var rest = false; var recoveryActivity: String? = nil; var plan: Plan?; var meals: [NutritionMeal] = []
 }
 struct PlanningCycle: Codable, Identifiable {
     var id = newID(); var name: String; var kind: String; var startDate: String; var endDate: String; var timezone: String
@@ -120,6 +120,29 @@ extension AppStore {
     var calendarKey: String { DayKey.string(calendarDate, zone: settings.timezone) }
     func scheduled(_ kind: String, date: String) -> (PlanningCycle, CycleDay)? {
         for c in cycles where c.kind == kind { if let d = c.days.first(where: { $0.date == date }) { return (c,d) } }; return nil
+    }
+    @discardableResult func setRestDayRecovery(on date: String, activity: String) -> Bool {
+        let value = activity.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.count <= 240 else { error = "恢复活动最多填写 240 字"; return false }
+        guard let (cycle, day) = scheduled("training", date: date), day.rest,
+              let index = cycle.days.firstIndex(where: { $0.id == day.id }) else { error = "这一天没有可修改的休息安排"; return false }
+        var changed = cycle; changed.days[index].recoveryActivity = value.isEmpty ? nil : value
+        guard save(changed, kind: "cycle", id: cycle.id) else { return false }
+        if !isDemo { Task { await synchronize(showErrors: true) } }
+        return true
+    }
+    @discardableResult func deleteRestDay(on date: String) -> Bool {
+        guard let (cycle, day) = scheduled("training", date: date), day.rest else { error = "这一天没有可删除的休息安排"; return false }
+        if cycle.days.count == 1 {
+            remove(kind: "cycle", id: cycle.id)
+            return scheduled("training", date: date) == nil
+        }
+        var changed = cycle; changed.days.removeAll { $0.id == day.id }
+        changed.startDate = changed.days.map(\.date).min() ?? cycle.startDate
+        changed.endDate = changed.days.map(\.date).max() ?? cycle.endDate
+        guard save(changed, kind: "cycle", id: cycle.id) else { return false }
+        if !isDemo { Task { await synchronize(showErrors: true) } }
+        return true
     }
     func meals(on date: String) -> [MealLog] { mealLogs.filter { DayKey.string($0.eatenAt, zone: settings.timezone) == date }.sorted { $0.eatenAt < $1.eatenAt } }
     func workouts(on date: String) -> [Workout] { workouts.filter { DayKey.string($0.startedAt, zone: settings.timezone) == date } }
