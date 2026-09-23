@@ -20,7 +20,7 @@ struct CoachResult: Codable {
     var dataCutoffAt: Date?; var lastHealthSyncAt: Date?
 }
 struct CoachRun: Codable, Identifiable {
-    var id: String; var kind: String; var targetDate: String; var timezone: String; var status: String
+    var id: String; var requestId: String? = nil; var kind: String; var targetDate: String; var timezone: String; var status: String
     var message: String; var result: CoachResult?; var model: String; var planId: String?; var errorCode: String
     var notifyAt: Date?; var createdAt: Date; var completedAt: Date?
 }
@@ -90,6 +90,7 @@ extension AppStore {
         let owner = scope, client = network
         let requestIdentity = message + "\nanalysis_date=" + (analysisDate ?? "")
         if coachPendingMessage != requestIdentity || coachPendingOwner != owner { coachPendingID = newID(); coachPendingMessage = requestIdentity; coachPendingOwner = owner }
+        let submittedID = coachPendingID
         do {
             var body = ["request_id": coachPendingID, "message": message]
             if let analysisDate { body["analysis_date"] = analysisDate }
@@ -100,10 +101,24 @@ extension AppStore {
             if run.status == "running" { scheduleCoachPolling(); return true }
             coachPendingID = newID(); return true
         } catch {
-            guard scope == owner else { return false }; await loadCoach()
-            if coach?.runs.first(where: { $0.kind == "chat" && $0.message == message && $0.status == "running" }) != nil { scheduleCoachPolling(); return true }
-            if coach?.runs.first?.status == "failed" && coach?.runs.first?.message == message { coachPendingID = newID() }
-            coachError = error.localizedDescription; return false
+            guard scope == owner else { return false }
+            if needsReauthentication { coachError = "云端登录已过期，请重新登录。"; return false }
+            // A lost POST response does not mean the server lost the request.
+            // Check the durable request ID before making another generation.
+            for attempt in 0..<5 {
+                await loadCoach()
+                guard scope == owner else { return false }
+                if let run = coach?.runs.first(where: { $0.requestId == submittedID }) {
+                    if run.status == "running" { coachError = nil; scheduleCoachPolling(); return true }
+                    if run.status == "completed" { coachPendingID = newID(); coachError = nil; return true }
+                    coachPendingID = newID()
+                    coachError = "AI 教练本次未完成，原问题已保留，可稍后重试。"
+                    return false
+                }
+                if attempt < 4 { try? await Task.sleep(for: .seconds(2)) }
+            }
+            coachError = "连接暂时中断，尚未确认教练是否收到；重发时会使用同一请求号，避免重复生成。"
+            return false
         }
     }
     func analyzeCoach(_ kind: String) async {
