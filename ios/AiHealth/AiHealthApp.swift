@@ -48,6 +48,10 @@ import SwiftData
                 state.save(breakfast, kind: "meal", id: breakfast.id)
                 state.save(lunch, kind: "meal", id: lunch.id)
             }
+            if ProcessInfo.processInfo.arguments.contains("--food-share-ui-test") {
+                state.scope = state.network.baseURL.absoluteString + "/ui-test-user"
+                state.reload(); state.selectedTab = "diet"
+            }
             if ProcessInfo.processInfo.arguments.contains("--sleep-ui-test") {
                 state.startDemo(); state.setHealthReading(false); state.settings.timezone = "Asia/Shanghai"
                 let end = Date().addingTimeInterval(-1)

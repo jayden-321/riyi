@@ -113,12 +113,35 @@ extension AppStore {
 
     func shareFood(_ product: FoodProduct, searchable: Bool) async throws -> String {
         guard !isDemo else { throw AppError.message("分享商品需要登录账号") }
-        await synchronize(showErrors: true)
+        try await syncFoodForSharing(product)
         guard !pending.contains(where: { $0.kind == "food" && $0.recordId == product.id }) else { throw AppError.message("请先完成商品同步，再分享") }
         struct Request: Encodable { var productID: String; var searchable: Bool }
         struct Reply: Decodable { var code: String }
         let reply: Reply = try Wire.read(await network.request("/v1/foods/share", method: "POST", body: Wire.data(Request(productID: product.id, searchable: searchable))))
         return reply.code
+    }
+
+    private func syncFoodForSharing(_ product: FoodProduct) async throws {
+        reload()
+        guard let change = pending.first(where: { $0.kind == "food" && $0.recordId == product.id }) else { return }
+        guard change.conflictData == nil else { throw AppError.message("商品与云端记录冲突，请先处理同步冲突") }
+        let owner = scope
+        let baseVersion = change.baseVersion < 0 ? records.first(where: { $0.kind == "food" && $0.recordId == product.id })?.version ?? 0 : change.baseVersion
+        let raw = try JSONSerialization.jsonObject(with: change.payload)
+        let payload: [String: Any] = ["id": change.id, "kind": "food", "record_id": product.id,
+                                      "base_version": baseVersion, "deleted": change.tombstoned, "payload": raw]
+        let reply: SyncReply = try Wire.read(await network.request("/v1/sync", method: "POST", body: JSONSerialization.data(withJSONObject: payload)))
+        guard scope == owner else { throw AppError.message("账号已切换，商品保留在原账号空间") }
+        reload()
+        guard let current = pending.first(where: { $0.id == change.id }) else { return }
+        if reply.status == "conflict" {
+            current.conflictData = try Wire.data(reply.record)
+            try context.save(); reload()
+            throw AppError.message("商品与云端记录冲突，请先处理同步冲突")
+        }
+        if let record = records.first(where: { $0.kind == "food" && $0.recordId == product.id }) { record.version = reply.record.version }
+        context.delete(current)
+        try context.save(); reload()
     }
 
     func foodShareStatus(_ product: FoodProduct) async throws -> FoodShareStatus {
@@ -133,7 +156,7 @@ extension AppStore {
     }
 
     func importSharedFood(_ shared: SharedFood) async throws -> FoodProduct {
-        if let existing = foodProducts.first(where: { $0.originShareCode == shared.code || $0.name == shared.product.name && $0.packageAmount == shared.product.packageAmount && $0.energyPer100 == shared.product.energyPer100 }) {
+        if let existing = foodProducts.first(where: { $0.originShareCode == shared.code || $0.brand == shared.product.brand && $0.name == shared.product.name && $0.packageAmount == shared.product.packageAmount && $0.energyPer100 == shared.product.energyPer100 }) {
             return existing
         }
         var copy = shared.product; copy.id = newID(); copy.source = "imported"; copy.originShareCode = shared.code; copy.verifiedAt = Date()

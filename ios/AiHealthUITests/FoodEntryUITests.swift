@@ -1,6 +1,32 @@
 import XCTest
 
 final class FoodEntryUITests: XCTestCase {
+    func testPackageSaveAutomaticallyOpensShareAndShowsBrand() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--food-share-ui-test"]
+        app.launch()
+        app.buttons["常用"].tap()
+        app.buttons["拍包装，加入常用"].tap()
+        app.buttons["手动填写商品资料"].tap()
+        func fill(_ label: String, _ value: String) {
+            let field = app.textFields[label]
+            XCTAssertTrue(field.waitForExistence(timeout: 5), label)
+            field.tap(); field.typeText(value)
+        }
+        fill("商品名称", "方便面")
+        fill("品牌（识别后请核对）", "盒马")
+        fill("整包净含量", "100")
+        fill("每 100 克/毫升能量", "1900")
+        app.buttons["保存并共享"].tap()
+        XCTAssertTrue(app.navigationBars["分享商品"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["盒马 · 方便面"].exists)
+        let searchable = app.switches["允许其他用户按名称或品牌搜索"]
+        XCTAssertTrue(searchable.exists)
+        XCTAssertEqual(searchable.value as? String, "1")
+    }
+
     func testEntryOrderAndPhotoRoutes() {
         continueAfterFailure = false
         let app = XCUIApplication()

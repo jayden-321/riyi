@@ -155,6 +155,7 @@ struct FoodPackageReviewView: View {
     @State private var eaten = 0.0
     @State private var slot = "breakfast"
     @State private var error: String?
+    @State private var productToShare: FoodProduct?
 
     private var preview: FoodProduct {
         FoodProduct(name: name.trimmingCharacters(in: .whitespacesAndNewlines), brand: brand,
@@ -167,7 +168,8 @@ struct FoodPackageReviewView: View {
             Form {
                 Section("请核对包装") {
                     TextField("商品名称", text: $name)
-                    TextField("品牌（可留空）", text: $brand)
+                    TextField("品牌（识别后请核对）", text: $brand)
+                    Text("AI 会把包装上清楚可见的品牌和商品名称分开填写；未读到品牌时可在这里补录。").font(.caption).foregroundStyle(.secondary)
                     HStack {
                         TextField("整包净含量", value: $packageAmount, format: .number).keyboardType(.decimalPad)
                         Picker("单位", selection: $packageUnit) { Text("克").tag("g"); Text("毫升").tag("ml") }.labelsHidden()
@@ -198,8 +200,11 @@ struct FoodPackageReviewView: View {
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }.navigationTitle("核对商品资料").toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("保存到常用") { save() }.disabled(!preview.valid) }
+                ToolbarItem(placement: .confirmationAction) { Button(store.isDemo ? "保存到常用" : "保存并共享") { save() }.disabled(!preview.valid) }
             }.onAppear { load() }
+                .sheet(item: $productToShare, onDismiss: { onSaved(); dismiss() }) { product in
+                    FoodShareView(store: store, product: product, autoGenerate: true)
+                }
         }
     }
     private func load() {
@@ -219,7 +224,8 @@ struct FoodPackageReviewView: View {
                 error = "商品已存入常用，但这次饮食未保存；请从常用再记录一次。"; return
             }
         }
-        onSaved(); dismiss()
+        if store.isDemo { onSaved(); dismiss() }
+        else { productToShare = product }
     }
 }
 
@@ -241,7 +247,8 @@ struct FoodCommonView: View {
                     ForEach(visible) { product in
                         NavigationLink { FoodRecordView(store: store, product: product, date: date) } label: {
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(product.name).font(.headline)
+                                Text(product.brand.isEmpty ? product.name : "\(product.brand) · \(product.name)").font(.headline)
+                                Text("品牌：\(product.brand.isEmpty ? "未填写" : product.brand)").font(.caption).foregroundStyle(.secondary)
                                 Text(product.amountPerUnit.map { "每\(product.servingUnit)约 \($0.formatted(.number.precision(.fractionLength(0...1)))) \(product.basisUnit == "g" ? "克" : "毫升")" } ?? "按\(product.basisUnit == "g" ? "克" : "毫升")记录").font(.caption).foregroundStyle(.secondary)
                             }
                         }
@@ -269,7 +276,8 @@ struct FoodRecordView: View {
     private var result: (amount: Double, kcal: Double)? { product.calculated(quantity: quantity, unit: unit) }
     var body: some View {
         Form {
-            Section(product.name) {
+            Section(product.brand.isEmpty ? product.name : "\(product.brand) · \(product.name)") {
+                Text("品牌：\(product.brand.isEmpty ? "未填写" : product.brand)").font(.footnote).foregroundStyle(.secondary)
                 Text("整包 \(product.packageAmount.formatted()) \(product.packageUnit == "g" ? "克" : "毫升") · 每 100 \(product.basisUnit == "g" ? "克" : "毫升") \(product.energyPer100.formatted()) \(product.energyUnit == "kJ" ? "千焦" : "千卡")").font(.footnote)
                 Picker("餐次", selection: $slot) { ForEach(mealSlots, id: \.0) { Text($0.1).tag($0.0) } }
                 Picker("数量单位", selection: $unit) {
@@ -280,7 +288,7 @@ struct FoodRecordView: View {
                 if let result { Text("约 \(result.kcal.formatted(.number.precision(.fractionLength(0)))) 千卡 · 按保存的包装数据计算").foregroundStyle(Theme.green) }
                 Button("保存实际饮食") { save() }.disabled(result == nil)
             }
-            Section { Button("分享商品资料") { sharing = true }.disabled(store.isDemo); Text("只分享商品名称、规格和营养值，不分享你的饮食记录。").font(.caption).foregroundStyle(.secondary) }
+            Section { Button("分享商品资料") { sharing = true }.disabled(store.isDemo); Text("只分享商品名称、品牌、规格和营养值，不分享你的饮食记录。").font(.caption).foregroundStyle(.secondary) }
             if let error { Section { Text(error).foregroundStyle(.red) } }
         }.navigationTitle("常用商品").onAppear {
             unit = product.amountPerUnit == nil ? product.basisUnit : product.servingUnit
@@ -297,18 +305,20 @@ struct FoodRecordView: View {
 struct FoodShareView: View {
     @Bindable var store: AppStore
     let product: FoodProduct
+    var autoGenerate = false
     @Environment(\.dismiss) private var dismiss
-    @State private var searchable = false
+    @State private var searchable = true
     @State private var code: String?
     @State private var busy = false
     @State private var error: String?
     var body: some View {
         NavigationStack {
             Form {
-                Section(product.name) {
-                    Text("分享商品规格与营养表，不包含个人饮食记录。")
-                    Toggle("允许其他用户按名称搜索到这款商品", isOn: $searchable)
-                    Button(busy ? "正在生成…" : "生成分享码") { Task { await share() } }.disabled(busy)
+                Section(product.brand.isEmpty ? product.name : "\(product.brand) · \(product.name)") {
+                    Text("品牌：\(product.brand.isEmpty ? "未填写" : product.brand)").font(.footnote).foregroundStyle(.secondary)
+                    Text("保存后默认允许其他用户按名称或品牌搜索。只共享商品名称、品牌、规格与营养表，不包含个人饮食记录；你可关闭搜索或撤销分享。").font(.footnote)
+                    Toggle("允许其他用户按名称或品牌搜索", isOn: $searchable)
+                    Button(busy ? "正在生成…" : code == nil ? "生成分享码" : "保存分享设置") { Task { await share() } }.disabled(busy)
                     if let code {
                         Text(code).textSelection(.enabled).font(.body.monospaced())
                         ShareLink("发送分享码", item: code)
@@ -317,7 +327,16 @@ struct FoodShareView: View {
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }.navigationTitle("分享商品").toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } } }
-             .task { if let state = try? await store.foodShareStatus(product), !state.code.isEmpty { code = state.code; searchable = state.searchable } }
+             .task {
+                 do {
+                     let state = try await store.foodShareStatus(product)
+                     if !state.code.isEmpty { code = state.code; searchable = state.searchable }
+                     else if autoGenerate { await share() }
+                 } catch {
+                     if autoGenerate { await share() }
+                     else { self.error = error.localizedDescription }
+                 }
+             }
         }
     }
     private func share() async {
@@ -327,7 +346,7 @@ struct FoodShareView: View {
     }
     private func revoke(_ value: String) async {
         busy = true; error = nil; defer { busy = false }
-        do { try await store.revokeFoodShare(value); code = nil; searchable = false }
+        do { try await store.revokeFoodShare(value); code = nil; searchable = true }
         catch { self.error = error.localizedDescription }
     }
 }
@@ -347,7 +366,8 @@ struct FoodImportView: View {
                     if results.isEmpty { Text("输入商品名或朋友给的分享码").foregroundStyle(.secondary) }
                     ForEach(results) { item in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(item.product.name).font(.headline)
+                            Text(item.product.brand.isEmpty ? item.product.name : "\(item.product.brand) · \(item.product.name)").font(.headline)
+                            Text("品牌：\(item.product.brand.isEmpty ? "未填写" : item.product.brand)").font(.caption).foregroundStyle(.secondary)
                             Text("整包 \(item.product.packageAmount.formatted()) \(item.product.packageUnit == "g" ? "克" : "毫升") · 每 100 \(item.product.basisUnit == "g" ? "克" : "毫升") \(item.product.energyPer100.formatted()) \(item.product.energyUnit == "kJ" ? "千焦" : "千卡")").font(.caption).foregroundStyle(.secondary)
                             Button("核对一致，导入常用") { Task { await importItem(item) } }
                         }
