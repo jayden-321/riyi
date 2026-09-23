@@ -222,9 +222,93 @@ extension WorkoutExercise {
     }
 }
 
+private struct WorkoutInsightStats: Codable {
+    let elapsedMinutes: Double?
+    let completedVolumeKg: Double
+    let completedSets: Int
+    let skippedSets: Int
+}
+private struct WorkoutHeartSet: Codable, Identifiable {
+    let exercise: String
+    let setId: String
+    let pointCount: Int
+    let pointMeanBpm: Double
+    let maxBpm: Double
+    var id: String { setId }
+}
+private struct WorkoutHeartSummary: Codable {
+    let pointCount: Int
+    let pointMeanBpm: Double
+    let minBpm: Double
+    let maxBpm: Double
+    let setWindows: [WorkoutHeartSet]
+    let setWindowsTruncated: Bool
+}
+private struct WorkoutInsights: Codable {
+    let stats: WorkoutInsightStats
+    let heartRate: WorkoutHeartSummary?
+    let dataCutoffAt: Date
+}
+private struct WorkoutInsightsSection: View {
+    @Bindable var store: AppStore
+    let workout: Workout
+    @State private var insights: WorkoutInsights?
+    @State private var loading = false
+    @State private var loadError: String?
+    var body: some View {
+        Section("本次训练统计") {
+            let completed = insights?.stats.completedSets ?? workout.completedSets
+            let skipped = insights?.stats.skippedSets ?? workout.exercises.flatMap(\.sets).filter { $0.status == "skipped" }.count
+            Text("完成 \(completed) 组 · 跳过 \(skipped) 组")
+            if let minutes = insights?.stats.elapsedMinutes ?? workout.finishedAt.map({ workout.elapsedSeconds(at: $0) / 60 }) {
+                Text("实际运动 \(Int(minutes.rounded())) 分钟（已扣除暂停）")
+            }
+            if workout.activity == nil {
+                let volume = insights?.stats.completedVolumeKg ?? workout.completedVolumeKg
+                Text("实际容量 \((volume / 1000).formatted(.number.precision(.fractionLength(0...2)))) 吨")
+            }
+            if let heart = insights?.heartRate {
+                Text("心率采样均值 \(Int(heart.pointMeanBpm.rounded())) 次/分 · 最高 \(Int(heart.maxBpm.rounded())) · 最低 \(Int(heart.minBpm.rounded()))")
+                Text("共 \(heart.pointCount) 个采样点；这是采样点均值，不代表连续心率。")
+                    .font(.caption).foregroundStyle(.secondary)
+                ForEach(heart.setWindows) { window in
+                    Text("\(window.exercise) · 第 \(setNumber(window.setId)) 组：均值 \(Int(window.pointMeanBpm.rounded()))，最高 \(Int(window.maxBpm.rounded())) 次/分")
+                        .font(.caption)
+                }
+                if heart.setWindowsTruncated { Text("仅展示前 30 个有心率采样的组。") .font(.caption).foregroundStyle(.secondary) }
+            } else {
+                Text("暂无可关联的手表心率采样；缺失不等于零。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if !store.isDemo {
+                Button(loading ? "正在更新…" : "更新心率统计") { Task { await load() } }.disabled(loading)
+            }
+            if let loadError { Text(loadError).font(.caption).foregroundStyle(.secondary) }
+            if let cutoff = insights?.dataCutoffAt { Text("数据截至 \(cutoff.formatted(date: .abbreviated, time: .shortened))").font(.caption2).foregroundStyle(.secondary) }
+        }.task(id: workout.id) { await load() }
+    }
+    private func setNumber(_ id: String) -> Int {
+        for exercise in workout.exercises {
+            if let index = exercise.sets.firstIndex(where: { $0.id == id }) { return index + 1 }
+        }
+        return 0
+    }
+    private func load() async {
+        guard store.signedIn && !store.isDemo else { return }
+        loading = true; defer { loading = false }
+        do {
+            let data = try await store.network.request("/v1/workouts/\(workout.id)/insights")
+            insights = try Wire.read(data)
+            loadError = nil
+        } catch { loadError = "云端心率统计暂不可用，已保留本机训练记录。" }
+    }
+}
+
 struct WorkoutView: View {
     @Bindable var store: AppStore; @State var workout: Workout; @State private var endConfirm = false
     @State private var phoneHealthConfirm = false
+    @State private var shareImage: WorkoutShareImage?
+    @State private var sharing = false
     var active: Bool { workout.status == "in_progress" }
     var paused: Bool { workout.pausedAt != nil }
     var lastCompleted: Date? { workout.exercises.flatMap(\.sets).compactMap(\.completedAt).max() }
@@ -261,6 +345,7 @@ struct WorkoutView: View {
                     Text("只计已完成的正式组；热身、自重及辅助重量不计入。每只重量按所选单只或双只累计。").font(.caption2).foregroundStyle(.secondary)
                 } }
             }
+            if !active { WorkoutInsightsSection(store: store, workout: workout) }
             ForEach(workout.exercises.indices, id: \.self) { index in
                 if let group = (workout.groups ?? []).first(where: { $0.exerciseIds.contains(workout.exercises[index].id) }) {
                     if group.exerciseIds.first == workout.exercises[index].id {
@@ -296,6 +381,10 @@ struct WorkoutView: View {
                 TextField("备注", text: $workout.feedback.note, axis: .vertical)
             }.disabled(!active)
             if workout.status == "completed" {
+                Section {
+                    Button(sharing ? "正在生成分享图…" : "分享训练总结") { Task { await prepareShare() } }
+                        .disabled(sharing)
+                }
                 Section("Apple 健康") {
                     if store.healthWorkoutSaved(workout.id) { Text("已写入 Apple 健康").foregroundStyle(Theme.green) }
                     else if store.workoutHealth.hasPairedWatch {
@@ -307,8 +396,9 @@ struct WorkoutView: View {
             }
             if active {
                 Section {
-                    Button("停止并保存训练") {
-                        if workout.exercises.flatMap(\.sets).contains(where: { $0.status == "pending" }) { endConfirm = true }
+                    let hasPendingSets = workout.exercises.flatMap(\.sets).contains { $0.status == "pending" }
+                    Button(workout.activity != nil ? "完成本次运动" : hasPendingSets ? "停止并保存训练" : "完成训练") {
+                        if hasPendingSets { endConfirm = true }
                         else { finish() }
                     }.font(.headline)
                 }
@@ -333,8 +423,22 @@ struct WorkoutView: View {
             .confirmationDialog("确认本次没有用日益手表记录？", isPresented: $phoneHealthConfirm) {
                 Button("由手机写入") { Task { await store.writeWorkoutToHealth(workout) } }
             } message: { Text("如果手表正在保存同一次训练，请等待同步，避免重复。") }
+            .sheet(item: $shareImage) { image in WorkoutShareSheet(image: image.image) }
     }
     func finish() { store.controlWorkout(id: workout.id, action: workout.activity == nil ? "finish_workout" : "finish_activity") }
+    private func prepareShare() async {
+        sharing = true; defer { sharing = false }
+        var heart: WorkoutShareHeart?
+        if store.signedIn && !store.isDemo,
+           let data = try? await store.network.request("/v1/workouts/\(workout.id)/insights"),
+           let details: WorkoutInsights = try? Wire.read(data), let value = details.heartRate {
+            heart = WorkoutShareHeart(mean: value.pointMeanBpm, maximum: value.maxBpm)
+        }
+        let renderer = ImageRenderer(content: WorkoutShareCard(workout: workout, heart: heart))
+        renderer.scale = 3
+        if let image = renderer.uiImage { shareImage = WorkoutShareImage(image: image) }
+        else { store.error = "分享图暂时无法生成，请稍后重试" }
+    }
 }
 
 struct SetRow: View {

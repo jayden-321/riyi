@@ -133,7 +133,7 @@ struct TimedActivity: Codable {
     }
 }
 let sportOptions: [(code: String, title: String, icon: String)] = [
-    ("strength", "力量训练", "dumbbell"), ("pilates", "普拉提", "figure.pilates"),
+    ("strength", "力量训练", "dumbbell"), ("hiit", "HIIT 高强度间歇", "figure.mixed.cardio"), ("pilates", "普拉提", "figure.pilates"),
     ("swimming", "游泳", "figure.pool.swim"), ("running", "跑步", "figure.run"),
     ("cycling", "骑行", "bicycle"), ("walking", "散步", "figure.walk"),
     ("yoga", "瑜伽", "figure.yoga"), ("hiking", "徒步", "figure.hiking"),

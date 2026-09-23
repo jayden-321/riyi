@@ -2,6 +2,7 @@ import Foundation
 
 struct CoachProfile: Codable {
     var goal = ""; var experience = ""; var daysPerWeek = 0; var sessionMinutes = 0
+    var exercisesPerSession = 0; var setsPerExercise = 0
     var equipment = ""; var limitations = ""; var allergies = ""; var foodPreferences = ""; var cookingConditions = ""
 }
 struct CoachSettings: Codable {

@@ -2,6 +2,16 @@ import XCTest
 @testable import AiHealth
 
 final class CoachConversationTests: XCTestCase {
+    func testAccountTrainingCountsRoundTripWithoutLosingExistingSplit() throws {
+        var settings = CoachSettings()
+        settings.profile.goal = "胸背肩腿循环"
+        settings.profile.exercisesPerSession = 4
+        settings.profile.setsPerExercise = 4
+        let restored: CoachSettings = try Wire.read(Wire.data(settings))
+        XCTAssertEqual(restored.profile.goal, "胸背肩腿循环")
+        XCTAssertEqual(restored.profile.exercisesPerSession, 4)
+        XCTAssertEqual(restored.profile.setsPerExercise, 4)
+    }
     func testRequestIDCorrelatesNewRunsWithoutBreakingCachedHistory() throws {
         var run = CoachRun(id: newID(), kind: "chat", targetDate: "2026-09-23", timezone: "Asia/Shanghai",
                            status: "running", message: "安排训练", result: nil, model: "test",

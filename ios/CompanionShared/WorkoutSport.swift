@@ -17,6 +17,7 @@ func healthWorkoutConfiguration(for workout: Workout) -> HKWorkoutConfiguration 
             configuration.swimmingLocationType = .openWater
         }
     case "pilates": configuration.activityType = .pilates; configuration.locationType = .indoor
+    case "hiit": configuration.activityType = .highIntensityIntervalTraining; configuration.locationType = .unknown
     case "yoga": configuration.activityType = .yoga; configuration.locationType = .indoor
     case "hiking": configuration.activityType = .hiking; configuration.locationType = .outdoor
     case "rowing": configuration.activityType = .rowing; configuration.locationType = .unknown

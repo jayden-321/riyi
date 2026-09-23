@@ -169,7 +169,15 @@ struct CoachRunCard: View {
                         ForEach(plan.days) { day in
                             Text("\(day.name) · \(day.exercises.count) 个动作").font(.subheadline)
                             ForEach(day.exercises) { exercise in
-                                NavigationLink { ExerciseGuideView(store: store, exerciseId: exercise.exerciseId, name: exercise.name) } label: { Label(exercise.name, systemImage: "figure.strengthtraining.traditional") }.font(.subheadline)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    NavigationLink { ExerciseGuideView(store: store, exerciseId: exercise.exerciseId, name: exercise.name) } label: { Label(exercise.name, systemImage: "figure.strengthtraining.traditional") }.font(.subheadline)
+                                    Text("\(ExerciseGuide.find(id: exercise.exerciseId, name: exercise.name)?.equipmentGroup ?? "器械待确认") · \(exercise.sets.count) 组")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    Text(exercise.sets.enumerated().map { index, set in
+                                        "\(index + 1)组 \(set.weight > 0 ? "\(set.weight.formatted()) kg" : "重量待确认") × \(set.reps)"
+                                    }.joined(separator: " · "))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                         }
                         Text(run.planId == nil ? "计划草稿 · 可修改后保存" : "已自动加入训练计划").font(.caption).foregroundStyle(Theme.green)
@@ -222,6 +230,10 @@ struct CoachSettingsView: View {
                 TextField("训练经验", text: $settings.profile.experience)
                 Stepper(settings.profile.daysPerWeek == 0 ? "每周天数 · 待补充" : "每周 \(settings.profile.daysPerWeek) 天", value: $settings.profile.daysPerWeek, in: 0...7)
                 Stepper(settings.profile.sessionMinutes == 0 ? "单次时长 · 待补充" : "单次 \(settings.profile.sessionMinutes) 分钟", value: $settings.profile.sessionMinutes, in: 0...240, step: 15)
+                Stepper(settings.profile.exercisesPerSession == 0 ? "每次动作数 · 由教练安排" : "每次 \(settings.profile.exercisesPerSession) 个动作", value: $settings.profile.exercisesPerSession, in: 0...8)
+                Stepper(settings.profile.setsPerExercise == 0 ? "每个动作组数 · 由教练安排" : "每个动作 \(settings.profile.setsPerExercise) 组", value: $settings.profile.setsPerExercise, in: 0...8)
+                Text("这两项保存在云端账号资料中；改为 3 个动作后，后续力量计划按新设置生成。0 表示不固定。")
+                    .font(.caption).foregroundStyle(.secondary)
                 TextField("器械与训练场地", text: $settings.profile.equipment, axis: .vertical)
                 TextField("运动限制或伤痛（无也请说明）", text: $settings.profile.limitations, axis: .vertical)
             }

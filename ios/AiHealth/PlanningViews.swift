@@ -643,11 +643,21 @@ struct CyclePreviewView: View {
                     if cycle.kind == "training" {
                         if day.sessions != nil {
                             ForEach(Array(day.trainingBlocks.enumerated()), id: \.element.id) { index, block in
-                                HStack {
-                                    Text("\(index + 1). \(block.name) · \(sportTitle(block.sport))")
-                                    Spacer()
-                                    Button("编辑") { editingTrainingBlock = PreviewTrainingBlockEditor(dayID: day.id, blockID: block.id, plan: block.editorPlan) }.buttonStyle(.borderless)
-                                    Button { removeTrainingBlock(block.id, from: day.id) } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless).tint(.red)
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Text("\(index + 1). \(block.name) · \(sportTitle(block.sport))")
+                                        Spacer()
+                                        Button("编辑") { editingTrainingBlock = PreviewTrainingBlockEditor(dayID: day.id, blockID: block.id, plan: block.editorPlan) }.buttonStyle(.borderless)
+                                        Button { removeTrainingBlock(block.id, from: day.id) } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless).tint(.red)
+                                    }
+                                    if let exerciseDay = block.plan?.days.first {
+                                        Text("\(exerciseDay.exercises.count) 个动作 · \(exerciseDay.exercises.reduce(0) { $0 + $1.sets.count }) 组")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                        ForEach(exerciseDay.exercises) { exercise in
+                                            Text("\(exercise.name) · \(ExerciseGuide.find(id: exercise.exerciseId, name: exercise.name)?.equipmentGroup ?? "器械待确认") · \(exercise.sets.map { $0.weight > 0 ? "\($0.weight.formatted())kg×\($0.reps)" : "重量待确认×\($0.reps)" }.joined(separator: " / "))")
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
                                 }
                             }
                             Button("添加训练项目") { editingTrainingBlock = PreviewTrainingBlockEditor(dayID: day.id, blockID: nil, plan: Plan.draft()) }

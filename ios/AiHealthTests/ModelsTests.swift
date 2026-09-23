@@ -18,6 +18,7 @@ final class ModelsTests: XCTestCase {
         let legacy = Plan.starter()
         XCTAssertEqual(legacy.resolvedCategory, "strength")
         XCTAssertEqual(healthWorkoutConfiguration(for: Workout(plan: legacy, day: legacy.days[0])).activityType, .traditionalStrengthTraining)
+        XCTAssertEqual(healthWorkoutConfiguration(for: Workout(activity: TimedActivity(name: "HIIT", targetMinutes: 25, sport: "hiit"))).activityType, .highIntensityIntervalTraining)
     }
     @MainActor func testStartedPlanCannotBeDeletedAndUnusedStarterCanBeRemoved() throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))

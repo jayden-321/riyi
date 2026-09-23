@@ -5,7 +5,9 @@ import Observation
     static let shared = WatchStore()
     var replica = CompanionReplica()
     var error: String?
+    var restAlertStatus: String?
     var health = WatchWorkoutHealth()
+    @ObservationIgnored private let restAlerts = WatchRestAlerts()
     @ObservationIgnored private let transport = CompanionTransport()
     @ObservationIgnored private let file: URL
     @ObservationIgnored private var retry: Timer?
@@ -67,6 +69,9 @@ import Observation
         }
         #endif
         transport.receive = { [weak self] in self?.receive($0) }
+        restAlerts.onPermissionStatus = { [weak self] allowed in
+            self?.restAlertStatus = allowed ? nil : "请在手表设置允许日益通知，休息结束才会播放提示音"
+        }
         transport.ready = { [weak self] in self?.flush() }
         transport.failure = { [weak self] in self?.error = $0 }
         health.samples = { [weak self] binding, session, samples, anchor in self?.enqueue(binding: binding, session: session, samples: samples, anchor: anchor) ?? false }
@@ -130,6 +135,8 @@ import Observation
     func flush() {
         guard !demo else { return }
         if let snapshot = replica.snapshot { health.reconcile(binding: snapshot.binding, workout: displayWorkout) }
+        restAlerts.prepareAuthorization(for: displayWorkout)
+        restAlerts.reconcile(workout: displayWorkout)
         transport.send(CompanionPacket(request: true), latest: true)
         guard let binding = replica.snapshot?.binding else { return }
         // One event in flight guarantees dependency order even if WC delivery paths race.
@@ -148,6 +155,8 @@ import Observation
             health.reconcile(binding: snapshot.binding, workout: displayWorkout)
             startRequested = false
         }
+        restAlerts.prepareAuthorization(for: displayWorkout)
+        restAlerts.reconcile(workout: displayWorkout)
         if packet.receipt != nil || packet.heartAck != nil || packet.startReceipt != nil { flush() }
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
