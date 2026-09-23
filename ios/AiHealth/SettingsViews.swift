@@ -51,6 +51,11 @@ struct AccountView: View {
     var body: some View {
         NavigationStack {
             List {
+                if !store.isDemo {
+                    Button { store.showReauthentication = true } label: {
+                        Label(store.needsReauthentication ? "登录已过期 · 重新登录" : "重新登录云端账号", systemImage: "person.crop.circle.badge.checkmark")
+                    }.accessibilityIdentifier("account-reauth")
+                }
                 NavigationLink { profilePage } label: { Label("我的健康档案", systemImage: "person.crop.circle") }.accessibilityIdentifier("account-profile")
                 NavigationLink { healthPage } label: { Label("Apple 健康", systemImage: "heart.text.clipboard") }.accessibilityIdentifier("account-health")
                 NavigationLink { imagesPage } label: { Label("动作图片", systemImage: "figure.strengthtraining.traditional") }.accessibilityIdentifier("account-images")

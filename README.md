@@ -17,13 +17,15 @@
 5. 选择 `AiHealth` scheme 和配对 iPhone，构建并安装手机 App；再选择 `AiHealthWatch` scheme 和真实 Apple Watch，构建并安装手表 App。检查两份签名产物的 Team ID 与开发证书指纹一致，同时分别检查手机、手表描述文件覆盖对应的 Bundle ID 和设备。若 Xcode 已随手机 App 自动安装 Watch App，仍需在手表端确认它存在并能启动。
 6. 分别在 iPhone 和 Apple Watch 上启动「日益」，确认手机端能使用本地记录、两端能完成一次演示训练同步。若要验证真实心率采集，请本人在 Watch 上授权健康权限后再单独测试。
 
-项目默认连接 `https://health.qyos.top`。不登录也能使用「先体验本地记录」；若要使用云端功能，请自己注册账号。Apple 健康读取、健康上传和 AI 分析分别由本人在 App 中授权。请勿使用仓库作者的账号或密钥。客户端仓库不需要在你的电脑上部署数据库或后端。
+项目默认连接 `https://health.qyos.top`。本次试用请在欢迎页点击「已有账号？登录」，使用你自己的云端账号进入，**不要选择「先体验本地记录」**；没有账号时可自行注册。Apple 健康读取、健康上传和 AI 分析分别由本人在 App 中授权。请勿使用仓库作者的账号或密钥。客户端仓库不需要在你的电脑上部署数据库或后端。
+
+当前客户端构建号为 **24**，包含训练／休息日日历、Apple 健康睡眠与体征、AI 教练、饮食文字与拍照粗估和新图标。饮食记录默认使用当前时刻；文字或照片粗估要求本人在 App 中同意 AI 使用数据，返回的范围需核对，份量不清时可先保存为“热量待估算”。云端登录过期时会提示重新登录，“我的”也有固定入口；只能重新登录同一账号，原本机记录会保留。清空教练聊天后，定时训练／睡眠分析仍可从「分析记录」单独查看。文字粗估接口已部署在默认服务器；此公开仓库仅含客户端。
 
 换用自己的 Bundle ID 会创建独立的 App 数据空间，不会自动迁移其他安装版的本地记录。测试时不要卸载已有的同名 App，先确认 Bundle ID 与数据空间。
 
 ## 给 Codex 的任务
 
-> 请阅读本仓库 README 和 `ios/project.yml`，协助我用自己的 Apple 账号 Personal Team 把「日益」**同时安装到我的 iPhone 和已配对的 Apple Watch**，两端必须使用**同一个 Team 和同一张 Apple Development 签名证书**。先检查 Mac、Xcode、两台设备和签名条件；在我的本地副本中修改 `RIYI_IOS_BUNDLE_ID` 与共用的 `DEVELOPMENT_TEAM`，重新生成工程，确认手机和手表目标均由该 Team 自动签名，并保留 HealthKit。两端 App ID 不同，各自的描述文件应分别匹配相应 App ID 与设备；请核对签名产物的 Team ID 和证书指纹。先验证构建，再确保 Xcode Device Hub 发现并登记两台设备、两端均启用开发者模式。分别安装并启动手机和手表 App，检查本地记录与演示训练同步；不能只凭 BUILD SUCCEEDED 或手机已装就称为完成。默认后端是 `https://health.qyos.top`，只验证其可达性，不修改或部署服务端。不要索取我的 Apple 密码，不使用作者证书，不把个人签名配置或密钥推回 GitHub。遇到阻碍请给出实际报错和下一步，最后分别报告 iPhone 与 Watch 的构建、签名、安装、启动和联动验证结果。
+> 请先 `git pull --ff-only origin main` 更新日益客户端源码，并保护我本机未提交的修改。阅读 README 与 `ios/project.yml`，用我自己的 Apple 账号 Personal Team 给 iPhone 和已配对的 Apple Watch 安装构建 **24** 的「日益」：两端必须使用同一个 Team、同一张 Apple Development 证书，各自的描述文件覆盖对应 Bundle ID 与设备。在本地填写独有的 `RIYI_IOS_BUNDLE_ID` 和共用 `DEVELOPMENT_TEAM`，重新运行 `xcodegen generate`，再用 Xcode 构建、安装并启动两端。手机欢迎页选择「已有账号？登录」，使用我自己的云端账号和默认服务器 `https://health.qyos.top`；**不要选择本地演示**，也不要使用仓库作者账号。请让我在设备上亲自输入密码并授予 Apple 健康、云端上传和 AI 权限。登录后核对云端数据、今天训练或休息日、手表收到的同日状态、饮食文字粗估、拍照识别及重新登录入口。只凭 BUILD SUCCEEDED 或已安装不能算完成；分别报告两端签名、安装、启动、同步与实际限制。不要部署或修改服务器，不索取 Apple 密码，不把个人签名配置、密钥或健康记录推回 GitHub。
 
 ## 第三方资料
 

@@ -1,6 +1,22 @@
 import XCTest
 
 final class SleepUITests: XCTestCase {
+    func testUnrequestedSleepShowsOneTimeAuthorizationReminder() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--sleep-ui-test", "--sleep-auth-reminder-ui-test"]
+        app.launch()
+        let card = app.buttons["sleep-summary"]
+        XCTAssertTrue(card.waitForExistence(timeout: 15))
+        for _ in 0..<4 where !card.isHittable { app.swipeUp() }
+        card.tap()
+        let reminder = app.alerts["授权本机睡眠读取"]
+        XCTAssertTrue(reminder.waitForExistence(timeout: 8))
+        XCTAssertTrue(reminder.buttons["去授权"].exists)
+        reminder.buttons["稍后"].tap()
+        XCTAssertTrue(app.buttons["sleep-auth-reminder-action"].exists)
+    }
     func testWeekMonthAndSelectedNight() {
         continueAfterFailure = false
         let app = XCUIApplication()

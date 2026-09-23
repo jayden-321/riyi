@@ -94,11 +94,17 @@ struct WatchTrainingView: View {
                         if let offer = store.todayOffer {
                             Text(offer.day.name).font(.system(size: 16, weight: .semibold)).lineLimit(2)
                             Text("今日训练 · \(offer.date)").font(.caption2)
+                        } else if store.todayStatus?.kind == "rest" {
+                            Text("今天是休息日").font(.headline)
+                            Text("今天没有训练任务，按计划恢复").font(.caption)
+                        } else if store.todayStatus?.kind == "unplanned" {
+                            Text("今天没有安排训练").font(.headline)
+                            Text("可在 iPhone 训练日历中安排").font(.caption)
                         } else {
                             Text("等待今日训练任务").font(.headline)
                             Text("请保持与 iPhone 连接").font(.caption)
                         }
-                        todayStartButton
+                        if store.todayOffer != nil { todayStartButton }
                     }
                     Button { showStatus = true } label: {
                         Text(store.error != nil ? "同步遇到问题，点此查看" : store.replica.displayMessage)

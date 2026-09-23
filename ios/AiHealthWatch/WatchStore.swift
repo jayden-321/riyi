@@ -13,7 +13,12 @@ import Observation
     @ObservationIgnored var startRequested = false
     var displayWorkout: Workout? {
         guard let snapshot = replica.snapshot, let workout = replica.projected else { return nil }
-        return CompanionCore.isOvernightStale(workout, zone: snapshot.timezone ?? workout.timezone, now: Date()) ? nil : workout
+        return CompanionCore.isCurrentWorkout(workout, zone: snapshot.timezone ?? workout.timezone, now: Date()) ? workout : nil
+    }
+    var todayStatus: CompanionDayStatus? {
+        guard let status = replica.snapshot?.today,
+              status.date == CompanionCore.dayKey(Date(), zone: status.timezone) else { return nil }
+        return status
     }
     var todayOffer: CompanionStartOffer? {
         guard let offer = replica.snapshot?.offer,
@@ -41,6 +46,15 @@ import Observation
             if FileManager.default.fileExists(atPath: file.path) { replica = try Wire.read(Data(contentsOf: file)) }
         } catch { self.error = "训练记录读取失败，请保留 App 数据" }
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--watch-rest-demo") {
+            demo = true
+            let plan = Plan.starter()
+            var old = Workout(plan: plan, day: plan.days[0])
+            old.startedAt = Date().addingTimeInterval(-86400); old.status = "cancelled"
+            let today = CompanionDayStatus(date: CompanionCore.dayKey(Date(), zone: old.timezone), timezone: old.timezone, kind: "rest")
+            replica = CompanionReplica(snapshot: CompanionSnapshot(binding: "synthetic", revision: 1, workout: old, today: today))
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--watch-demo") {
             demo = true
             let plan = Plan.starter(); var workout = Workout(plan: plan, day: plan.days[0])

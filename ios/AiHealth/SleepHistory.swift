@@ -17,6 +17,11 @@ struct SleepNight: Identifiable, Sendable, Codable {
     var cloud = false
     var cutoff: Date?
 }
+struct CloudSleepHistory: Codable {
+    let timezone: String
+    let lastHealthSyncAt: Date?
+    let nights: [SleepNight]
+}
 
 /// Date assignment uses complete source-local episodes, including following-day fragments.
 /// Unknown nights/stages remain absent; duplicate and overlapping samples are unioned.

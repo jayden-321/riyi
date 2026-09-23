@@ -1,6 +1,13 @@
 import XCTest
 
 final class PlanningUITests: XCTestCase {
+    func testTodayShowsScheduledRestInsteadOfEmptyPlanPrompt() {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--rest-day-ui-test"]; app.launch()
+        XCTAssertTrue(app.staticTexts["今天是休息日"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["从一份训练计划开始"].exists)
+    }
     func testExistingPlanCanBeArrangedForToday() {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString

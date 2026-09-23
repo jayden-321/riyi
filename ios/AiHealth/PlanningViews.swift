@@ -195,6 +195,8 @@ struct ScheduledTrainingView: View {
 struct DietView: View {
     @Bindable var store: AppStore
     @State private var editing: MealLog?; @State private var planning = false
+    @State private var common = false; @State private var textEntry = false; @State private var photoEntry = false
+    @State private var camera = false; @State private var capturedImage: UIImage?
     private var logs: [MealLog] { store.meals(on: store.calendarKey) }
     private var knownCalories: Double { logs.compactMap(\.energyKcal).reduce(0,+) }
     private var unknown: Int { logs.filter { $0.energyKcal == nil }.count }
@@ -204,13 +206,23 @@ struct DietView: View {
             List {
                 Section { PlanningCalendar(store: store,kind: "diet") }
                 Section {
-                    Button("记一笔饮食 · 加餐 / 饮料") { editing = makeLog() }.disabled(future).accessibilityIdentifier("add-meal-log")
+                    HStack {
+                        Button { common = true } label: { Label("常用", systemImage: "star") }.disabled(future)
+                        Spacer()
+                        Button { textEntry = true } label: { Label("文字", systemImage: "text.cursor") }.disabled(future).accessibilityIdentifier("add-meal-log")
+                        Spacer()
+                        Button {
+                            if UIImagePickerController.isSourceTypeAvailable(.camera) { camera = true }
+                            else { photoEntry = true }
+                        } label: { Label("拍照", systemImage: "camera") }.disabled(future)
+                    }.buttonStyle(.bordered)
                     Button("和 AI 安排饮食周期") { planning = true }
                 }
                 Section("\(store.calendarKey) · 实际摄入") {
                     Text("已知热量小计 \(knownCalories.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
                     Text("\(logs.count - unknown) 笔有热量，\(unknown) 笔待估算。计划未吃不计入实际；小计可能不完整。").font(.caption).foregroundStyle(.secondary)
                     if logs.contains(where: { $0.energyMethod == "estimated" }) { Text("小计包含估算值。").font(.caption).foregroundStyle(.secondary) }
+                    if logs.contains(where: { $0.energyMethod == "estimated_range" }) { Text("另有照片粗估范围，未计入上方小计。").font(.caption).foregroundStyle(.secondary) }
                     ForEach(logs) { log in Button { editing = log } label: { MealLogRow(log: log) }.buttonStyle(.plain).swipeActions { Button("删除",role: .destructive) { store.remove(kind: "meal",id: log.id) } } }
                 }
                 Section("当天食谱计划") {
@@ -224,14 +236,23 @@ struct DietView: View {
                     NavigationLink("饮水记录、补记与提醒") { WaterView(store: store) }
                 }
             }.navigationTitle("饮食").sheet(item: $editing) { log in MealLogEditor(store: store,log: log) }.sheet(isPresented: $planning) { PlanningRequestView(store: store,kind: "diet") }
+                .sheet(isPresented: $common) { FoodCommonView(store: store, date: store.calendarDate) }
+                .sheet(isPresented: $textEntry) { FoodTextEntryView(store: store, date: store.calendarDate) }
+                .sheet(isPresented: $photoEntry, onDismiss: { capturedImage = nil }) { FoodOutsidePhotoView(store: store, date: store.calendarDate, initialImage: capturedImage) }
+                .fullScreenCover(isPresented: $camera, onDismiss: { if capturedImage != nil { photoEntry = true } }) { FoodCameraPicker { capturedImage = $0 }.ignoresSafeArea() }
         }
     }
-    private func makeLog() -> MealLog { MealLog(description: "",eatenAt: min(store.calendarDate,Date()),timezone: store.settings.timezone) }
+    private func makeLog() -> MealLog { MealLog(description: "",eatenAt: mealEntryTime(for: store.calendarDate, zone: store.settings.timezone),timezone: store.settings.timezone) }
     private func water(_ amount: Int) { store.addWater(amount,date: DayKey.calendar(store.settings.timezone).isDate(store.calendarDate,inSameDayAs: Date()) ? Date() : store.calendarDate) }
 }
 struct MealLogRow: View {
     let log: MealLog
-    var body: some View { VStack(alignment: .leading,spacing: 5) { HStack { Text(mealSlots.first { $0.0 == log.slot }?.1 ?? "饮食").font(.headline); Spacer(); Text(log.eatenAt,format: .dateTime.hour().minute()).font(.caption) }; Text(log.description); Text(log.energyKcal.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) 千卡 · \(log.energyMethod == "label" ? "按标签计算" : log.energyMethod == "estimated" ? "估算" : "手动填写")" } ?? "热量待估算").font(.caption).foregroundStyle(.secondary) } }
+    private var energyText: String {
+        if let kcal = log.energyKcal { return "\(kcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡 · \(log.energyMethod == "label" ? "按标签计算" : log.energyMethod == "estimated" ? "估算" : "手动填写")" }
+        if let low = log.estimateMinKcal, let high = log.estimateMaxKcal { return "约 \(low.formatted(.number.precision(.fractionLength(0))))–\(high.formatted(.number.precision(.fractionLength(0)))) 千卡 · AI 粗估" }
+        return "热量待估算"
+    }
+    var body: some View { VStack(alignment: .leading,spacing: 5) { HStack { Text(mealSlots.first { $0.0 == log.slot }?.1 ?? "饮食").font(.headline); Spacer(); Text(log.eatenAt,format: .dateTime.hour().minute()).font(.caption) }; Text(log.description); Text(energyText).font(.caption).foregroundStyle(.secondary) } }
 }
 struct MealPlanDetail: View {
     @Bindable var store: AppStore; let meal: NutritionMeal; let date: String
@@ -241,7 +262,7 @@ struct MealPlanDetail: View {
             Section("\(date) · \(meal.name)") { Text(meal.foods.joined(separator: "、")); Text(meal.preparation); ForEach(Array(meal.alternatives.enumerated()),id: \.offset) { _,text in Text(text).font(.footnote) } }
             Section("实际记录") {
                 if let log = store.mealLogs.first(where: { $0.planMealId == meal.id }) { MealLogRow(log: log); Button("修改实际记录") { editing = log } }
-                else { Text("尚未记录，计划不代表已经吃过。").foregroundStyle(.secondary); Button("按计划记录 / 修改实际吃的") { editing = MealLog(id: stableID("meal/" + meal.id),slot: meal.slot,description: meal.foods.joined(separator: "、"),eatenAt: min(DayKey.date(date,zone: store.settings.timezone) ?? Date(),Date()),timezone: store.settings.timezone,planMealId: meal.id) }.disabled(date > DayKey.string(Date(),zone: store.settings.timezone)) }
+                else { Text("尚未记录，计划不代表已经吃过。").foregroundStyle(.secondary); Button("按计划记录 / 修改实际吃的") { editing = MealLog(id: stableID("meal/" + meal.id),slot: meal.slot,description: meal.foods.joined(separator: "、"),eatenAt: mealEntryTime(for: DayKey.date(date,zone: store.settings.timezone) ?? Date(), zone: store.settings.timezone),timezone: store.settings.timezone,planMealId: meal.id) }.disabled(date > DayKey.string(Date(),zone: store.settings.timezone)) }
             }
             Section { Button("和教练讨论这一餐") { store.coachPromptDraft = "请调整我已采用的 \(date) \(meal.name)："; store.selectedTab = "coach" } }
         }.navigationTitle("餐次详情").sheet(item: $editing) { log in MealLogEditor(store: store,log: log) }
@@ -249,6 +270,11 @@ struct MealPlanDetail: View {
 }
 struct MealLogEditor: View {
     @Bindable var store: AppStore; @State var log: MealLog; @Environment(\.dismiss) private var dismiss
+    @State private var photoEstimate = false
+    @State private var photoSaved = false
+    @State private var estimatingText = false
+    @State private var estimateNote: String?
+    @State private var aiEstimateDescription = ""
     private var calculated: MealLog { var value = log; value.calculateEnergy(); return value }
     var body: some View {
         NavigationStack { Form {
@@ -258,15 +284,47 @@ struct MealLogEditor: View {
                 DatePicker("发生时间",selection: $log.eatenAt,in: ...Date())
             }
             Section("热量（选填）") {
-                Picker("记录方式",selection: $log.energyMethod) { Text("暂不填写").tag("unknown"); Text("按标签与克数计算").tag("label"); Text("填写已知热量").tag("manual"); Text("填写估算热量").tag("estimated") }
+                Button(estimatingText ? "正在估算…" : "按文字请 AI 粗估") { Task { await estimateText() } }
+                    .disabled(estimatingText || log.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("拍照请 AI 识别并粗估") { photoEstimate = true }.accessibilityIdentifier("meal-ai-photo")
+                if let estimateNote { Text(estimateNote).font(.caption).foregroundStyle(.secondary) }
+                Picker("记录方式",selection: $log.energyMethod) { Text("热量待估算，先保存").tag("unknown"); Text("按标签与克数计算").tag("label"); Text("填写已知热量").tag("manual"); Text("填写估算热量").tag("estimated"); Text("手动填写粗估范围").tag("estimated_range") }
                 if log.energyMethod == "label" {
                     TextField("实际吃了多少克",value: $log.grams,format: .number).keyboardType(.decimalPad)
                     TextField("标签每 100 克多少千卡",value: $log.kcalPer100,format: .number).keyboardType(.decimalPad)
                     if let kcal = calculated.energyKcal { Text("本次 \(kcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡") }
+                } else if log.energyMethod == "estimated_range" {
+                    Text("范围可手动填写，也可由上方 AI 粗估带入。没有可靠数值时可选“热量待估算，先保存”。").font(.caption).foregroundStyle(.secondary)
+                    TextField("粗估下限（千卡）", value: $log.estimateMinKcal, format: .number).keyboardType(.decimalPad)
+                    TextField("粗估上限（千卡）", value: $log.estimateMaxKcal, format: .number).keyboardType(.decimalPad)
+                    TextField("估算依据", text: Binding(get: { log.nutritionSource ?? "" }, set: { log.nutritionSource = $0 }), axis: .vertical)
                 } else if log.energyMethod != "unknown" { TextField("本次总热量（千卡）",value: $log.energyKcal,format: .number).keyboardType(.decimalPad) }
-                Text("千焦 ÷ 4.184 = 千卡。份量或配方不清楚时可先留空；本版本不自动识别食物或照片，不会把未知值算成 0。").font(.caption).foregroundStyle(.secondary)
+                Text("千焦 ÷ 4.184 = 千卡。拍照识别会生成待确认结果；份量或配方不清楚时可保留粗估范围或留空，不会把未知值算成 0。").font(.caption).foregroundStyle(.secondary)
             }
-        }.navigationTitle("饮食记录").toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("保存") { if store.save(calculated,kind: "meal",id: log.id) { dismiss() } }.disabled(!calculated.valid).accessibilityIdentifier("save-meal-log") } } }
+        }.navigationTitle("饮食记录").toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("保存") { if store.save(calculated,kind: "meal",id: log.id) { dismiss() } }.disabled(!calculated.valid).accessibilityIdentifier("save-meal-log") } }
+            .sheet(isPresented: $photoEstimate, onDismiss: { if photoSaved { dismiss() } }) {
+                FoodOutsidePhotoView(store: store, date: log.eatenAt, existingLog: log) { photoSaved = true }
+            }
+            .onChange(of: log.description) { _, value in
+                if !aiEstimateDescription.isEmpty && value != aiEstimateDescription {
+                    log.energyMethod = "unknown"; log.estimateMinKcal = nil; log.estimateMaxKcal = nil
+                    log.nutritionSource = nil; estimateNote = "食物描述已改变，请重新估算。"
+                    aiEstimateDescription = ""
+                }
+            }
+        }
+    }
+    private func estimateText() async {
+        estimatingText = true; estimateNote = nil; defer { estimatingText = false }
+        do {
+            let result = try await store.estimateFoodText(log.description.trimmingCharacters(in: .whitespacesAndNewlines))
+            if let (low, high) = result.usableRange {
+                log.energyMethod = "estimated_range"; log.estimateMinKcal = low; log.estimateMaxKcal = high
+                log.nutritionSource = "AI 文字粗估：" + String(result.estimateBasis.prefix(280))
+                aiEstimateDescription = log.description
+                estimateNote = "AI 粗估约 \(low.formatted(.number.precision(.fractionLength(0))))–\(high.formatted(.number.precision(.fractionLength(0)))) 千卡；请核对份量后保存。"
+            } else { log.energyMethod = "unknown"; estimateNote = result.estimateBasis.isEmpty ? "份量信息不足，已改为热量待估算，可先保存。" : result.estimateBasis }
+        } catch { store.error = error.localizedDescription }
     }
 }
 

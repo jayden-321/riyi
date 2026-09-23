@@ -24,7 +24,11 @@ struct CoachRun: Codable, Identifiable {
     var message: String; var result: CoachResult?; var model: String; var planId: String?; var errorCode: String
     var notifyAt: Date?; var createdAt: Date; var completedAt: Date?
 }
-struct CoachState: Codable { var settings = CoachSettings(); var runs: [CoachRun] = []; var archivedChats: Int? }
+struct CoachState: Codable {
+    var settings = CoachSettings(); var runs: [CoachRun] = []; var archivedChats: Int?
+    var conversationRuns: [CoachRun] { runs.filter { $0.kind == "chat" } }
+    var analysisRuns: [CoachRun] { runs.filter { $0.kind != "chat" } }
+}
 
 extension AppStore {
     var coach: CoachState? { coachOwner == scope ? coachState : nil }
@@ -125,9 +129,16 @@ extension AppStore {
         defer { coachBusy = false }
         let owner = scope, client = network
         do {
-            _ = try await client.request("/v1/coach/conversation/" + (restore ? "restore" : "clear"), method: "POST", body: Data("{}".utf8))
+            struct Reply: Decodable { var affected: Int }
+            let reply: Reply = try Wire.read(await client.request("/v1/coach/conversation/" + (restore ? "restore" : "clear"), method: "POST", body: Data("{}".utf8)))
             guard scope == owner else { return }
             coachPendingID = newID(); coachPendingMessage = ""
+            if !restore, var visible = coach {
+                visible.runs.removeAll { $0.kind == "chat" }
+                visible.archivedChats = (visible.archivedChats ?? 0) + reply.affected
+                coachState = visible; coachOwner = owner
+                if let data = try? Wire.data(visible) { UserDefaults.standard.set(data, forKey: "coach.\(owner)") }
+            }
             await loadCoach()
         } catch { if scope == owner { coachError = error.localizedDescription } }
     }

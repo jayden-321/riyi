@@ -43,6 +43,12 @@ struct CompanionSnapshot: Codable {
     var workout: Workout?
     var offer: CompanionStartOffer? = nil
     var timezone: String? = nil
+    var today: CompanionDayStatus? = nil
+}
+struct CompanionDayStatus: Codable, Equatable {
+    var date: String
+    var timezone: String
+    var kind: String // rest, training, or unplanned
 }
 struct CompanionHeartBatch: Codable, Identifiable {
     var id = newID()
@@ -71,10 +77,12 @@ enum CompanionCore {
     static func lastActivity(_ workout: Workout) -> Date {
         max(workout.startedAt, workout.exercises.flatMap(\.sets).flatMap { [$0.startedAt, $0.completedAt] }.compactMap { $0 }.max() ?? workout.startedAt)
     }
-    /// A cross-midnight session remains valid while the user is still active.
+    /// A new calendar day always gets its own task, including on the Watch.
     static func isOvernightStale(_ workout: Workout, zone: String, now: Date) -> Bool {
-        workout.status == "in_progress" && dayKey(workout.startedAt, zone: zone) < dayKey(now, zone: zone) &&
-        now.timeIntervalSince(lastActivity(workout)) >= 90 * 60 && dayKey(lastActivity(workout), zone: zone) < dayKey(now, zone: zone)
+        workout.status == "in_progress" && dayKey(workout.startedAt, zone: zone) < dayKey(now, zone: zone)
+    }
+    static func isCurrentWorkout(_ workout: Workout, zone: String, now: Date) -> Bool {
+        dayKey(workout.startedAt, zone: zone) == dayKey(now, zone: zone)
     }
     static func startOutcome(_ request: CompanionStartRequest, offer: CompanionStartOffer?, binding: String,
                              active: Workout?, now: Date) -> String {
@@ -208,6 +216,10 @@ struct CompanionReplica: Codable {
             message = events.isEmpty && hearts.isEmpty ? "已连接 iPhone" : "账号已切换；旧账号待同步记录已隔离"
         }
         snapshot = incoming
+        if incoming.workout == nil && events.isEmpty && hearts.isEmpty && pendingStart == nil {
+            if incoming.today?.kind == "rest" { message = "今日休息，已与 iPhone 同步" }
+            else if incoming.today?.kind == "unplanned" { message = "今日暂无训练安排，已与 iPhone 同步" }
+        }
     }
     var displayMessage: String {
         if message.contains("（conflict）") { return "该组已有更新，请按当前进度继续" }

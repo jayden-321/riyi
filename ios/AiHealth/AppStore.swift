@@ -4,6 +4,7 @@ import Observation
 
 @MainActor @Observable final class AppStore {
     @ObservationIgnored var companionChanged: (() -> Void)?
+    @ObservationIgnored var companionRefreshRequested: (() -> Void)?
     @ObservationIgnored var companionStarted: (() -> Void)?
     @ObservationIgnored let container: ModelContainer
     @ObservationIgnored let context: ModelContext
@@ -15,6 +16,9 @@ import Observation
     @ObservationIgnored private var settingsRevision = 0
     var healthHistoryWindow: HealthHistoryWindow = .year
     var selectedTab = "today"
+    var needsReauthentication = false
+    var showReauthentication = false
+    var reauthenticating = false
     var sleepRevision = 0
     var calendarDate = Date()
     var coachPromptDraft = ""
@@ -53,6 +57,7 @@ import Observation
         return nil
     }
     var healthReadingEnabled = false
+    var sleepAuthReminderShown = false
     var localHealthReadAt: Date?
     var localHealthSampleCount = 0
     var recentHealthSamples: [HealthSample] = []
@@ -83,7 +88,7 @@ import Observation
     }
     var activeWorkout: Workout? { workouts.first { $0.status == "in_progress" } }
     var lastOvernightClosure: String?
-    /// End an abandoned previous-day session at its last recorded action, preserving every set.
+    /// End a previous-day session at its last recorded action, preserving every set.
     func expireOvernightWorkouts(now: Date = Date()) {
         for original in workouts where CompanionCore.isOvernightStale(original, zone: settings.timezone, now: now) {
             var ended = original; ended.status = "cancelled"; ended.finishedAt = CompanionCore.lastActivity(original); ended.autoExpiredAt = now; ended.restUntil = nil
@@ -97,9 +102,33 @@ import Observation
         healthStorage = Task.detached { HealthStorage(modelContainer: container) }
         let url = UserDefaults.standard.string(forKey: "serverURL") ?? Network.defaultURL
         network = Network(baseURL: URL(string: url) ?? URL(string: "http://localhost:18089")!)
+        observeSessionExpiry()
         if let t = network.tokens { scope = network.baseURL.absoluteString + "/" + t.userId }
         else if UserDefaults.standard.bool(forKey: "localDemo") { scope = "local-demo" }
         restoreSettings(); reload(); Task { [weak self] in await self?.refreshLocalHealth() }
+    }
+    private func observeSessionExpiry() {
+        network.onSessionExpired = { [weak self] in
+            guard let self, self.signedIn, !self.isDemo else { return }
+            self.needsReauthentication = true
+            self.showReauthentication = true
+        }
+    }
+    func reauthenticate(email: String, password: String) async -> Bool {
+        guard signedIn, !isDemo, !reauthenticating else { return false }
+        let owner = scope
+        guard owner.hasPrefix(network.baseURL.absoluteString + "/") else { error = "账号空间与服务器地址不一致"; return false }
+        let userID = String(owner.dropFirst(network.baseURL.absoluteString.count + 1))
+        reauthenticating = true
+        defer { reauthenticating = false }
+        do {
+            try await network.authenticate(email: email, password: password, register: false, expectedUserID: userID)
+            guard scope == owner else { return false }
+            needsReauthentication = false; showReauthentication = false
+            error = nil
+            Task { await synchronize(showErrors: false) }
+            return true
+        } catch { self.error = error.localizedDescription; return false }
     }
     func values<T: Decodable>(_ kind: String) -> [T] { records.filter { $0.kind == kind && !$0.tombstoned }.compactMap { try? Wire.read($0.payload) } }
     func reload() {
@@ -114,9 +143,12 @@ import Observation
     private func restoreSettings() {
         coachPollTask?.cancel(); coachPollTask = nil; coachPollOwner = ""; coachPollRunID = ""
         coachState = nil; coachOwner = ""; coachError = nil; selectedTab = "today"
+        sleepAuthReminderShown = false
         settings = CloudSettings()
         if let data = UserDefaults.standard.data(forKey: "settings.\(scope)"), let value: CloudSettings = try? Wire.read(data) { settings = value }
-        healthReadingEnabled = UserDefaults.standard.object(forKey: "healthReading.\(scope)") as? Bool ?? settings.healthConsent
+        // Cloud upload consent belongs to the account. A newly signed app has
+        // its own HealthKit authorization and must not infer local read access.
+        healthReadingEnabled = UserDefaults.standard.bool(forKey: "healthReading.\(scope)")
         localHealthReadAt = UserDefaults.standard.object(forKey: "healthReadAt.\(scope)") as? Date
         healthHistoryWindow = HealthHistoryWindow(rawValue: UserDefaults.standard.string(forKey: "healthWindow.\(scope)") ?? "year") ?? .year
         healthUploadPaused = UserDefaults.standard.bool(forKey: "healthUploadPaused.\(scope)")
@@ -130,7 +162,8 @@ import Observation
         syncing = true; defer { syncing = false }
         do {
             let client = Network(baseURL: base); try await client.authenticate(email: email, password: password, register: register)
-            network = client; scope = base.absoluteString + "/" + client.tokens!.userId
+            network = client; observeSessionExpiry(); scope = base.absoluteString + "/" + client.tokens!.userId
+            needsReauthentication = false; showReauthentication = false
             UserDefaults.standard.set(base.absoluteString, forKey: "serverURL"); UserDefaults.standard.set(false, forKey: "localDemo")
             cloudSummary = nil; localSummary = nil; report = nil; lastSync = nil; restoreSettings(); reload(); Task { [weak self] in await self?.refreshLocalHealth() }
             settings = try Wire.read(await client.request("/v1/settings")); persistSettings()
@@ -138,6 +171,7 @@ import Observation
         } catch { self.error = error.localizedDescription }
     }
     func startDemo() {
+        needsReauthentication = false; showReauthentication = false
         scope = "local-demo"; UserDefaults.standard.set(true, forKey: "localDemo"); restoreSettings(); reload(); Task { [weak self] in await self?.refreshLocalHealth() }
         if !records.contains(where: { $0.kind == "plan" }) { let p = Plan.starter(); save(p, kind: "plan", id: p.id) }
     }
@@ -146,7 +180,7 @@ import Observation
         Notifications.shared.cancel()
         coachPollTask?.cancel(); coachPollTask = nil; coachPollOwner = ""; coachPollRunID = ""
         coachState = nil; coachOwner = ""; coachError = nil; selectedTab = "today"
-        network.forget(); UserDefaults.standard.set(false, forKey: "localDemo"); scope = ""; cloudSummary = nil; localSummary = nil; report = nil
+        network.forget(); needsReauthentication = false; showReauthentication = false; UserDefaults.standard.set(false, forKey: "localDemo"); scope = ""; cloudSummary = nil; localSummary = nil; report = nil
         lastSync = nil; settings = CloudSettings(); healthReadingEnabled = false; localHealthReadAt = nil; localHealthSampleCount = 0; recentHealthSamples = []; reload()
     }
     func logout() async {

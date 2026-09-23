@@ -1,6 +1,16 @@
 import XCTest
 
 final class WatchStartUITests: XCTestCase {
+    func testRestDayHidesOldEndedWorkoutAndStartButton() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--watch-rest-demo"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["今天是休息日"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["训练已结束"].exists)
+        XCTAssertFalse(app.buttons["开始今天训练"].exists)
+        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "休息日不展示昨天训练"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
     func testTodayTaskStartsOnWatchAndReturnsWorkout() {
         continueAfterFailure = false
         let app = XCUIApplication()

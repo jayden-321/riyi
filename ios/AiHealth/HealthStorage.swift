@@ -251,6 +251,12 @@ actor HealthStorage {
         try saveCache(scope: scope, kind: "sleep_cloud_cache", entry: SleepDayCache(date: date, timezone: zone, night: night))
         try modelContext.save()
     }
+    func saveCloudNights(scope: String, zone: String, dates: [String], nights: [String: SleepNight]) throws {
+        for date in dates {
+            try saveCache(scope: scope, kind: "sleep_cloud_cache", entry: SleepDayCache(date: date, timezone: zone, night: nights[date]))
+        }
+        try modelContext.save()
+    }
     /// Cached daily aggregates avoid rereading the raw sleep rows when a date is opened again.
     func sleepHistory(scope: String, zone: String, days: [Date], since: Date, now: Date) throws -> [SleepNight] {
         let calendar = DayKey.calendar(zone)

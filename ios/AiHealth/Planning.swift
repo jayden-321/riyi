@@ -33,14 +33,38 @@ struct PlanningCycle: Codable, Identifiable {
 struct MealLog: Codable, Identifiable {
     var id = newID(); var slot = "snack"; var description = ""; var eatenAt = Date(); var timezone = TimeZone.current.identifier
     var planMealId: String?; var energyKcal: Double?; var energyMethod = "unknown"; var grams: Double?; var kcalPer100: Double?
-    mutating func calculateEnergy() { if energyMethod == "unknown" { energyKcal = nil; grams = nil; kcalPer100 = nil }; if energyMethod == "label", let grams, let kcalPer100 { energyKcal = grams * kcalPer100 / 100 } }
+    var foodProductId: String?; var nutritionSource: String?
+    var quantity: Double?; var quantityUnit: String?
+    var energyBasisUnit: String?; var estimateMinKcal: Double?; var estimateMaxKcal: Double?
+    mutating func calculateEnergy() {
+        if energyMethod == "unknown" {
+            energyKcal = nil; grams = nil; kcalPer100 = nil; estimateMinKcal = nil; estimateMaxKcal = nil
+            foodProductId = nil; nutritionSource = nil; energyBasisUnit = nil
+        } else if energyMethod == "estimated_range" {
+            energyKcal = nil; grams = nil; kcalPer100 = nil; foodProductId = nil; energyBasisUnit = nil
+        } else {
+            estimateMinKcal = nil; estimateMaxKcal = nil
+            if energyMethod == "label", let grams, let kcalPer100 { energyKcal = grams * kcalPer100 / 100 }
+            if energyMethod != "label" { grams = nil; kcalPer100 = nil; foodProductId = nil; nutritionSource = nil; energyBasisUnit = nil }
+        }
+    }
     var valid: Bool {
         guard !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, description.utf8.count <= 2000, eatenAt <= Date(), mealSlots.contains(where: { $0.0 == slot }) else { return false }
-        if energyMethod == "unknown" { return energyKcal == nil }
+        if energyMethod == "estimated_range" { guard energyKcal == nil, grams == nil, kcalPer100 == nil, let low = estimateMinKcal, let high = estimateMaxKcal else { return false }; return low.isFinite && high.isFinite && (0...30000).contains(low) && (low...30000).contains(high) && nutritionSource?.isEmpty == false }
+        if energyMethod == "unknown" { return energyKcal == nil && estimateMinKcal == nil && estimateMaxKcal == nil }
+        if estimateMinKcal != nil || estimateMaxKcal != nil { return false }
         guard let energyKcal, energyKcal.isFinite, (0...30000).contains(energyKcal) else { return false }
         if energyMethod == "label" { guard let grams, let kcalPer100, grams.isFinite, kcalPer100.isFinite, (0.1...10000).contains(grams), (0...1000).contains(kcalPer100) else { return false }; return abs(energyKcal - grams * kcalPer100 / 100) < 0.01 }
         return ["manual", "estimated"].contains(energyMethod)
     }
+}
+
+func mealEntryTime(for selectedDate: Date, zone: String, now: Date = Date()) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: zone) ?? .current
+    if calendar.isDate(selectedDate, inSameDayAs: now) { return now }
+    let clock = calendar.dateComponents([.hour, .minute, .second], from: now)
+    return min(calendar.date(bySettingHour: clock.hour ?? 12, minute: clock.minute ?? 0, second: clock.second ?? 0, of: selectedDate) ?? selectedDate, now)
 }
 struct AdoptCycleRequest: Codable { var requestId: String; var cycle: PlanningCycle; var replace: Bool; var versions: [String: Int] }
 struct AdoptCycleReply: Codable { var records: [CloudRecord]; var adopted: Int; var kept: Int }

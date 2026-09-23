@@ -1,4 +1,15 @@
 .DS_Store
+.env
+.env.*
+!.env.example
+signing/
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
+*.ipa
+*.xcarchive/
+*.xcresult/
 .build/
 build/
 DerivedData/

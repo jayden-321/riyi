@@ -34,6 +34,11 @@ import SwiftData
                 let cycle = PlanningCycle(name: "界面验证食谱",kind: "diet",startDate: date,endDate: date,timezone: state.settings.timezone,days: [CycleDay(date: date,meals: [meal])])
                 state.save(cycle,kind: "cycle",id: cycle.id)
             }
+            if ProcessInfo.processInfo.arguments.contains("--session-expired-ui-test") {
+                state.scope = state.network.baseURL.absoluteString + "/ui-test-user"
+                state.reload(); state.selectedTab = "coach"
+                state.needsReauthentication = true; state.showReauthentication = true
+            }
             if ProcessInfo.processInfo.arguments.contains("--sleep-ui-test") {
                 state.startDemo(); state.setHealthReading(false); state.settings.timezone = "Asia/Shanghai"
                 let end = Date().addingTimeInterval(-1)
@@ -55,6 +60,13 @@ import SwiftData
                 state.startDemo(); state.selectedTab = "training"
                 var plan = Plan.starter(); plan.scheduledDate = DayKey.string(Date(), zone: state.settings.timezone)
                 state.save(plan, kind: "plan", id: plan.id)
+            }
+            if ProcessInfo.processInfo.arguments.contains("--rest-day-ui-test") {
+                state.startDemo(); state.selectedTab = "today"
+                let date = DayKey.string(Date(), zone: state.settings.timezone)
+                let cycle = PlanningCycle(name: "休息日验证", kind: "training", startDate: date, endDate: date,
+                                          timezone: state.settings.timezone, days: [CycleDay(date: date, rest: true)])
+                state.save(cycle, kind: "cycle", id: cycle.id)
             }
             if ProcessInfo.processInfo.arguments.contains("--watch-pair-test") {
                 state.startDemo(); state.selectedTab = "training"
@@ -90,6 +102,7 @@ struct RootView: View {
             } else { WelcomeView(store: store) }
         }
         .alert("提示", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) { Button("知道了") { store.error = nil } } message: { Text(store.error ?? "") }
+        .sheet(isPresented: $store.showReauthentication) { ReauthenticationView(store: store) }
         .task(id: store.scope) { await refresh() }
         .onChange(of: phase) { _, value in if value == .active { Task { await refresh() } } }
     }
@@ -99,6 +112,7 @@ struct RootView: View {
         refreshingScope = owner
         defer { if refreshingScope == owner { refreshingScope = nil } }
         store.expireOvernightWorkouts()
+        store.companionRefreshRequested?()
         async let coach: () = store.loadCoach()
         await health.syncAll()
         await health.activate()
@@ -106,6 +120,31 @@ struct RootView: View {
         await store.synchronize(showErrors: false)
         await store.refreshLocalHealth()
         await coach
+        if store.scope == owner { store.companionRefreshRequested?() }
+    }
+}
+
+struct ReauthenticationView: View {
+    @Bindable var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var email = ""
+    @State private var password = ""
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("重新登录云端账号") {
+                    Text("登录已过期。用原账号重新登录后，继续同步这台设备上的记录。")
+                    Text("服务器：\(store.network.baseURL.absoluteString)").font(.caption).foregroundStyle(.secondary)
+                    TextField("原账号邮箱", text: $email).textContentType(.username).keyboardType(.emailAddress).textInputAutocapitalization(.never).accessibilityIdentifier("reauth-email")
+                    AccountSecureField(placeholder: "密码", text: $password, contentType: .password).frame(height: 36)
+                    Button("重新登录") {
+                        dismissInputKeyboard()
+                        Task { if await store.reauthenticate(email: email, password: password) { dismiss() } }
+                    }.disabled(store.reauthenticating || email.isEmpty || password.isEmpty).accessibilityIdentifier("reauth-submit")
+                }
+                Section { Text("本机记录和待上传数据会保留在原账号空间。登录其他账号不会覆盖它们。") .font(.footnote).foregroundStyle(.secondary) }
+            }.navigationTitle("云端账号").toolbar { Button("稍后") { dismiss() } }
+        }
     }
 }
 
@@ -159,6 +198,9 @@ struct TodayView: View {
                             if let w = store.activeWorkout {
                                 Text(w.name).font(.title.bold()); Text("已完成 \(w.completedSets) / \(w.totalSets) 组").foregroundStyle(.secondary)
                                 NavigationLink("继续训练") { WorkoutView(store: store, workout: w) }.buttonStyle(.borderedProminent)
+                            } else if let (_, scheduled) = store.scheduled("training", date: DayKey.string(Date(), zone: store.settings.timezone)), scheduled.rest {
+                                Text("今天是休息日").font(.title.bold())
+                                Text("训练日历已安排休息，今天没有训练组。按计划恢复即可。").foregroundStyle(.secondary)
                             } else if let p = store.todayPlan, let d = p.days.first {
                                 Text(d.name).font(.title.bold()); Text("\(d.exercises.count) 个动作 · \(d.exercises.reduce(0) { $0 + $1.sets.count }) 组计划").foregroundStyle(.secondary)
                                 Button("开始训练") { store.start(plan: p, day: d) }.buttonStyle(.borderedProminent)
@@ -179,7 +221,10 @@ struct TodayView: View {
                         metric("昨日 HRV", key: "hrv_sdnn", unit: "ms", icon: "waveform.path.ecg")
                     }
                     if let date = store.localHealthReadAt { Text("最近本机健康读取：\(date.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary) }
-                    if !store.healthReadingEnabled { Text("到「我的 → Apple 健康」授权读取，无需连接服务器。").font(.footnote).foregroundStyle(Theme.muted) }
+                    if !store.healthReadingEnabled {
+                        NavigationLink("本机健康尚未授权 · 去查看睡眠读取权限") { SleepDetailView(store: store, health: health) }
+                            .font(.footnote).foregroundStyle(Theme.green)
+                    }
                     Surface {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack { Label("AI 每日报告", systemImage: "sparkles").font(.headline); Spacer(); if store.report?.stale == true { Text("数据已更新").font(.caption).foregroundStyle(.orange) } }

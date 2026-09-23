@@ -10,13 +10,16 @@ struct CoachView: View {
     @State private var planningKind = "training"
     @FocusState private var inputFocused: Bool
     private var canChat: Bool { !store.isDemo && store.settings.aiConsent }
-    private var runs: [CoachRun] { Array((store.coach?.runs ?? []).reversed()) }
+    private var runs: [CoachRun] { Array((store.coach?.conversationRuns ?? []).reversed()) }
     private var conversationRevision: String { runs.map { $0.id + $0.status }.joined(separator: "/") }
     var body: some View {
         NavigationStack {
             ScrollViewReader { reader in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        if store.needsReauthentication {
+                            Button("云端登录已过期 · 重新登录") { store.showReauthentication = true }.buttonStyle(.borderedProminent)
+                        }
                         if store.isDemo {
                             Text("登录云端账号后，即可与教练讨论训练、生成计划和每日食谱。").foregroundStyle(.secondary)
                         } else if !store.settings.aiConsent {
@@ -39,7 +42,7 @@ struct CoachView: View {
                             if store.coachBusy || runs.contains(where: { $0.status == "running" }) {
                                 HStack(spacing: 10) { ProgressView(); Text("正在等待 AI 教练安排，完成后会自动显示…").font(.subheadline).foregroundStyle(Theme.muted) }.padding(.vertical, 8)
                             }
-                            if let error = store.coachError { Text(error).font(.footnote).foregroundStyle(.red) }
+                            if !store.needsReauthentication, let error = store.coachError { Text(error).font(.footnote).foregroundStyle(.red) }
                         }
                         Color.clear.frame(height: 1).id("coach-bottom")
                     }.padding(20)
@@ -65,8 +68,8 @@ struct CoachView: View {
                             Button("制定训练计划") { message = "请根据我的记录帮我制定训练计划。缺少的信息先问我。"; inputFocused = true }
                             Button("今日食谱") { sendMessage(recipePrompt) }.disabled(store.coachBusy)
                             Button("分析次日训练") { Task { await store.analyzeCoach("fitness") } }.disabled(store.coachBusy)
-                            Button("分析今晚睡眠") { Task { await store.analyzeCoach("sleep") } }.disabled(store.coachBusy)
                             NavigationLink("教练思路与资料来源") { CoachSourcesView() }
+                            NavigationLink("分析记录") { CoachAnalysisHistoryView(store: store) }
                             Divider()
                             Button("清空对话", role: .destructive) { confirmClear = true }.disabled(store.coachBusy || !runs.contains(where: { $0.kind == "chat" }))
                             if (store.coach?.archivedChats ?? 0) > 0 { Button("恢复已清空对话") { Task { await store.clearCoachConversation(restore: true) } }.disabled(store.coachBusy) }
@@ -79,7 +82,7 @@ struct CoachView: View {
             .onAppear { receiveDraft() }
             .onChange(of: store.coachPromptDraft) { _,_ in receiveDraft() }
             .confirmationDialog("清空教练对话？", isPresented: $confirmClear, titleVisibility: .visible) {
-                Button("清空对话", role: .destructive) { Task { await store.clearCoachConversation() } }.accessibilityIdentifier("confirm-clear-coach")
+                Button("清空对话", role: .destructive) { message = ""; Task { await store.clearCoachConversation() } }.accessibilityIdentifier("confirm-clear-coach")
                 Button("取消", role: .cancel) { }
             } message: { Text("聊天将移入已清空记录，可从菜单恢复。已保存的计划、健康档案和定时分析保留；新对话不再引用这些旧聊天。") }
         }
@@ -122,6 +125,22 @@ struct CoachView: View {
             await Task.yield()
             withAnimation(.easeOut(duration: 0.2)) { reader.scrollTo("coach-bottom", anchor: .bottom) }
         }
+    }
+}
+
+private struct CoachAnalysisHistoryView: View {
+    @Bindable var store: AppStore
+    @State private var editing: Plan?
+    private var runs: [CoachRun] { Array((store.coach?.analysisRuns ?? []).reversed()) }
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 14) {
+                if runs.isEmpty { Text("暂无定时分析记录").foregroundStyle(.secondary) }
+                ForEach(runs) { run in CoachRunCard(store: store, run: run) { editing = $0 } }
+            }.padding(20)
+        }.background(Theme.cream).navigationTitle("分析记录").navigationBarTitleDisplayMode(.inline)
+            .task(id: store.scope) { await store.loadCoach() }
+            .sheet(item: $editing) { plan in PlanEditor(store: store, plan: plan) }
     }
 }
 

@@ -53,6 +53,7 @@ import Network
     private let pathMonitor = NWPathMonitor()
     private var lastPayload: Data?
     private var lastOfferPayload: Data?
+    private var lastDayStatusPayload: Data?
     private var current: CompanionSnapshot?
     private var binding = ""
     private var lastScope: String?
@@ -65,6 +66,7 @@ import Network
         transport.ready = { [weak self] in self?.publish(force: true) }
         transport.failure = { [weak store] in store?.error = "手表同步：" + $0 }
         store.companionChanged = { [weak self] in self?.publish() }
+        store.companionRefreshRequested = { [weak self] in self?.publish(force: true) }
         store.companionStarted = { [weak self] in self?.launchWatch() }
         transport.activate(); publish()
         pathMonitor.pathUpdateHandler = { [weak self] path in
@@ -86,18 +88,24 @@ import Network
             defaults.set(binding, forKey: key)
             lastScope = store.scope
         }
-        var workout = store.signedIn ? (store.activeWorkout ?? store.workouts.first) : nil
+        let today = CompanionCore.dayKey(Date(), zone: store.settings.timezone)
+        var workout = store.signedIn ? (store.activeWorkout ?? store.workouts.first {
+            CompanionCore.dayKey($0.startedAt, zone: store.settings.timezone) == today
+        }) : nil
         workout?.companionReceipts = nil // Receipts travel individually, never inflate snapshots.
         // Legacy guest/demo fixtures are not consent to start a real HealthKit workout.
         if workout?.synthetic == nil { workout?.synthetic = store.isDemo }
         let offer = todayOffer(store: store)
-        let payload = try? Wire.data(workout), offerPayload = try? Wire.data(offer)
-        let changed = payload != lastPayload || offerPayload != lastOfferPayload || current?.binding != binding
+        let rest = store.scheduled("training", date: today).map { $0.1.rest } ?? false
+        let dayStatus = store.signedIn ? CompanionDayStatus(date: today, timezone: store.settings.timezone,
+            kind: rest ? "rest" : offer == nil ? "unplanned" : "training") : nil
+        let payload = try? Wire.data(workout), offerPayload = try? Wire.data(offer), dayPayload = try? Wire.data(dayStatus)
+        let changed = payload != lastPayload || offerPayload != lastOfferPayload || dayPayload != lastDayStatusPayload || current?.binding != binding
         if changed {
             let revision = max(defaults.integer(forKey: "companion.revision") + 1, Int(Date().timeIntervalSince1970 * 1000))
             defaults.set(revision, forKey: "companion.revision")
-            current = CompanionSnapshot(binding: binding, revision: revision, workout: workout, offer: offer, timezone: store.settings.timezone)
-            lastPayload = payload; lastOfferPayload = offerPayload
+            current = CompanionSnapshot(binding: binding, revision: revision, workout: workout, offer: offer, timezone: store.settings.timezone, today: dayStatus)
+            lastPayload = payload; lastOfferPayload = offerPayload; lastDayStatusPayload = dayPayload
         }
         if force || changed { transport.send(CompanionPacket(snapshot: current), latest: true) }
     }

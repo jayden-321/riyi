@@ -11,6 +11,22 @@ final class CompanionTests: XCTestCase {
         let e = workout.exercises[0], s = e.sets[index]
         return CompanionEvent(binding: "paired", sessionId: workout.id, exerciseId: e.id, setId: s.id, expectedSet: CompanionCore.token(s), action: action, observedAt: at ?? now, weight: 42.5, reps: 8)
     }
+    func testRestDayDoesNotShowYesterdaysFinishedWorkout() throws {
+        var old = fixture()
+        old.startedAt = now.addingTimeInterval(-24 * 3600)
+        old.status = "cancelled"
+        XCTAssertFalse(CompanionCore.isCurrentWorkout(old, zone: "Asia/Shanghai", now: now))
+        let today = CompanionDayStatus(date: CompanionCore.dayKey(now, zone: "Asia/Shanghai"), timezone: "Asia/Shanghai", kind: "rest")
+        let snapshot = CompanionSnapshot(binding: "paired", revision: 2, workout: nil, today: today)
+        let restored: CompanionSnapshot = try Wire.read(Wire.data(snapshot))
+        XCTAssertEqual(restored.today?.kind, "rest")
+        var replica = CompanionReplica()
+        replica.receive(restored)
+        XCTAssertEqual(replica.displayMessage, "今日休息，已与 iPhone 同步")
+        old.status = "in_progress"
+        old.exercises[0].sets[0].startedAt = now
+        XCTAssertFalse(CompanionCore.isCurrentWorkout(old, zone: "Asia/Shanghai", now: now))
+    }
     func testRetryAfterLostAcknowledgementAndRestartDoesNotDuplicate() throws {
         var w = fixture(); let start = event(w, "start")
         let first = CompanionCore.apply(start, binding: "paired", to: &w, now: now)
@@ -198,12 +214,13 @@ extension CompanionTests {
         XCTAssertTrue(store.save(new, kind: "workout", id: new.id))
         XCTAssertEqual(store.activeWorkout?.id, new.id)
     }
-    func testRealCrossMidnightActivityIsNotClosed() {
+    func testNewDayClosesPreviousDayEvenIfRecentlyActive() {
         let plan = Plan.starter(); var workout = Workout(plan: plan, day: plan.days[0])
         workout.startedAt = ISO8601DateFormatter().date(from: "2026-09-22T23:40:00+08:00")!
         workout.exercises[0].sets[0].startedAt = ISO8601DateFormatter().date(from: "2026-09-23T00:05:00+08:00")!
         let now = ISO8601DateFormatter().date(from: "2026-09-23T00:20:00+08:00")!
-        XCTAssertFalse(CompanionCore.isOvernightStale(workout, zone: "Asia/Shanghai", now: now))
+        XCTAssertTrue(CompanionCore.isOvernightStale(workout, zone: "Asia/Shanghai", now: now))
+        XCTAssertFalse(CompanionCore.isCurrentWorkout(workout, zone: "Asia/Shanghai", now: now))
     }
 }
 

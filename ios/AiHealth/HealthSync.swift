@@ -45,6 +45,22 @@ import SwiftData
         if let sleep = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) { result.append(Spec(type: sleep, name: "sleep_analysis", unit: nil, wireUnit: "category")) }
         result.append(Spec(type: HKObjectType.workoutType(), name: "workout", unit: nil, wireUnit: "workout")); return result
     }
+    private func authorizationRequestStatus(for type: HKObjectType) async throws -> HKAuthorizationRequestStatus {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HKAuthorizationRequestStatus, Error>) in
+            health.getRequestStatusForAuthorization(toShare: [], read: [type]) { status, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: status) }
+            }
+        }
+    }
+    func sleepAuthorizationNeedsRequest() async -> Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--sleep-auth-reminder-ui-test") { return true }
+        if ProcessInfo.processInfo.arguments.contains("--sleep-ui-test") { return false }
+        #endif
+        guard HKHealthStore.isHealthDataAvailable(), let sleep = specs.first(where: { $0.name == "sleep_analysis" }) else { return false }
+        return (try? await authorizationRequestStatus(for: sleep.type)) == .shouldRequest
+    }
     func requestAndSync() async {
         guard let store else { return }
         guard !requesting else { return }; requesting = true; defer { requesting = false }
@@ -85,7 +101,17 @@ import SwiftData
                 try await store.healthStorage.value.resetAnchor(key: key)
                 try await store.healthStorage.value.clearSleepCache(scope: owner)
             }
-            guard store.healthReadingEnabled, store.scope == owner else { return }
+            guard store.healthReadingEnabled, store.scope == owner else {
+                if !automatic { store.healthStatus = "请先点“授权 / 补充本机睡眠读取”；云端已有记录仍可查看" }
+                return
+            }
+            if !requestAuthorization {
+                let status = try await authorizationRequestStatus(for: spec.type)
+                guard status == .unnecessary else {
+                    store.healthStatus = status == .shouldRequest ? "新日益尚未请求睡眠读取权限，请点“授权 / 补充本机睡眠读取”" : "暂时无法确认睡眠授权状态，请稍后重试"
+                    return
+                }
+            }
             let oldRevision = store.sleepRevision
             try await pull(spec)
             guard store.scope == owner else { return }
@@ -101,7 +127,12 @@ import SwiftData
             if store.settings.healthConsent && !store.isDemo && (!automatic || store.sleepRevision != oldRevision) { await store.synchronize(showErrors: false) }
         } catch {
             if requestAuthorization { await activate() }
-            if store.scope == owner { store.error = "睡眠读取未完成：\(error.localizedDescription)" }
+            guard store.scope == owner else { return }
+            if (error as? HKError)?.code == .errorAuthorizationNotDetermined {
+                store.healthStatus = "睡眠读取需要先授权，请点“授权 / 补充本机睡眠读取”；云端记录仍可查看"
+            } else if automatic {
+                store.healthStatus = "本机睡眠自动读取待重试；云端记录仍可查看"
+            } else { store.error = "睡眠读取未完成：\(error.localizedDescription)" }
         }
     }
     func requestProfileAndSync() async {
@@ -143,6 +174,7 @@ import SwiftData
         let epoch = generation
         for spec in specs {
             guard generation == epoch && store.scope + "/" + store.healthHistoryWindow.rawValue == observerKey && store.healthReadingEnabled else { return }
+            guard (try? await authorizationRequestStatus(for: spec.type)) == .unnecessary else { continue }
             let query = HKObserverQuery(sampleType: spec.type, predicate: nil) { [weak self] _, completion, error in
                 Task { @MainActor in
                     guard let self else { completion(); return }
@@ -181,9 +213,13 @@ import SwiftData
         let scope = store.scope, selectedWindow = store.healthHistoryWindow; store.healthStatus = "正在读取可访问的健康记录…"
         let epoch = generation
         var failed: [String] = []
+        var needsAuthorization = false
         let ordered = specs.filter { $0.name == "sleep_analysis" } + specs.filter { $0.name != "sleep_analysis" }
         for spec in ordered {
             guard scope == store.scope && store.healthReadingEnabled && store.healthHistoryWindow == selectedWindow && generation == epoch else { return }
+            do {
+                guard try await authorizationRequestStatus(for: spec.type) == .unnecessary else { needsAuthorization = true; continue }
+            } catch { failed.append("\(LocalHealthOverview.names[spec.name] ?? spec.name)：暂时无法确认授权"); continue }
             do { try await pull(spec) } catch { failed.append("\(LocalHealthOverview.names[spec.name] ?? spec.name)：\(error.localizedDescription)") }
             if spec.name == "body_mass" || spec.name == "sleep_analysis" { await store.refreshLocalHealth() }
         }
@@ -191,7 +227,7 @@ import SwiftData
         await store.refreshLocalHealth(markRead: true)
         UserDefaults.standard.set(Date(), forKey: sweepKey)
         let localResult = store.localHealthSampleCount > 0 ? "本机已保存 \(store.localHealthSampleCount) 条健康记录" : "未读到可访问记录，请检查系统健康授权；这不代表没有健康数据"
-        store.healthStatus = failed.isEmpty ? localResult : localResult + "；部分类型待重试：" + failed.joined(separator: "；")
+        store.healthStatus = (failed.isEmpty ? localResult : localResult + "；部分类型待重试：" + failed.joined(separator: "；")) + (needsAuthorization ? "；部分类型尚未请求读取权限" : "")
     }
     private func pull(_ spec: Spec) async throws {
         guard let store, store.healthReadingEnabled, store.signedIn else { return }

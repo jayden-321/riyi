@@ -35,15 +35,18 @@ enum Keychain {
     }
     var baseURL: URL
     var tokens: Tokens?
+    var onSessionExpired: (() -> Void)?
     private var refreshTask: Task<Tokens, Error>?
     init(baseURL: URL) {
         self.baseURL = baseURL
         if let data = Keychain.read(key: baseURL.absoluteString) { tokens = try? Wire.read(data) }
     }
-    func authenticate(email: String, password: String, register: Bool) async throws {
+    func authenticate(email: String, password: String, register: Bool, expectedUserID: String? = nil) async throws {
         let body = try Wire.data(["email": email, "password": password, "timezone": TimeZone.current.identifier])
         let data = try await request(register ? "/v1/auth/register" : "/v1/auth/login", method: "POST", body: body, authenticated: false)
-        let value: Tokens = try Wire.read(data); try Keychain.save(Wire.data(value), key: baseURL.absoluteString); tokens = value
+        let value: Tokens = try Wire.read(data)
+        if let expectedUserID, value.userId != expectedUserID { throw AppError.message("登录的是另一个账号。本机记录仍保留在原账号，请用原账号重新登录。") }
+        try Keychain.save(Wire.data(value), key: baseURL.absoluteString); tokens = value
     }
     func request(_ path: String, method: String = "GET", body: Data? = nil, authenticated: Bool = true, retry: Bool = true, timeout: TimeInterval = 85) async throws -> Data {
         guard let url = URL(string: baseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + path) else { throw AppError.message("服务器地址无效") }
@@ -57,6 +60,7 @@ enum Keychain {
         }
         guard (200..<300).contains(http.statusCode) else {
             let error = try? JSONDecoder().decode([String: String].self, from: data)
+            if http.statusCode == 401 && ((path == "/v1/auth/refresh" && error?["code"] == "SESSION_EXPIRED") || (authenticated && !retry)) { onSessionExpired?() }
             throw AppError.message(error?["message"] ?? "请求失败（\(http.statusCode)）")
         }; return data
     }

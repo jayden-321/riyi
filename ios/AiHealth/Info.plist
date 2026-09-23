@@ -1,19 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CFBundleDisplayName</key><string>日益</string>
-<key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-<key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
-<key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
-<key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
-<key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
-<key>AIHealthDefaultServerURL</key><string>$(DEFAULT_SERVER_URL)</string>
-<key>UILaunchScreen</key><dict/>
-<key>UIUserInterfaceStyle</key><string>Light</string>
-<key>NSHealthShareUsageDescription</key><string>读取你选择的体重、睡眠、心率、活动和训练数据，用于健康概览。云端同步和 AI 分析需另外同意。</string>
-<key>NSHealthUpdateUsageDescription</key><string>当前版本只读取健康数据，不向 Apple 健康写入。</string>
-<key>NSLocalNetworkUsageDescription</key><string>连接你配置的本地开发服务器。</string>
-<key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
-<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
-</dict></plist>
+<plist version="1.0">
+<dict>
+	<key>AIHealthDefaultServerURL</key>
+	<string>$(DEFAULT_SERVER_URL)</string>
+	<key>CFBundleDisplayName</key>
+	<string>日益</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSHealthShareUsageDescription</key>
+	<string>读取你选择的体重、睡眠、心率、活动和训练数据，用于健康概览。云端同步和 AI 分析需另外同意。</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>当前版本只读取健康数据，不向 Apple 健康写入。</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>连接你配置的本地开发服务器。</string>
+	<key>NSCameraUsageDescription</key>
+	<string>拍摄食物或包装营养表，确认后记录饮食；使用 AI 识别时照片会上传到你配置的服务。</string>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Light</string>
+</dict>
+</plist>
