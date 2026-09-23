@@ -22,6 +22,7 @@ struct WorkoutShareSheet: UIViewControllerRepresentable {
 struct WorkoutShareCard: View {
     let workout: Workout
     let heart: WorkoutShareHeart?
+    let energyKcal: Double?
     private let ink = Color(red: 0.10, green: 0.31, blue: 0.25)
     private let muted = Color(red: 0.43, green: 0.54, blue: 0.47)
     private let pale = Color(red: 0.95, green: 0.98, blue: 0.94)
@@ -66,6 +67,13 @@ struct WorkoutShareCard: View {
                 HStack(spacing: 8) {
                     Image(systemName: "heart.fill").foregroundStyle(.red)
                     Text("心率采样均值 \(Int(heart.mean.rounded())) · 最高 \(Int(heart.maximum.rounded())) 次/分")
+                }.font(.subheadline.bold()).padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 14))
+            }
+            if let energyKcal {
+                HStack(spacing: 8) {
+                    Image(systemName: "flame.fill").foregroundStyle(.orange)
+                    Text("Apple 健康记录活动能量 \(Int(energyKcal.rounded())) 千卡")
                 }.font(.subheadline.bold()).padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 14))
             }
@@ -114,5 +122,64 @@ struct WorkoutShareCard: View {
             }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
             .background(.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 15))
+    }
+}
+
+struct WorkoutSummaryView: View {
+    @Bindable var store: AppStore
+    let workout: Workout
+    @State private var heart: WorkoutShareHeart?
+    @State private var energyKcal: Double?
+    @State private var loading = false
+    @State private var sharing = false
+    @State private var shareImage: WorkoutShareImage?
+    @State private var note: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                WorkoutShareCard(workout: workout, heart: heart, energyKcal: energyKcal)
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: Color.black.opacity(0.06), radius: 14, y: 7)
+                if loading { ProgressView("正在读取心率统计…") }
+                else if heart == nil {
+                    Text("本次暂无可关联的手表心率采样；分享图不会显示虚构数值。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let note { Text(note).font(.caption).foregroundStyle(.secondary) }
+                Button { Task { await share() } } label: {
+                    Label(sharing ? "正在生成图片…" : "分享这张训练总结", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }.buttonStyle(.borderedProminent).disabled(sharing || loading)
+                Text("图片仅在这台手机生成；是否发送给别人由你在系统分享面板决定。")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 18)
+            .frame(maxWidth: .infinity)
+        }
+        .background(Theme.cream)
+        .navigationTitle("训练总结")
+        .task(id: workout.id) { await load() }
+        .sheet(item: $shareImage) { image in WorkoutShareSheet(image: image.image) }
+    }
+    private func load() async {
+        guard store.signedIn && !store.isDemo else { return }
+        loading = true; defer { loading = false }
+        do {
+            let data = try await store.network.request("/v1/workouts/\(workout.id)/insights")
+            let result: WorkoutInsights = try Wire.read(data)
+            if let value = result.heartRate { heart = WorkoutShareHeart(mean: value.pointMeanBpm, maximum: value.maxBpm) }
+            else { heart = nil }
+            energyKcal = result.activeEnergyKcal
+            note = nil
+        } catch { note = "云端统计暂不可用；本机已保存的训练内容仍可预览和分享。" }
+    }
+    private func share() async {
+        sharing = true; defer { sharing = false }
+        let renderer = ImageRenderer(content: WorkoutShareCard(workout: workout, heart: heart, energyKcal: energyKcal))
+        renderer.scale = 3
+        renderer.proposedSize = ProposedViewSize(width: 360, height: nil)
+        if let image = renderer.uiImage { shareImage = WorkoutShareImage(image: image) }
+        else { note = "图片暂时无法生成，请稍后重试。" }
     }
 }

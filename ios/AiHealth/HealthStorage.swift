@@ -156,6 +156,10 @@ actor HealthStorage {
                     for (key, value) in sample.metadataJson where original.metadataJson[key] == nil {
                         original.metadataJson[key] = value; enriched = true
                     }
+                    for (key, value) in sample.workoutJson ?? [:] where original.workoutJson?[key] == nil {
+                        if original.workoutJson == nil { original.workoutJson = [:] }
+                        original.workoutJson?[key] = value; enriched = true
+                    }
                     if enriched { let merged = try encoder.encode(original); row.payload = merged; row.cloudUploaded = false; changed.append(merged) }
                 }
             } else { let row = LocalHealthRecord(scope: scope, sample: sample, payload: data); modelContext.insert(row); byKey[key] = row; changed.append(data) }

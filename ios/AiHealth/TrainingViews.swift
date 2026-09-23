@@ -222,13 +222,13 @@ extension WorkoutExercise {
     }
 }
 
-private struct WorkoutInsightStats: Codable {
+struct WorkoutInsightStats: Codable {
     let elapsedMinutes: Double?
     let completedVolumeKg: Double
     let completedSets: Int
     let skippedSets: Int
 }
-private struct WorkoutHeartSet: Codable, Identifiable {
+struct WorkoutHeartSet: Codable, Identifiable {
     let exercise: String
     let setId: String
     let pointCount: Int
@@ -236,7 +236,7 @@ private struct WorkoutHeartSet: Codable, Identifiable {
     let maxBpm: Double
     var id: String { setId }
 }
-private struct WorkoutHeartSummary: Codable {
+struct WorkoutHeartSummary: Codable {
     let pointCount: Int
     let pointMeanBpm: Double
     let minBpm: Double
@@ -244,9 +244,10 @@ private struct WorkoutHeartSummary: Codable {
     let setWindows: [WorkoutHeartSet]
     let setWindowsTruncated: Bool
 }
-private struct WorkoutInsights: Codable {
+struct WorkoutInsights: Codable {
     let stats: WorkoutInsightStats
     let heartRate: WorkoutHeartSummary?
+    let activeEnergyKcal: Double?
     let dataCutoffAt: Date
 }
 private struct WorkoutInsightsSection: View {
@@ -267,6 +268,7 @@ private struct WorkoutInsightsSection: View {
                 let volume = insights?.stats.completedVolumeKg ?? workout.completedVolumeKg
                 Text("实际容量 \((volume / 1000).formatted(.number.precision(.fractionLength(0...2)))) 吨")
             }
+            if let kcal = insights?.activeEnergyKcal { Text("Apple 健康记录活动能量 \(Int(kcal.rounded())) 千卡") }
             if let heart = insights?.heartRate {
                 Text("心率采样均值 \(Int(heart.pointMeanBpm.rounded())) 次/分 · 最高 \(Int(heart.maxBpm.rounded())) · 最低 \(Int(heart.minBpm.rounded()))")
                 Text("共 \(heart.pointCount) 个采样点；这是采样点均值，不代表连续心率。")
@@ -307,8 +309,6 @@ private struct WorkoutInsightsSection: View {
 struct WorkoutView: View {
     @Bindable var store: AppStore; @State var workout: Workout; @State private var endConfirm = false
     @State private var phoneHealthConfirm = false
-    @State private var shareImage: WorkoutShareImage?
-    @State private var sharing = false
     var active: Bool { workout.status == "in_progress" }
     var paused: Bool { workout.pausedAt != nil }
     var lastCompleted: Date? { workout.exercises.flatMap(\.sets).compactMap(\.completedAt).max() }
@@ -344,6 +344,13 @@ struct WorkoutView: View {
                     }
                     Text("只计已完成的正式组；热身、自重及辅助重量不计入。每只重量按所选单只或双只累计。").font(.caption2).foregroundStyle(.secondary)
                 } }
+            }
+            if workout.status == "completed" {
+                Section("训练总结") {
+                    NavigationLink { WorkoutSummaryView(store: store, workout: workout) } label: {
+                        Label("查看总结与分享图片", systemImage: "square.and.arrow.up")
+                    }.accessibilityIdentifier("workout-summary")
+                }
             }
             if !active { WorkoutInsightsSection(store: store, workout: workout) }
             ForEach(workout.exercises.indices, id: \.self) { index in
@@ -381,10 +388,6 @@ struct WorkoutView: View {
                 TextField("备注", text: $workout.feedback.note, axis: .vertical)
             }.disabled(!active)
             if workout.status == "completed" {
-                Section {
-                    Button(sharing ? "正在生成分享图…" : "分享训练总结") { Task { await prepareShare() } }
-                        .disabled(sharing)
-                }
                 Section("Apple 健康") {
                     if store.healthWorkoutSaved(workout.id) { Text("已写入 Apple 健康").foregroundStyle(Theme.green) }
                     else if store.workoutHealth.hasPairedWatch {
@@ -423,22 +426,8 @@ struct WorkoutView: View {
             .confirmationDialog("确认本次没有用日益手表记录？", isPresented: $phoneHealthConfirm) {
                 Button("由手机写入") { Task { await store.writeWorkoutToHealth(workout) } }
             } message: { Text("如果手表正在保存同一次训练，请等待同步，避免重复。") }
-            .sheet(item: $shareImage) { image in WorkoutShareSheet(image: image.image) }
     }
     func finish() { store.controlWorkout(id: workout.id, action: workout.activity == nil ? "finish_workout" : "finish_activity") }
-    private func prepareShare() async {
-        sharing = true; defer { sharing = false }
-        var heart: WorkoutShareHeart?
-        if store.signedIn && !store.isDemo,
-           let data = try? await store.network.request("/v1/workouts/\(workout.id)/insights"),
-           let details: WorkoutInsights = try? Wire.read(data), let value = details.heartRate {
-            heart = WorkoutShareHeart(mean: value.pointMeanBpm, maximum: value.maxBpm)
-        }
-        let renderer = ImageRenderer(content: WorkoutShareCard(workout: workout, heart: heart))
-        renderer.scale = 3
-        if let image = renderer.uiImage { shareImage = WorkoutShareImage(image: image) }
-        else { store.error = "分享图暂时无法生成，请稍后重试" }
-    }
 }
 
 struct SetRow: View {

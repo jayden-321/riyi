@@ -199,6 +199,24 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(try reopened.fetch(FetchDescriptor<HealthCursor>()).count, 1)
     }
 
+    @MainActor func testWorkoutEnergyEnrichesExistingWatchSample() async throws {
+        let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let worker = HealthStorage(modelContainer: container)
+        let observed = Date()
+        var sample = HealthSample(healthkitUuid: newID(), type: "workout", unit: "workout", startAt: observed, endAt: observed.addingTimeInterval(60), sourceBundleId: "synthetic.watch")
+        sample.metadataJson["watch_session_id"] = .string(newID())
+        sample.workoutJson = ["duration_seconds": .number(60)]
+        try await worker.persist(samples: [sample], anchor: nil, cursorKey: "test/watch", scope: "test", upload: false)
+        sample.workoutJson = ["active_energy_kcal": .number(123.4)]
+        try await worker.persist(samples: [sample], anchor: nil, cursorKey: "test/phone", scope: "test", upload: false)
+        let rows = try ModelContext(container).fetch(FetchDescriptor<LocalHealthRecord>())
+        let stored: HealthSample = try Wire.read(try XCTUnwrap(rows.first?.payload))
+        if case .number(let duration)? = stored.workoutJson?["duration_seconds"] { XCTAssertEqual(duration, 60) }
+        else { XCTFail("Watch duration was lost") }
+        if case .number(let energy)? = stored.workoutJson?["active_energy_kcal"] { XCTAssertEqual(energy, 123.4) }
+        else { XCTFail("measured energy enrichment was lost") }
+    }
+
     @MainActor func testLiveClientSyncContract() async throws {
         guard let endpoint = ProcessInfo.processInfo.environment["AICORE_TEST_API"], let url = URL(string: endpoint) else { throw XCTSkip("AICORE_TEST_API required for local HTTP integration") }
         let client = Network(baseURL: url)
