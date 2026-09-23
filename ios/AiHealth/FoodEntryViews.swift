@@ -175,11 +175,11 @@ struct FoodPackageReviewView: View {
                         Picker("单位", selection: $packageUnit) { Text("克").tag("g"); Text("毫升").tag("ml") }.labelsHidden()
                     }
                     HStack {
-                        TextField("整包数量（没有可留 0）", value: $count, format: .number).keyboardType(.decimalPad)
+                        TextField("数量", value: $count, format: .number).keyboardType(.decimalPad)
                         TextField("数量单位", text: $servingUnit).frame(width: 60)
                     }
                     if extraction != nil && extraction?.unitsPerPackage == nil {
-                        Text("照片未读出整包只数；按只记录前，请从包装其他位置或购买信息核对后填写。").font(.caption).foregroundStyle(.orange)
+                        Text("照片未读出数量；按片、只等单位记录前，请从包装其他位置或购买信息核对。").font(.caption).foregroundStyle(.orange)
                     }
                     HStack {
                         TextField("每 100 克/毫升能量", value: $energy, format: .number).keyboardType(.decimalPad)
@@ -211,7 +211,11 @@ struct FoodPackageReviewView: View {
         guard !loaded else { return }; loaded = true
         name = extraction?.name ?? ""; brand = extraction?.brand ?? ""
         packageAmount = extraction?.packageAmount ?? 0; packageUnit = extraction?.packageUnit ?? "g"
-        count = extraction?.unitsPerPackage ?? 0; servingUnit = extraction?.servingUnit ?? "只"
+        count = extraction?.unitsPerPackage ?? 0
+        let recognized = extraction?.servingUnit?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if name.contains("午餐肉"), count > 1, (recognized.isEmpty || ["只", "包", "件"].contains(recognized)) {
+            servingUnit = "片"
+        } else { servingUnit = recognized.isEmpty ? "只" : recognized }
         energy = extraction?.energyPer100 ?? 0; energyUnit = extraction?.energyUnit ?? "kJ"
     }
     private func save() {

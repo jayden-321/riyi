@@ -71,7 +71,7 @@ final class FoodEntryUITests: XCTestCase {
         }
         fill("商品名称", "非遗黑猪肉老面小笼包")
         fill("整包净含量", "500")
-        fill("整包数量（没有可留 0）", "20")
+        fill("数量", "20")
         fill("每 100 克/毫升能量", "992")
         XCTAssertTrue(app.staticTexts["平均每只约 25 克"].waitForExistence(timeout: 5))
         app.buttons["保存到常用"].tap()
