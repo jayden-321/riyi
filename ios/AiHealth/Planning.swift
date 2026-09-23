@@ -66,6 +66,33 @@ func mealEntryTime(for selectedDate: Date, zone: String, now: Date = Date()) -> 
     let clock = calendar.dateComponents([.hour, .minute, .second], from: now)
     return min(calendar.date(bySettingHour: clock.hour ?? 12, minute: clock.minute ?? 0, second: clock.second ?? 0, of: selectedDate) ?? selectedDate, now)
 }
+
+struct MealEnergySummary {
+    let singleCount: Int
+    let singleKcal: Double
+    let rangeCount: Int
+    let rangeMinKcal: Double
+    let rangeMaxKcal: Double
+    let unknownCount: Int
+    var totalMinKcal: Double { singleKcal + rangeMinKcal }
+    var totalMaxKcal: Double { singleKcal + rangeMaxKcal }
+
+    init(_ logs: [MealLog]) {
+        var singles = 0, ranges = 0, unknown = 0
+        var singleTotal = 0.0, lowTotal = 0.0, highTotal = 0.0
+        for log in logs {
+            if let kcal = log.energyKcal, kcal.isFinite, kcal >= 0 {
+                singles += 1; singleTotal += kcal
+            } else if let low = log.estimateMinKcal, let high = log.estimateMaxKcal,
+                      low.isFinite, high.isFinite, low >= 0, high >= low {
+                ranges += 1; lowTotal += low; highTotal += high
+            } else { unknown += 1 }
+        }
+        singleCount = singles; singleKcal = singleTotal
+        rangeCount = ranges; rangeMinKcal = lowTotal; rangeMaxKcal = highTotal
+        unknownCount = unknown
+    }
+}
 struct AdoptCycleRequest: Codable { var requestId: String; var cycle: PlanningCycle; var replace: Bool; var versions: [String: Int] }
 struct AdoptCycleReply: Codable { var records: [CloudRecord]; var adopted: Int; var kept: Int }
 

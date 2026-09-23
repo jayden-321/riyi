@@ -198,8 +198,7 @@ struct DietView: View {
     @State private var common = false; @State private var textEntry = false; @State private var photoEntry = false
     @State private var camera = false; @State private var capturedImage: UIImage?
     private var logs: [MealLog] { store.meals(on: store.calendarKey) }
-    private var knownCalories: Double { logs.compactMap(\.energyKcal).reduce(0,+) }
-    private var unknown: Int { logs.filter { $0.energyKcal == nil }.count }
+    private var energy: MealEnergySummary { MealEnergySummary(logs) }
     private var future: Bool { store.calendarKey > DayKey.string(Date(),zone: store.settings.timezone) }
     var body: some View {
         NavigationStack {
@@ -219,10 +218,15 @@ struct DietView: View {
                     Button("和 AI 安排饮食周期") { planning = true }
                 }
                 Section("\(store.calendarKey) · 实际摄入") {
-                    Text("已知热量小计 \(knownCalories.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
-                    Text("\(logs.count - unknown) 笔有热量，\(unknown) 笔待估算。计划未吃不计入实际；小计可能不完整。").font(.caption).foregroundStyle(.secondary)
-                    if logs.contains(where: { $0.energyMethod == "estimated" }) { Text("小计包含估算值。").font(.caption).foregroundStyle(.secondary) }
-                    if logs.contains(where: { $0.energyMethod == "estimated_range" }) { Text("另有照片粗估范围，未计入上方小计。").font(.caption).foregroundStyle(.secondary) }
+                    if energy.rangeCount > 0 {
+                        Text("已记录约 \(energy.totalMinKcal.formatted(.number.precision(.fractionLength(0...1))))–\(energy.totalMaxKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
+                        Text("\(energy.singleCount) 笔单值热量，\(energy.rangeCount) 笔粗估范围，\(energy.unknownCount) 笔仍待估算。计划未吃不计入实际。").font(.caption).foregroundStyle(.secondary)
+                        Text(energy.unknownCount > 0 ? "还有未估算记录，以上区间不代表全天总摄入。" : "这是已记录饮食的粗估区间，不是精确热量。").font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text("已记录热量小计 \(energy.singleKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
+                        Text("\(energy.singleCount) 笔有单值热量，\(energy.unknownCount) 笔待估算。计划未吃不计入实际；小计可能不完整。").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if logs.contains(where: { $0.energyMethod == "estimated" }) { Text("单值热量中包含估算值。").font(.caption).foregroundStyle(.secondary) }
                     ForEach(logs) { log in Button { editing = log } label: { MealLogRow(log: log) }.buttonStyle(.plain).swipeActions { Button("删除",role: .destructive) { store.remove(kind: "meal",id: log.id) } } }
                 }
                 Section("当天食谱计划") {

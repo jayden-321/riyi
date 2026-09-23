@@ -14,6 +14,21 @@ final class FoodLibraryTests: XCTestCase {
         let past = mealEntryTime(for: yesterdayMidnight, zone: "Asia/Shanghai", now: now)
         XCTAssertEqual(formatter.string(from: past), "2026-09-22T04:47:30Z")
     }
+    func testEstimatedRangesAreCountedSeparatelyFromMissingCalories() {
+        var breakfast = MealLog(slot: "breakfast", description: "小笼包", eatenAt: Date(), timezone: "Asia/Shanghai")
+        breakfast.energyMethod = "estimated_range"; breakfast.estimateMinKcal = 200; breakfast.estimateMaxKcal = 400
+        breakfast.nutritionSource = "AI 文字粗估"
+        var lunch = MealLog(slot: "lunch", description: "泡面、虾、鸡蛋", eatenAt: Date(), timezone: "Asia/Shanghai")
+        lunch.energyMethod = "estimated_range"; lunch.estimateMinKcal = 515; lunch.estimateMaxKcal = 950
+        lunch.nutritionSource = "AI 文字粗估"
+        let summary = MealEnergySummary([breakfast, lunch])
+        XCTAssertEqual(summary.singleCount, 0)
+        XCTAssertEqual(summary.rangeCount, 2)
+        XCTAssertEqual(summary.unknownCount, 0)
+        XCTAssertEqual(summary.totalMinKcal, 715)
+        XCTAssertEqual(summary.totalMaxKcal, 1350)
+        XCTAssertEqual(MealEnergySummary([breakfast, lunch, MealLog(description: "水果")]).unknownCount, 1)
+    }
     #if canImport(UIKit)
     func testCameraPhotoIsRenderedAtUploadPixelSize() throws {
         let format = UIGraphicsImageRendererFormat.default()

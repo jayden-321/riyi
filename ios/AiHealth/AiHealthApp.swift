@@ -39,6 +39,15 @@ import SwiftData
                 state.reload(); state.selectedTab = "coach"
                 state.needsReauthentication = true; state.showReauthentication = true
             }
+            if ProcessInfo.processInfo.arguments.contains("--energy-summary-ui-test") {
+                state.startDemo(); state.selectedTab = "diet"
+                var breakfast = MealLog(slot: "breakfast", description: "小笼包", eatenAt: Date(), timezone: state.settings.timezone)
+                breakfast.energyMethod = "estimated_range"; breakfast.estimateMinKcal = 200; breakfast.estimateMaxKcal = 400; breakfast.nutritionSource = "AI 粗估"
+                var lunch = MealLog(slot: "lunch", description: "泡面、虾、鸡蛋", eatenAt: Date(), timezone: state.settings.timezone)
+                lunch.energyMethod = "estimated_range"; lunch.estimateMinKcal = 515; lunch.estimateMaxKcal = 950; lunch.nutritionSource = "AI 粗估"
+                state.save(breakfast, kind: "meal", id: breakfast.id)
+                state.save(lunch, kind: "meal", id: lunch.id)
+            }
             if ProcessInfo.processInfo.arguments.contains("--sleep-ui-test") {
                 state.startDemo(); state.setHealthReading(false); state.settings.timezone = "Asia/Shanghai"
                 let end = Date().addingTimeInterval(-1)
