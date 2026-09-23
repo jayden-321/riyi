@@ -75,10 +75,9 @@ struct PlanEditor: View {
                             if day.exercises.isEmpty { Text("先从动作库选择动作").font(.caption).foregroundStyle(.secondary) }
                             Button { selectingDayID = day.id; replacingExerciseID = nil } label: { Label("从动作库选择动作", systemImage: "square.grid.2x2") }
                                 .accessibilityIdentifier("choose-library-exercise")
-                            VolumeTargetEditor(value: $day.volumeTargetKg)
-                            if !day.exercises.isEmpty { NavigationLink("特殊组合 · \((day.groups ?? []).count) 个") { GroupEditor(day: $day) } }
+                            Text(day.plannedVolumeKg > 0 ? "计划容量 \((day.plannedVolumeKg / 1000).formatted(.number.precision(.fractionLength(0...2)))) 吨 · 按下方正式组自动计算" : "填写正式组重量和次数后，自动计算计划容量")
+                                .font(.caption).foregroundStyle(.secondary)
                         } else {
-                            TextField("运动项目", text: Binding(get: { day.activity?.name ?? "" }, set: { day.activity?.name = $0 }))
                             TextField("目标分钟数（可选）", value: Binding(get: { day.activity?.targetMinutes }, set: { day.activity?.targetMinutes = $0 }), format: .number).keyboardType(.numberPad)
                             if distanceSport {
                                 TextField("目标距离（米，可选）", value: Binding(get: { day.activity?.targetDistanceMeters }, set: { day.activity?.targetDistanceMeters = $0 }), format: .number).keyboardType(.decimalPad)
@@ -121,6 +120,7 @@ struct PlanEditor: View {
                                 HStack { Button("添加一组") { exercise.sets.append(PlanSet()) }; Spacer(); Button("删除动作", role: .destructive) { day.exercises.removeAll { $0.id == exercise.id } } }.buttonStyle(.borderless)
                             }
                         }
+                        if day.exercises.count >= 2 || !(day.groups ?? []).isEmpty { GroupEditor(day: $day) }
                     }
                 }
                 if !oneDayOnly { Button("添加训练日") { plan.days.append(strength ? PlanDay(name: "力量训练", exercises: []) : PlanDay(name: sportTitle(plan.resolvedCategory), exercises: [], activity: TimedActivity(name: sportTitle(plan.resolvedCategory), sport: plan.resolvedCategory))) } }
@@ -148,8 +148,8 @@ struct PlanEditor: View {
                     Button(saving ? "保存中…" : "保存") {
                         if let onSave {
                             saving = true; saveError = nil
-                            Task { defer { saving = false }; do { try await onSave(plan); dismiss() } catch { saveError = error.localizedDescription } }
-                        } else if store.save(plan, kind: "plan", id: plan.id) { dismiss() }
+                            Task { defer { saving = false }; do { try await onSave(plan.withCalculatedVolume()); dismiss() } catch { saveError = error.localizedDescription } }
+                        } else if store.save(plan.withCalculatedVolume(), kind: "plan", id: plan.id) { dismiss() }
                     }.disabled(!valid || saving || oneDayOnly && plan.days.count != 1)
                 }
             }
@@ -171,54 +171,40 @@ struct PlanEditor: View {
     }
 }
 
-struct VolumeTargetEditor: View {
-    @Binding var value: Double?
-    @State private var tons = ""
-    private var entered: Double? { Double(tons.replacingOccurrences(of: ",", with: ".")) }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(value.map { "容量目标 \(($0 / 1000).formatted()) 吨" } ?? "容量目标 · 未设置").font(.subheadline)
-            HStack {
-                Button("10 吨") { value = 10_000 }
-                Button("15 吨") { value = 15_000 }
-                Spacer(); Button("不设目标") { value = nil }
-            }.buttonStyle(.borderless)
-            HStack {
-                TextField("自定义吨数", text: $tons).keyboardType(.decimalPad)
-                Text("吨").foregroundStyle(.secondary)
-                Button("设置") { if let entered { value = entered * 1000 }; dismissInputKeyboard() }
-                    .buttonStyle(.borderless).disabled(entered == nil || !(0.001...1000).contains(entered ?? 0))
-            }
-        }
-    }
-}
-
 struct GroupEditor: View {
     @Binding var day: PlanDay
     private var groups: Binding<[ExerciseGroup]> { Binding(get: { day.groups ?? [] }, set: { day.groups = $0 }) }
     var body: some View {
-        Form {
-            Section { Text("超级组选 2 个动作，三合组选 3 个，巨人组选 4 个或以上。同一动作只加入一个组合，按选择顺序逐轮记录。").font(.caption) }
+        Group {
+            Section("动作组合（可选）") {
+                Text("从上面已选动作中组合，不会新增动作。超级组 2 个、三合组 3 个、巨人组至少 4 个；训练时按顺序轮流完成。")
+                    .font(.caption).foregroundStyle(.secondary)
+                ForEach(groupOptions, id: \.0) { style, name in
+                    Button("组合为\(name)") { addGroup(style: style, name: name) }
+                        .disabled(day.exercises.filter { exercise in !(day.groups ?? []).contains { $0.exerciseIds.contains(exercise.id) } }.count < groupMinimum(style))
+                }
+            }
             ForEach(groups) { $group in
-                Section {
+                Section("\(group.name) · \(groupTitle(group.style))") {
                     TextField("组合名称", text: $group.name)
-                    Picker("组合方式", selection: $group.style) { ForEach(groupOptions, id: \.0) { Text($0.1).tag($0.0) } }
                     ForEach(day.exercises) { exercise in
                         Toggle(exercise.name, isOn: Binding(get: { group.exerciseIds.contains(exercise.id) }, set: { selected in
                             if selected { group.exerciseIds.append(exercise.id) }
                             else { group.exerciseIds.removeAll { $0 == exercise.id } }
                         })).disabled((day.groups ?? []).contains { $0.id != group.id && $0.exerciseIds.contains(exercise.id) })
                     }
-                    Text("已选 \(group.exerciseIds.count) 个动作").font(.caption).foregroundStyle(.secondary)
+                    Text("按上面勾选的顺序训练 · 已选 \(group.exerciseIds.count) 个动作")
+                        .font(.caption).foregroundColor(group.exerciseIds.count < groupMinimum(group.style) ? .orange : .secondary)
                     Button("移除组合", role: .destructive) { day.groups?.removeAll { $0.id == group.id } }
                 }
             }
-            Section("添加组合") {
-                ForEach(groupOptions, id: \.0) { style, name in
-                    Button(name) { day.groups = (day.groups ?? []) + [ExerciseGroup(name: name, style: style)] }
-                }
-            }
-        }.navigationTitle("特殊组合")
+        }
+    }
+    private func addGroup(style: String, name: String) {
+        let available = day.exercises.filter { exercise in !(day.groups ?? []).contains { $0.exerciseIds.contains(exercise.id) } }
+        let count = groupMinimum(style)
+        guard available.count >= count else { return }
+        day.groups = (day.groups ?? []) + [ExerciseGroup(name: name, style: style, exerciseIds: Array(available.prefix(count).map(\.id)))]
     }
 }
 
@@ -234,6 +220,7 @@ struct WorkoutView: View {
     @Bindable var store: AppStore; @State var workout: Workout; @State private var endConfirm = false
     @State private var phoneHealthConfirm = false
     var active: Bool { workout.status == "in_progress" }
+    var paused: Bool { workout.pausedAt != nil }
     var lastCompleted: Date? { workout.exercises.flatMap(\.sets).compactMap(\.completedAt).max() }
     var body: some View {
         List {
@@ -242,8 +229,8 @@ struct WorkoutView: View {
                 if let activity = workout.activity {
                     Text(activity.targetMinutes.map { "目标 \($0) 分钟" } ?? "按时长记录").foregroundStyle(.secondary)
                     if let distance = activity.targetDistanceMeters { Text("距离目标 \(distance.formatted()) 米").foregroundStyle(.secondary) }
-                    if active { TimelineView(.periodic(from: .now, by: 1)) { context in Text("已运动 \(Int(context.date.timeIntervalSince(workout.startedAt) / 60)) 分钟").monospacedDigit() } }
-                    else if let end = workout.finishedAt { Text("实际 \(Int(end.timeIntervalSince(workout.startedAt) / 60)) 分钟") }
+                    if active { TimelineView(.periodic(from: .now, by: 1)) { context in Text("\(paused ? "已暂停 · " : "")已运动 \(Int(workout.elapsedSeconds(at: context.date) / 60)) 分钟").monospacedDigit() } }
+                    else if workout.finishedAt != nil { Text("实际 \(Int(workout.elapsedSeconds(at: Date()) / 60)) 分钟") }
                     if active {
                         TextField("实际距离（米，可选）", value: $workout.actualDistanceMeters, format: .number).keyboardType(.decimalPad)
                     } else if let distance = workout.actualDistanceMeters { Text("实际距离 \(distance.formatted()) 米") }
@@ -255,13 +242,16 @@ struct WorkoutView: View {
                     }
                 }
                 Text(workout.startedAt, format: .dateTime.year().month().day().hour().minute()).font(.caption).foregroundStyle(.secondary)
+                if active {
+                    Button(paused ? "继续训练" : "暂停训练") { store.controlWorkout(id: workout.id, action: paused ? "resume_workout" : "pause_workout") }
+                        .buttonStyle(.bordered)
+                }
                 if workout.activity == nil { VStack(alignment: .leading, spacing: 8) {
                     Text("已完成容量 \((workout.completedVolumeKg / 1000).formatted(.number.precision(.fractionLength(0...2)))) 吨").font(.headline)
                     if let target = workout.volumeTargetKg, target > 0 {
                         ProgressView(value: min(workout.completedVolumeKg, target), total: target).tint(Theme.green)
-                        Text(workout.completedVolumeKg >= target ? "本次容量目标已达成" : "目标 \((target / 1000).formatted()) 吨 · 还差 \(((target - workout.completedVolumeKg) / 1000).formatted(.number.precision(.fractionLength(0...2)))) 吨").font(.caption)
+                        Text("计划容量 \((target / 1000).formatted(.number.precision(.fractionLength(0...2)))) 吨 · 由计划正式组自动计算").font(.caption)
                     }
-                    if active { DisclosureGroup("设置本次容量目标") { VolumeTargetEditor(value: $workout.volumeTargetKg) } }
                     Text("只计已完成的正式组；热身、自重及辅助重量不计入。每只重量按所选单只或双只累计。").font(.caption2).foregroundStyle(.secondary)
                 } }
             }
@@ -279,7 +269,7 @@ struct WorkoutView: View {
                                             Text("第 \(round + 1) 轮 · \(workout.exercises[exerciseIndex].name)").font(.headline)
                                             Text(workout.exercises[exerciseIndex].displayMethod).font(.caption).foregroundStyle(.secondary)
                                             NavigationLink("查看动作说明") { ExerciseGuideView(store: store, exerciseId: workout.exercises[exerciseIndex].exerciseId, name: workout.exercises[exerciseIndex].name) }.font(.caption)
-                                            SetRow(set: $workout.exercises[exerciseIndex].sets[round], editable: active)
+                                            SetRow(set: $workout.exercises[exerciseIndex].sets[round], editable: active && !paused)
                                         }
                                     }
                                 }
@@ -289,7 +279,7 @@ struct WorkoutView: View {
                 } else {
                     Section {
                         NavigationLink("动作图解与说明") { ExerciseGuideView(store: store, exerciseId: workout.exercises[index].exerciseId, name: workout.exercises[index].name) }
-                        ForEach($workout.exercises[index].sets) { $set in SetRow(set: $set, editable: active) }
+                        ForEach($workout.exercises[index].sets) { $set in SetRow(set: $set, editable: active && !paused) }
                     } header: { Text("\(workout.exercises[index].name) · \(workout.exercises[index].displayMethod)") }
                     }
             }
@@ -311,7 +301,7 @@ struct WorkoutView: View {
             }
             if active {
                 Section {
-                    Button("完成训练") {
+                    Button("停止并保存训练") {
                         if workout.exercises.flatMap(\.sets).contains(where: { $0.status == "pending" }) { endConfirm = true }
                         else { finish() }
                     }.font(.headline)
@@ -320,6 +310,7 @@ struct WorkoutView: View {
         }.navigationTitle(workout.name)
             .onChange(of: try? Wire.data(workout)) { old, new in
                 guard let old, let base: Workout = try? Wire.read(old),
+                      base.id == workout.id,
                       new != (try? Wire.data(store.workouts.first { $0.id == workout.id })) else { return }
                 store.saveWorkoutEdits(base: base, proposed: workout)
                 if let latest = store.workouts.first(where: { $0.id == workout.id }) { workout = latest }
@@ -330,14 +321,14 @@ struct WorkoutView: View {
             .alert("还有未完成的组", isPresented: $endConfirm) {
                 Button("继续训练", role: .cancel) { }
                 Button("标记剩余组为跳过并结束") {
-                    for i in workout.exercises.indices { for j in workout.exercises[i].sets.indices where workout.exercises[i].sets[j].status == "pending" { workout.exercises[i].sets[j].status = "skipped" } }; finish()
+                    finish()
                 }
             } message: { Text("已完成的组会保留，未完成的组不会计入完成量。") }
             .confirmationDialog("确认本次没有用日益手表记录？", isPresented: $phoneHealthConfirm) {
                 Button("由手机写入") { Task { await store.writeWorkoutToHealth(workout) } }
             } message: { Text("如果手表正在保存同一次训练，请等待同步，避免重复。") }
     }
-    func finish() { workout.status = "completed"; workout.finishedAt = Date() }
+    func finish() { store.controlWorkout(id: workout.id, action: workout.activity == nil ? "finish_workout" : "finish_activity") }
 }
 
 struct SetRow: View {

@@ -197,6 +197,7 @@ struct Surface<Content: View>: View {
 struct TodayView: View {
     let health: HealthSync
     @Bindable var store: AppStore; @State private var feedback = false
+    @State private var training: Workout?
     @State private var teamRefreshRevision = 0
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
     var body: some View {
@@ -233,8 +234,11 @@ struct TodayView: View {
                                             }
                                             Spacer()
                                             if let workout = store.workout(for: block, on: scheduled.date) {
-                                                Text(workout.status == "completed" ? "已完成" : workout.status == "in_progress" ? "进行中" : "已结束")
-                                                    .font(.caption).foregroundStyle(.secondary)
+                                                if workout.status == "in_progress" {
+                                                    Button("继续") { training = workout }.buttonStyle(.bordered)
+                                                } else {
+                                                    Text("已完成").font(.caption).foregroundStyle(.secondary)
+                                                }
                                             } else if let plan = block.plan, let day = plan.days.first {
                                                 Button("开始") { store.start(plan: plan, day: day, scheduledBlockId: block.id) }.buttonStyle(.bordered)
                                             } else if let activity = block.activity {
@@ -248,6 +252,14 @@ struct TodayView: View {
                                 Text(d.name).font(.title.bold())
                                 Text(d.activity == nil ? "\(d.exercises.count) 个动作 · \(d.exercises.reduce(0) { $0 + $1.sets.count }) 组计划" : "\(sportTitle(d.activity!.resolvedSport)) · \(d.activity!.targetMinutes.map { "目标 \($0) 分钟" } ?? "按时长记录")").foregroundStyle(.secondary)
                                 Button("开始训练") { store.start(plan: p, day: d) }.buttonStyle(.borderedProminent)
+                            } else if !store.workouts(on: DayKey.string(Date(), zone: store.settings.timezone)).isEmpty {
+                                Text("今日已记录训练").font(.title3.bold())
+                                ForEach(store.workouts(on: DayKey.string(Date(), zone: store.settings.timezone))) { workout in
+                                    NavigationLink("\(workout.name) · \(workout.status == "completed" ? "已完成" : workout.status == "in_progress" ? "进行中" : "已结束")") {
+                                        WorkoutView(store: store, workout: workout)
+                                    }.buttonStyle(.bordered)
+                                }
+                                Button("继续安排训练") { store.calendarDate = Date(); store.selectedTab = "training" }.buttonStyle(.bordered)
                             } else if !store.plans.isEmpty {
                                 Text("今天还没有安排训练").font(.title3.bold())
                                 Text("已有 \(store.plans.count) 份计划模板，可在训练日历里选择训练日和日期。").foregroundStyle(.secondary)
@@ -290,6 +302,9 @@ struct TodayView: View {
                     Text(store.isDemo ? "数据保存在本机" : "待同步 \(store.pendingCount) 项 · 冲突 \(store.conflicts.count) 项").font(.caption).foregroundStyle(.secondary)
                 }.padding(20)
             }.background(Theme.cream).navigationTitle("今天").navigationBarTitleDisplayMode(.inline)
+                .navigationDestination(isPresented: Binding(get: { training != nil }, set: { if !$0 { training = nil } })) {
+                    if let training { WorkoutView(store: store, workout: training) }
+                }
                 .refreshable { await health.refreshSleep(invalidateCache: true); if !store.settings.healthConsent { await store.synchronize(showErrors: false) }; teamRefreshRevision += 1 }
                 .sheet(isPresented: $feedback) { CheckinView(store: store) }
         }

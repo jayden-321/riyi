@@ -43,6 +43,16 @@ struct Plan: Codable, Identifiable {
     var days: [PlanDay] = [PlanDay()]
     var scheduledDate: String?
     var resolvedCategory: String { category ?? "strength" }
+    func withCalculatedVolume() -> Plan {
+        var copy = self
+        let category = resolvedCategory
+        for index in copy.days.indices {
+            let volume = copy.days[index].plannedVolumeKg
+            copy.days[index].volumeTargetKg = volume > 0 ? volume : nil
+            if category != "strength" { copy.days[index].activity?.name = sportTitle(category) }
+        }
+        return copy
+    }
     static func draft() -> Plan { var p = Plan(); p.trainingGoal = "custom"; p.days = [PlanDay(name: "力量训练", exercises: [])]; return p }
     var validEditorDraft: Bool {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !days.isEmpty, days.count <= 14 else { return false }
@@ -85,6 +95,15 @@ struct PlanDay: Codable, Identifiable {
     var id = newID(); var name = "训练日"; var exercises: [PlanExercise] = [PlanExercise()]
     var activity: TimedActivity? = nil
     var volumeTargetKg: Double?; var groups: [ExerciseGroup]?
+    var plannedVolumeKg: Double {
+        exercises.reduce(0) { total, exercise in
+            guard ["total", "per_hand", "added"].contains(exercise.loadBasis) else { return total }
+            let count = exercise.loadBasis == "per_hand" ? (exercise.loadCount ?? 1) : 1
+            return total + exercise.sets.filter { $0.role == "working" }.reduce(0) {
+                $0 + $1.weight * Double($1.reps) * Double(count)
+            }
+        }
+    }
 }
 struct PlanExercise: Codable, Identifiable {
     var id = newID(); var exerciseId = "custom"; var name = "新动作"; var loadBasis = "total"
@@ -129,6 +148,8 @@ struct Workout: Codable, Identifiable {
     var scheduledBlockId: String?
     var autoExpiredAt: Date?
     var restUntil: Date?
+    var pausedAt: Date?
+    var pausedDurationSeconds: Double? = nil
     var companionReceipts: [CompanionReceipt]?
     var id = newID(); var planId: String?; var name: String; var status = "in_progress"
     var startedAt = Date(); var finishedAt: Date?; var timezone = TimeZone.current.identifier
@@ -139,7 +160,7 @@ struct Workout: Codable, Identifiable {
         planId = plan.id; name = day.name
         self.scheduledBlockId = scheduledBlockId
         planDayId = day.id
-        volumeTargetKg = day.volumeTargetKg
+        volumeTargetKg = day.plannedVolumeKg > 0 ? day.plannedVolumeKg : nil
         activity = day.activity
         exercises = day.exercises.map { e in WorkoutExercise(exerciseId: e.exerciseId, name: e.name, loadBasis: e.loadBasis, sets: e.sets.map { WorkoutSet(role: $0.role, plannedWeight: $0.weight, plannedReps: $0.reps) }, setPattern: e.setPattern ?? plan.setPattern, loadCount: e.loadCount) }
         let ids = Dictionary(uniqueKeysWithValues: zip(day.exercises.map(\.id), exercises.map(\.id)))
@@ -153,6 +174,9 @@ struct Workout: Codable, Identifiable {
     }
     var completedSets: Int { exercises.flatMap(\.sets).filter { $0.status == "completed" }.count }
     var totalSets: Int { exercises.flatMap(\.sets).count }
+    func elapsedSeconds(at time: Date) -> TimeInterval {
+        max(0, (pausedAt ?? finishedAt ?? time).timeIntervalSince(startedAt) - (pausedDurationSeconds ?? 0))
+    }
     var completedVolumeKg: Double {
         exercises.reduce(0) { total, exercise in
             guard ["total", "per_hand", "added"].contains(exercise.loadBasis) else { return total }

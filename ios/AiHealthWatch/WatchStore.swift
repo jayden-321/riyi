@@ -21,15 +21,17 @@ import Observation
         return status
     }
     var todayOffer: CompanionStartOffer? {
-        guard let offer = replica.snapshot?.offer,
-              offer.date == CompanionCore.dayKey(Date(), zone: offer.timezone) else { return nil }
-        return offer
+        todayOffers.first
     }
-    var canStartToday: Bool { !demo && displayWorkout?.status != "in_progress" && replica.pendingStart == nil && todayOffer != nil }
-    func startToday() {
-        guard canStartToday, let snapshot = replica.snapshot, let offer = todayOffer else { return }
+    var todayOffers: [CompanionStartOffer] {
+        let offers = replica.snapshot?.offers ?? replica.snapshot?.offer.map { [$0] } ?? []
+        return offers.filter { $0.date == CompanionCore.dayKey(Date(), zone: $0.timezone) }
+    }
+    var canStartToday: Bool { !demo && displayWorkout?.status != "in_progress" && replica.pendingStart == nil && !todayOffers.isEmpty }
+    func startToday(offer: CompanionStartOffer) {
+        guard canStartToday, todayOffers.contains(where: { $0.blockId == offer.blockId && $0.plan.id == offer.plan.id }), let snapshot = replica.snapshot else { return }
         let request = CompanionStartRequest(binding: snapshot.binding, date: offer.date,
-                                            planId: offer.plan.id, dayId: offer.day.id, observedAt: Date())
+                                            planId: offer.plan.id, dayId: offer.day.id, observedAt: Date(), blockId: offer.blockId)
         var next = replica; next.pendingStart = request; next.message = "已发送开始请求，等待 iPhone 确认"
         if commit(next) { flush() }
     }
@@ -102,6 +104,27 @@ import Observation
             var work = workout; let receipt = CompanionCore.apply(event, binding: snapshot.binding, to: &work, now: Date())
             next.snapshot?.workout = work; next.message = receipt.outcome == "applied" ? "演示：运动已完成" : receipt.outcome
         } else { next.events.append(event); next.message = "结束请求已保存在手表，等待 iPhone 确认" }
+        if commit(next) { flush() }
+    }
+    func finishStrength() {
+        guard let snapshot = replica.snapshot, let workout = displayWorkout,
+              workout.activity == nil, workout.status == "in_progress",
+              !replica.events.contains(where: { $0.sessionId == workout.id && $0.action == "finish_workout" }) else { return }
+        let event = CompanionEvent(binding: snapshot.binding, sessionId: workout.id, exerciseId: "", setId: "", expectedSet: "", action: "finish_workout", observedAt: Date())
+        var next = replica
+        if demo {
+            var work = workout; let receipt = CompanionCore.apply(event, binding: snapshot.binding, to: &work, now: Date())
+            next.snapshot?.workout = work; next.message = receipt.outcome == "applied" ? "演示：训练已完成" : receipt.outcome
+        } else { next.events.append(event); next.message = "结束请求已保存在手表，等待 iPhone 确认" }
+        if commit(next) { flush() }
+    }
+    func controlWorkout(_ action: String) {
+        guard ["pause_workout", "resume_workout"].contains(action),
+              let snapshot = replica.snapshot, let workout = displayWorkout, workout.status == "in_progress",
+              (action == "pause_workout") == (workout.pausedAt == nil),
+              !replica.events.contains(where: { $0.sessionId == workout.id && $0.action == action }) else { return }
+        let event = CompanionEvent(binding: snapshot.binding, sessionId: workout.id, exerciseId: "", setId: "", expectedSet: "", action: action, observedAt: Date())
+        var next = replica; next.events.append(event); next.message = action == "pause_workout" ? "已暂停，等待 iPhone 确认" : "已继续，等待 iPhone 确认"
         if commit(next) { flush() }
     }
     func flush() {

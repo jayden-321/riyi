@@ -61,6 +61,7 @@ import Observation
             session.prepare()
             let start = collectionStartedAt ?? Date(); session.startActivity(with: start)
             try await builder!.beginCollection(at: start)
+            if workout.pausedAt != nil { session.pause() }
             var metadata: [String: Any] = [HKMetadataKeyExternalUUID: workout.id, "riyi_session_id": workout.id]
             if workout.activity?.resolvedSport == "swimming" {
                 let location: HKWorkoutSwimmingLocationType = workout.activity?.swimLocation == "pool" ? .pool : .openWater
@@ -105,6 +106,8 @@ import Observation
                 session?.stopActivity(with: Date()); return
             }
             self.workout = workout
+            if workout?.pausedAt != nil, session?.state == .running { session?.pause() }
+            else if workout?.pausedAt == nil, session?.state == .paused { session?.resume() }
             if rawFailed { observeRaw() }
         } else if let desired {
             Task { await start(binding: desired.binding, workout: desired.workout) }

@@ -93,6 +93,23 @@ final class PlanningTests: XCTestCase {
         XCTAssertEqual(store.trainingBlocks(on: date).map(\.id), [first.id])
         XCTAssertEqual(store.workouts.count, 1)
     }
+    @MainActor func testLaterPlanMatchesOnlyUnambiguousSameSportActual() throws {
+        let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: db); store.scope = "local-demo"; store.reload()
+        let date = DayKey.string(Date(), zone: store.settings.timezone)
+        var recorded = Workout(activity: TimedActivity(name: "游泳", sport: "swimming", swimLocation: "open_water"))
+        recorded.status = "completed"; recorded.finishedAt = Date()
+        XCTAssertTrue(store.save(recorded, kind: "workout", id: recorded.id))
+        var swim = Plan.draft(); swim.category = "swimming"
+        swim.days = [PlanDay(name: "游泳", exercises: [], activity: TimedActivity(name: "泳池游泳", sport: "swimming", swimLocation: "pool", poolLengthMeters: 25))]
+        let block = TrainingBlock(plan: swim)
+        let cycle = PlanningCycle(name: "今日", kind: "training", startDate: date, endDate: date, timezone: store.settings.timezone, days: [CycleDay(date: date, sessions: [block])])
+        XCTAssertTrue(store.save(cycle, kind: "cycle", id: cycle.id))
+        XCTAssertEqual(store.workout(for: block, on: date)?.id, recorded.id)
+        var another = recorded; another.id = newID(); another.startedAt = another.startedAt.addingTimeInterval(1); another.finishedAt = Date()
+        XCTAssertTrue(store.save(another, kind: "workout", id: another.id))
+        XCTAssertNil(store.workout(for: block, on: date), "Two swimming records cannot be guessed into one plan")
+    }
     @MainActor func testAddingSportToLegacyScheduledStrengthDoesNotReplaceIt() async throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: db); store.scope = "local-demo"; store.reload()

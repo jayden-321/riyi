@@ -7,17 +7,20 @@ struct DailyTrainingScheduleView: View {
     @State private var adding = false
     @State private var editing: TrainingBlock?
     @State private var removing: TrainingBlock?
-    private var blocks: [TrainingBlock] { store.trainingBlocks(on: date) }
+    private var selectedDate: String { date.isEmpty ? store.calendarKey : date }
+    private var blocks: [TrainingBlock] { store.trainingBlocks(on: selectedDate) }
     var body: some View {
         NavigationStack {
             List {
-                Section("\(date) · 训练项目") {
+                Section("\(selectedDate) · 训练项目") {
                     if blocks.isEmpty { Text("这一天尚未安排训练").foregroundStyle(.secondary) }
                     ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("\(index + 1). \(block.name)").font(.headline)
-                                Text(sportTitle(block.sport)).font(.caption).foregroundStyle(.secondary)
+                                let actual = store.workout(for: block, on: selectedDate)
+                                Text("\(sportTitle(block.sport)) · \(actual.map { $0.status == "completed" ? "已完成" : $0.status == "in_progress" ? "进行中" : "已结束" } ?? "尚未开始")")
+                                    .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                             Button("编辑") { editing = block }.buttonStyle(.borderless)
@@ -27,9 +30,12 @@ struct DailyTrainingScheduleView: View {
                     Button { adding = true } label: { Label("添加训练项目", systemImage: "plus.circle.fill") }
                         .accessibilityIdentifier("add-training-block")
                 }
-                if !store.workouts(on: date).isEmpty {
-                    Section("当天实际训练") {
-                        ForEach(store.workouts(on: date)) { workout in
+                let unmatched = store.workouts(on: selectedDate).filter { workout in
+                    !blocks.contains { store.workout(for: $0, on: selectedDate)?.id == workout.id }
+                }
+                if !unmatched.isEmpty {
+                    Section("未关联安排的实际训练") {
+                        ForEach(unmatched) { workout in
                             NavigationLink { WorkoutView(store: store, workout: workout) } label: {
                                 Text("\(workout.name) · \(workout.status == "completed" ? "已完成" : "进行中")")
                             }
@@ -42,17 +48,17 @@ struct DailyTrainingScheduleView: View {
         .onAppear { if blocks.isEmpty { adding = true } }
         .sheet(isPresented: $adding) {
             PlanEditor(store: store, plan: Plan.draft(), oneDayOnly: true) { plan in
-                try await store.upsertTrainingBlock(on: date, plan: plan)
+                try await store.upsertTrainingBlock(on: selectedDate, plan: plan)
             }
         }
         .sheet(item: $editing) { block in
             PlanEditor(store: store, plan: block.editorPlan, oneDayOnly: true) { plan in
-                try await store.upsertTrainingBlock(on: date, blockID: block.id, plan: plan)
+                try await store.upsertTrainingBlock(on: selectedDate, blockID: block.id, plan: plan)
             }
         }
         .confirmationDialog("移除这一个训练项目？", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })) {
             Button("移除项目", role: .destructive) {
-                if let removing { _ = store.deleteTrainingBlock(on: date, blockID: removing.id) }
+                if let removing { _ = store.deleteTrainingBlock(on: selectedDate, blockID: removing.id) }
                 removing = nil
             }
         } message: { Text("只移除该日历项目，已记录的实际训练保留。") }

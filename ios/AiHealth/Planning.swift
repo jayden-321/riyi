@@ -174,10 +174,16 @@ extension AppStore {
         return []
     }
     func workout(for block: TrainingBlock, on date: String) -> Workout? {
-        workouts(on: date).first { workout in
+        let actual = workouts(on: date)
+        if let exact = actual.first(where: { workout in
             workout.scheduledBlockId == block.id || workout.scheduledBlockId == nil &&
                 (block.plan.map { workout.planId == $0.id } ?? (workout.activity != nil && workout.name == block.name))
-        }
+        }) { return exact }
+        // A user may add today's plan after recording the activity. Link only an
+        // unambiguous legacy record; never guess between repeated same-sport sessions.
+        guard trainingBlocks(on: date).filter({ $0.sport == block.sport }).count == 1 else { return nil }
+        let unmatched = actual.filter { $0.scheduledBlockId == nil && ($0.activity?.resolvedSport ?? "strength") == block.sport }
+        return unmatched.count == 1 ? unmatched.first : nil
     }
     func upsertTrainingBlock(on date: String, blockID: String? = nil, plan: Plan) async throws {
         guard plan.validEditorDraft, plan.days.count == 1 else { throw AppError.message("请先完成这一个训练项目") }
@@ -207,6 +213,12 @@ extension AppStore {
                                       days: [CycleDay(date: date, sessions: blocks)])
             if isDemo {
                 guard save(cycle, kind: "cycle", id: cycle.id) else { throw AppError.message(error ?? "训练安排未保存") }
+            } else if !workouts(on: date).isEmpty {
+                // The user is adding a plan after an actual workout already exists.
+                // AI adoption protects recorded days, but an explicit user addition
+                // must be allowed without changing or deleting that workout.
+                guard save(cycle, kind: "cycle", id: cycle.id) else { throw AppError.message(error ?? "训练安排未保存") }
+                await synchronize(showErrors: true)
             } else {
                 _ = try await adoptCycle(cycle, replace: false, requestId: newID(), minimumAdopted: 1)
             }

@@ -24,6 +24,7 @@ struct CompanionStartOffer: Codable {
     var plan: Plan
     var day: PlanDay
     var blockId: String? = nil
+    var lastStatus: String? = nil
 }
 struct CompanionStartRequest: Codable, Identifiable {
     var id = newID()
@@ -32,6 +33,7 @@ struct CompanionStartRequest: Codable, Identifiable {
     var planId: String
     var dayId: String
     var observedAt: Date
+    var blockId: String? = nil
 }
 struct CompanionStartReceipt: Codable {
     var requestId: String
@@ -45,6 +47,7 @@ struct CompanionSnapshot: Codable {
     var offer: CompanionStartOffer? = nil
     var timezone: String? = nil
     var today: CompanionDayStatus? = nil
+    var offers: [CompanionStartOffer]? = nil
 }
 struct CompanionDayStatus: Codable, Equatable {
     var date: String
@@ -90,7 +93,8 @@ enum CompanionCore {
                              active: Workout?, now: Date) -> String {
         guard request.binding == binding else { return "wrong_account" }
         guard let offer, request.date == dayKey(now, zone: offer.timezone), request.date == offer.date,
-              request.planId == offer.plan.id, request.dayId == offer.day.id else { return "stale_plan" }
+              request.planId == offer.plan.id, request.dayId == offer.day.id,
+              request.blockId == nil || request.blockId == offer.blockId else { return "stale_plan" }
         guard request.observedAt <= now.addingTimeInterval(30), now.timeIntervalSince(request.observedAt) <= 10 * 60 else { return "expired" }
         guard active == nil else { return "already_active" }
         return "start"
@@ -149,11 +153,33 @@ enum CompanionCore {
         else if event.sessionId != workout.id { outcome = "wrong_session" }
         else if workout.status != "in_progress" { outcome = "session_finished" }
         else if event.observedAt < workout.startedAt || event.observedAt > now.addingTimeInterval(30) { outcome = "invalid_time" }
+        else if event.action == "pause_workout", event.exerciseId.isEmpty, event.setId.isEmpty, event.expectedSet.isEmpty, workout.pausedAt == nil {
+            workout.pausedAt = event.observedAt; workout.restUntil = nil; outcome = "applied"
+        }
+        else if event.action == "resume_workout", event.exerciseId.isEmpty, event.setId.isEmpty, event.expectedSet.isEmpty,
+                let pausedAt = workout.pausedAt, event.observedAt >= pausedAt {
+            workout.pausedDurationSeconds = (workout.pausedDurationSeconds ?? 0) + event.observedAt.timeIntervalSince(pausedAt)
+            workout.pausedAt = nil; outcome = "applied"
+        }
         else if event.action == "finish_activity", workout.activity != nil,
                 event.exerciseId.isEmpty, event.setId.isEmpty, event.expectedSet.isEmpty,
                 event.observedAt > workout.startedAt {
-            workout.status = "completed"; workout.finishedAt = event.observedAt; workout.restUntil = nil; outcome = "applied"
+            if let pausedAt = workout.pausedAt { workout.pausedDurationSeconds = (workout.pausedDurationSeconds ?? 0) + event.observedAt.timeIntervalSince(pausedAt) }
+            workout.pausedAt = nil; workout.status = "completed"; workout.finishedAt = event.observedAt; workout.restUntil = nil; outcome = "applied"
         }
+        else if event.action == "finish_workout", workout.activity == nil,
+                event.exerciseId.isEmpty, event.setId.isEmpty, event.expectedSet.isEmpty,
+                event.observedAt > workout.startedAt {
+            for i in workout.exercises.indices {
+                for j in workout.exercises[i].sets.indices where workout.exercises[i].sets[j].status == "pending" {
+                    workout.exercises[i].sets[j].status = "skipped"
+                    workout.exercises[i].sets[j].completedAt = event.observedAt
+                }
+            }
+            if let pausedAt = workout.pausedAt { workout.pausedDurationSeconds = (workout.pausedDurationSeconds ?? 0) + event.observedAt.timeIntervalSince(pausedAt) }
+            workout.pausedAt = nil; workout.status = "completed"; workout.finishedAt = event.observedAt; workout.restUntil = nil; outcome = "applied"
+        }
+        else if workout.pausedAt != nil { outcome = "paused" }
         else if let i = workout.exercises.firstIndex(where: { $0.id == event.exerciseId }),
                 let j = workout.exercises[i].sets.firstIndex(where: { $0.id == event.setId }) {
             var set = workout.exercises[i].sets[j]
@@ -211,7 +237,7 @@ struct CompanionReplica: Codable {
     var message = "等待 iPhone 同步今日任务"
     var projected: Workout? {
         guard let snapshot, var workout = snapshot.workout else { return nil }
-        for event in events where event.binding == snapshot.binding && event.sessionId == workout.id && event.action != "finish_activity" {
+        for event in events where event.binding == snapshot.binding && event.sessionId == workout.id && !["finish_activity", "finish_workout"].contains(event.action) {
             _ = CompanionCore.apply(event, binding: snapshot.binding, to: &workout, now: max(Date(), event.observedAt))
         }
         return workout

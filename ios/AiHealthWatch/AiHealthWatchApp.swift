@@ -38,6 +38,8 @@ struct WatchTrainingView: View {
     @State private var reps = 0
     @State private var skipConfirm = false
     @State private var activityFinishConfirm = false
+    @State private var strengthFinishConfirm = false
+    @State private var selectedOfferIndex = 0
     @State private var editDraft: WatchActualDraft?
     @State private var showStatus = false
     @Environment(\.scenePhase) var scenePhase
@@ -48,7 +50,14 @@ struct WatchTrainingView: View {
             TimelineView(.periodic(from: .now, by: 1)) { timeline in
                 VStack(alignment: .leading, spacing: 5) {
                     if let workout = store.displayWorkout {
-                        if workout.status == "in_progress", let (exercise, set) = CompanionCore.current(workout) {
+                        if workout.status == "in_progress", workout.pausedAt != nil {
+                            Text("训练已暂停").font(.headline)
+                            Text("已运动 \(Int(workout.elapsedSeconds(at: timeline.date) / 60)) 分钟").font(.caption)
+                            Button("继续训练") { store.controlWorkout("resume_workout") }
+                                .buttonStyle(.plain).foregroundStyle(.white).frame(maxWidth: .infinity, minHeight: 42).background(green, in: Capsule())
+                            Button("停止并保存") { strengthFinishConfirm = workout.activity == nil; activityFinishConfirm = workout.activity != nil }
+                                .font(.caption).buttonStyle(.plain)
+                        } else if workout.status == "in_progress", let (exercise, set) = CompanionCore.current(workout) {
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
                                 Text(exercise.name).font(.system(size: 18, weight: .bold)).lineLimit(2).minimumScaleFactor(0.75)
                                 Spacer(minLength: 0)
@@ -74,28 +83,40 @@ struct WatchTrainingView: View {
                                 }.buttonStyle(.plain).foregroundStyle(.white).background(green, in: Capsule())
                                 Button("跳过") { skipConfirm = true }.font(.system(size: 12)).buttonStyle(.plain)
                                     .frame(width: 38, height: 42).background(green.opacity(0.1), in: Capsule())
+                                Button("结束") { strengthFinishConfirm = true }.font(.system(size: 12)).buttonStyle(.plain)
+                                    .frame(width: 38, height: 42).background(green.opacity(0.1), in: Capsule())
                             }
                             .confirmationDialog("跳过当前组？", isPresented: $skipConfirm) { Button("跳过") { store.act("skip") } }
+                            HStack {
+                                Button("暂停") { store.controlWorkout("pause_workout") }
+                                Spacer()
+                                Button("停止并保存") { strengthFinishConfirm = true }
+                            }.font(.system(size: 11)).buttonStyle(.plain)
                             .task(id: set.id) { weight = set.actualWeight ?? set.plannedWeight; reps = set.actualReps ?? set.plannedReps }
                         } else if let activity = workout.activity {
                             Text(activity.name).font(.headline)
-                            Text(workout.status == "in_progress" ? "已运动 \(Int(timeline.date.timeIntervalSince(workout.startedAt) / 60)) 分钟" : "本次训练已结束")
+                            Text(workout.status == "in_progress" ? "已运动 \(Int(workout.elapsedSeconds(at: timeline.date) / 60)) 分钟" : "本次训练已结束")
                                 .font(.caption).monospacedDigit()
                             if let target = activity.targetMinutes { Text("目标 \(target) 分钟").font(.caption2) }
                             if let meters = store.health.distanceMeters { Text("已记录 \(Int(meters)) 米").font(.caption2).monospacedDigit() }
                             if activity.resolvedSport == "swimming" { Text("游泳结束后先解锁入水锁定").font(.caption2) }
                             if workout.status == "in_progress" {
+                                Button("暂停") { store.controlWorkout("pause_workout") }.font(.caption).buttonStyle(.plain)
                                 Button(store.replica.events.contains(where: { $0.action == "finish_activity" && $0.sessionId == workout.id }) ? "等待手机确认…" : "完成本次运动") { activityFinishConfirm = true }
                                     .font(.system(size: 15, weight: .semibold)).frame(maxWidth: .infinity, minHeight: 42)
                                     .buttonStyle(.plain).foregroundStyle(.white).background(green, in: Capsule())
                                     .disabled(store.replica.events.contains(where: { $0.action == "finish_activity" && $0.sessionId == workout.id }))
-                                    .confirmationDialog("结束并保存这次运动？", isPresented: $activityFinishConfirm) { Button("完成运动") { store.finishActivity() } }
                             }
                         } else {
                             Text(workout.status == "in_progress" ? "本次组已完成" : "训练已结束").font(.headline)
                             Text("\(workout.completedSets) / \(workout.totalSets) 组").font(.caption)
-                            if workout.status == "in_progress" { Text("在手机结束训练").font(.caption2) }
-                            else { todayStartButton }
+                            if workout.status == "in_progress" {
+                                HStack {
+                                    Button("暂停") { store.controlWorkout("pause_workout") }
+                                    Button("停止并保存") { strengthFinishConfirm = true }
+                                }.font(.caption).buttonStyle(.plain)
+                            }
+                            else if selectedOffer != nil { todayStartButton }
                         }
                         HStack(spacing: 5) {
                             Image(systemName: "heart.fill")
@@ -106,9 +127,9 @@ struct WatchTrainingView: View {
                             if !store.replica.events.isEmpty { Image(systemName: "arrow.triangle.2.circlepath") }
                         }.font(.system(size: 13, weight: .medium)).frame(height: 20)
                     } else {
-                        if let offer = store.todayOffer {
+                        if let offer = selectedOffer {
                             Text(offer.day.name).font(.system(size: 16, weight: .semibold)).lineLimit(2)
-                            Text("今日训练 · \(offer.date)").font(.caption2)
+                            Text("\(sportTitle(offer.plan.resolvedCategory)) · \(selectedOfferIndex + 1)/\(store.todayOffers.count) · 左右滑动切换").font(.caption2)
                         } else if let name = store.todayStatus?.activityName {
                             Text(name).font(.headline)
                             Text("今日训练 · 请在 iPhone 开始").font(.caption)
@@ -122,7 +143,7 @@ struct WatchTrainingView: View {
                             Text("等待今日训练任务").font(.headline)
                             Text("请保持与 iPhone 连接").font(.caption)
                         }
-                        if store.todayOffer != nil { todayStartButton }
+                        if selectedOffer != nil { todayStartButton }
                     }
                     Button { showStatus = true } label: {
                         Text(store.error != nil ? "同步遇到问题，点此查看" : store.replica.displayMessage)
@@ -136,7 +157,18 @@ struct WatchTrainingView: View {
                             .padding(.trailing, 10).padding(.top, 15).offset(y: -geometry.safeAreaInsets.top).allowsHitTesting(false)
                     }
             }
-        }.onChange(of: scenePhase) { _, phase in if phase == .active { store.flush() } }
+        }.gesture(DragGesture(minimumDistance: 25).onEnded { value in
+            guard store.displayWorkout?.status != "in_progress", store.todayOffers.count > 1 else { return }
+            if value.translation.width < -25 { selectedOfferIndex = min(store.todayOffers.count - 1, selectedOfferIndex + 1) }
+            if value.translation.width > 25 { selectedOfferIndex = max(0, selectedOfferIndex - 1) }
+        })
+        .confirmationDialog("结束并保存这次力量训练？未完成的组将标为跳过。", isPresented: $strengthFinishConfirm) {
+            Button("结束训练") { store.finishStrength() }
+        }
+        .confirmationDialog("结束并保存这次运动？", isPresented: $activityFinishConfirm) {
+            Button("完成运动") { store.finishActivity() }
+        }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { store.flush() } }
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--watch-editor-demo"),
@@ -167,11 +199,15 @@ struct WatchTrainingView: View {
             }.background(cream).foregroundStyle(green)
         }
     }
+    private var selectedOffer: CompanionStartOffer? {
+        let offers = store.todayOffers
+        return offers.indices.contains(selectedOfferIndex) ? offers[selectedOfferIndex] : offers.first
+    }
     private var todayStartButton: some View {
         Button {
-            store.startToday()
+            if let selectedOffer { store.startToday(offer: selectedOffer) }
         } label: {
-            Text(store.replica.pendingStart == nil ? "开始今天训练" : "等待手机确认…")
+            Text(store.replica.pendingStart != nil ? "等待手机确认…" : selectedOffer?.lastStatus == "completed" || selectedOffer?.lastStatus == "cancelled" ? "重新开始此项目" : "开始此项目")
                 .font(.system(size: 15, weight: .semibold))
                 .frame(maxWidth: .infinity, minHeight: 42)
         }.buttonStyle(.plain).foregroundStyle(.white).background(green, in: Capsule())

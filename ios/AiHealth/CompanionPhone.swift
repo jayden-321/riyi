@@ -1,6 +1,38 @@
 import Foundation
 
 extension AppStore {
+    func controlWorkout(id: String, action: String) {
+        guard var current = workouts.first(where: { $0.id == id && $0.status == "in_progress" }),
+              ["pause_workout", "resume_workout", "finish_activity", "finish_workout"].contains(action) else { return }
+        let event = CompanionEvent(binding: "phone", sessionId: id, exerciseId: "", setId: "", expectedSet: "", action: action, observedAt: Date())
+        let receipt = CompanionCore.apply(event, binding: "phone", to: &current, now: Date())
+        guard receipt.outcome == "applied" else { error = "训练状态未更新：\(receipt.outcome)"; return }
+        if save(current, kind: "workout", id: id), current.status == "completed" {
+            Task { await writeWorkoutToHealth(current, automatic: true) }
+        }
+    }
+    func restartWorkout(_ previous: Workout) {
+        expireOvernightWorkouts()
+        guard previous.status != "in_progress", activeWorkout == nil else { error = "请先完成当前训练"; return }
+        var next = previous
+        next.id = newID(); next.status = "in_progress"; next.startedAt = Date(); next.finishedAt = nil
+        next.autoExpiredAt = nil; next.restUntil = nil; next.pausedAt = nil; next.pausedDurationSeconds = nil
+        next.companionReceipts = nil; next.actualDistanceMeters = nil; next.feedback = Feedback()
+        var exerciseIDs: [String: String] = [:]
+        for i in next.exercises.indices {
+            let old = next.exercises[i].id; next.exercises[i].id = newID(); exerciseIDs[old] = next.exercises[i].id
+            for j in next.exercises[i].sets.indices {
+                next.exercises[i].sets[j].id = newID(); next.exercises[i].sets[j].actualWeight = nil
+                next.exercises[i].sets[j].actualReps = nil; next.exercises[i].sets[j].status = "pending"
+                next.exercises[i].sets[j].startedAt = nil; next.exercises[i].sets[j].completedAt = nil
+                next.exercises[i].sets[j].rpe = nil; next.exercises[i].sets[j].note = ""
+            }
+        }
+        next.groups = next.groups?.map { group in
+            var updated = group; updated.id = newID(); updated.exerciseIds = group.exerciseIds.compactMap { exerciseIDs[$0] }; return updated
+        }
+        if save(next, kind: "workout", id: next.id) { companionStarted?() }
+    }
     /// Three-way merge protects confirmed Watch results from an open phone form's stale copy.
     func saveWorkoutEdits(base: Workout, proposed: Workout) {
         guard var current = workouts.first(where: { $0.id == proposed.id }), current.status == "in_progress" else { return }
@@ -56,6 +88,7 @@ import Network
     private let pathMonitor = NWPathMonitor()
     private var lastPayload: Data?
     private var lastOfferPayload: Data?
+    private var lastOffersPayload: Data?
     private var lastDayStatusPayload: Data?
     private var current: CompanionSnapshot?
     private var binding = ""
@@ -92,7 +125,8 @@ import Network
             lastScope = store.scope
         }
         let today = CompanionCore.dayKey(Date(), zone: store.settings.timezone)
-        let offer = todayOffer(store: store)
+        let offers = todayOffers(store: store)
+        let offer = offers.first
         let scheduled = store.scheduled("training", date: today)?.1
         let pendingActivity = scheduled?.trainingBlocks.first(where: { block in
             block.activity != nil && store.workout(for: block, on: today) == nil
@@ -108,22 +142,37 @@ import Network
             kind: rest ? "rest" : scheduled?.trainingBlocks.isEmpty == false || offer != nil ? "training" : "unplanned",
             activityName: pendingActivity?.name) : nil
         let payload = try? Wire.data(workout), offerPayload = try? Wire.data(offer), dayPayload = try? Wire.data(dayStatus)
-        let changed = payload != lastPayload || offerPayload != lastOfferPayload || dayPayload != lastDayStatusPayload || current?.binding != binding
+        let offersPayload = try? Wire.data(offers)
+        let changed = payload != lastPayload || offerPayload != lastOfferPayload || offersPayload != lastOffersPayload || dayPayload != lastDayStatusPayload || current?.binding != binding
         if changed {
             let revision = max(defaults.integer(forKey: "companion.revision") + 1, Int(Date().timeIntervalSince1970 * 1000))
             defaults.set(revision, forKey: "companion.revision")
-            current = CompanionSnapshot(binding: binding, revision: revision, workout: workout, offer: offer, timezone: store.settings.timezone, today: dayStatus)
-            lastPayload = payload; lastOfferPayload = offerPayload; lastDayStatusPayload = dayPayload
+            current = CompanionSnapshot(binding: binding, revision: revision, workout: workout, offer: offer, timezone: store.settings.timezone, today: dayStatus, offers: offers)
+            lastPayload = payload; lastOfferPayload = offerPayload; lastOffersPayload = offersPayload; lastDayStatusPayload = dayPayload
         }
         if force || changed { transport.send(CompanionPacket(snapshot: current), latest: true) }
     }
     private func todayOffer(store: AppStore) -> CompanionStartOffer? {
-        guard store.signedIn else { return nil }
+        todayOffers(store: store).first
+    }
+    private func todayOffers(store: AppStore) -> [CompanionStartOffer] {
+        guard store.signedIn else { return [] }
         let date = DayKey.string(Date(), zone: store.settings.timezone)
-        if let (_, scheduled) = store.scheduled("training", date: date), scheduled.rest { return nil }
-        guard let plan = store.todayPlan, let day = plan.days.first else { return nil }
-        let blockID = store.trainingBlocks(on: date).first(where: { $0.plan?.id == plan.id && store.workout(for: $0, on: date) == nil })?.id
-        return CompanionStartOffer(date: date, timezone: store.settings.timezone, plan: plan, day: day, blockId: blockID)
+        if let (_, scheduled) = store.scheduled("training", date: date), scheduled.rest { return [] }
+        let blocks = store.trainingBlocks(on: date)
+        if !blocks.isEmpty {
+            return blocks.compactMap { block in
+                var plan = block.editorPlan
+                if block.plan == nil {
+                    plan.id = stableID("watch-plan/" + block.id)
+                    plan.days[0].id = stableID("watch-day/" + block.id)
+                }
+                guard let day = plan.days.first else { return nil }
+                return CompanionStartOffer(date: date, timezone: store.settings.timezone, plan: plan, day: day, blockId: block.id, lastStatus: store.workout(for: block, on: date)?.status)
+            }
+        }
+        guard let plan = store.todayPlan, let day = plan.days.first else { return [] }
+        return [CompanionStartOffer(date: date, timezone: store.settings.timezone, plan: plan, day: day)]
     }
     private func receive(_ packet: CompanionPacket) {
         guard let store else { return }
@@ -141,7 +190,7 @@ import Network
                 now: Date())
             // save() commits workout + receipt + existing server outbox atomically before ACK.
             guard store.save(workout, kind: "workout", id: workout.id) else { return }
-            if event.action == "finish_activity", receipt.outcome == "applied" {
+            if ["finish_activity", "finish_workout"].contains(event.action), receipt.outcome == "applied" {
                 Task { await store.writeWorkoutToHealth(workout, automatic: true) }
             }
             publish(force: true)
@@ -177,7 +226,9 @@ import Network
             publish(force: true); return
         }
         store.expireOvernightWorkouts()
-        let offer = todayOffer(store: store)
+        let offer = todayOffers(store: store).first { candidate in
+            candidate.plan.id == request.planId && candidate.day.id == request.dayId && (request.blockId == nil || request.blockId == candidate.blockId)
+        }
         let outcome = CompanionCore.startOutcome(request, offer: offer, binding: binding,
                                                  active: store.activeWorkout, now: Date())
         guard outcome == "start", let offer else {

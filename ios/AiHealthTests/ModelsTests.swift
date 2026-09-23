@@ -69,7 +69,7 @@ final class ModelsTests: XCTestCase {
         workout.exercises[1].loadBasis = "assisted"
         XCTAssertEqual(workout.completedVolumeKg, 0)
         let restored = try Wire.read(Wire.data(workout), as: Workout.self)
-        XCTAssertEqual(restored.volumeTargetKg, 10_000)
+        XCTAssertEqual(restored.volumeTargetKg, day.plannedVolumeKg)
         XCTAssertEqual(restored.groups?.first?.style, "giant")
         day.groups![0].exerciseIds.removeLast()
         XCTAssertFalse(validGroups(day.groups!, exerciseIds: day.exercises.map(\.id)))
@@ -79,6 +79,20 @@ final class ModelsTests: XCTestCase {
         raw["exercises"] = (raw["exercises"] as! [[String: Any]]).map { e in var old = e; old.removeValue(forKey: "set_pattern"); old.removeValue(forKey: "load_count"); return old }
         let legacy = try Wire.read(JSONSerialization.data(withJSONObject: raw), as: Workout.self)
         XCTAssertNil(legacy.volumeTargetKg); XCTAssertNil(legacy.groups); XCTAssertNil(legacy.exercises[0].setPattern)
+    }
+    func testPlannedVolumeComesFromWorkingSetsAndSelectedLoadCount() {
+        var plan = Plan.draft()
+        plan.days[0].exercises = [
+            PlanExercise(name: "杠铃卧推", loadBasis: "total", sets: [PlanSet(role: "working", weight: 50, reps: 10), PlanSet(role: "warmup", weight: 20, reps: 10)]),
+            PlanExercise(name: "哑铃卧推", loadBasis: "per_hand", sets: [PlanSet(role: "working", weight: 20, reps: 10)], loadCount: 2),
+            PlanExercise(name: "自重动作", loadBasis: "bodyweight", sets: [PlanSet(role: "working", weight: 70, reps: 10)])
+        ]
+        plan.days[0].volumeTargetKg = 15_000 // Old manual value must not override the set details.
+        XCTAssertEqual(plan.days[0].plannedVolumeKg, 900)
+        XCTAssertEqual(plan.withCalculatedVolume().days[0].volumeTargetKg, 900)
+        XCTAssertEqual(Workout(plan: plan, day: plan.days[0]).volumeTargetKg, 900)
+        plan.days[0].exercises[0].sets[0].weight = 60
+        XCTAssertEqual(plan.days[0].plannedVolumeKg, 1000)
     }
     @MainActor func testAddingLocalHealthStoragePreservesExistingRecords() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("aihealth-migration-" + newID())
