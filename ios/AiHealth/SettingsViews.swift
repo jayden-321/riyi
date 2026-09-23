@@ -13,9 +13,15 @@ struct WaterView: View {
                         Label("今天已记录", systemImage: "drop.fill").foregroundStyle(Theme.green)
                         HStack(alignment: .firstTextBaseline) { Text("\(store.waterToday)").font(.system(size: 48, weight: .bold, design: .rounded)); Text("/ \(store.profile.waterGoalMl) ml").foregroundStyle(.secondary) }
                         ProgressView(value: min(Double(store.waterToday) / Double(store.profile.waterGoalMl), 1))
-                        HStack { Button("+ 250 ml") { store.addWater(250) }; Spacer(); Button("+ 500 ml") { store.addWater(500) } }.buttonStyle(.borderedProminent)
+                        HStack { Button("+ 250 ml") { store.addWater(250) }; Spacer(); Button("+ 500 ml") { store.addWater(500) } }.buttonStyle(.bordered)
                         Text("未登记不代表未喝水；目标可在个人档案中调整。").font(.caption).foregroundStyle(.secondary)
                     }.padding(.vertical, 12)
+                }
+                Section("最近记录 · 左滑可删除") {
+                    ForEach(Array(store.waters.prefix(50))) { w in
+                        HStack { Label("\(w.amountMl) ml", systemImage: "drop"); Spacer(); Text(w.drankAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.secondary) }
+                            .swipeActions { Button("删除", role: .destructive) { store.remove(kind: "water", id: w.id) } }
+                    }
                 }
                 Section("自定义 / 补记") {
                     HStack { Text("饮水量"); TextField("ml", value: $custom, format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing); Text("ml") }
@@ -29,12 +35,6 @@ struct WaterView: View {
                     Button("保存并开启提醒") { Task { do { try await Notifications.shared.schedule(start: start, end: end, interval: interval); reminderStatus = "已安排 \(start):00–\(end):00 的每日提醒" } catch { store.error = error.localizedDescription } } }.disabled(start >= end)
                     Button("关闭提醒") { Task { await Notifications.shared.cancelWater(); reminderStatus = "提醒已关闭" } }
                     if !reminderStatus.isEmpty { Text(reminderStatus).font(.caption).foregroundStyle(.secondary) }
-                }
-                Section("最近记录 · 左滑可删除") {
-                    ForEach(Array(store.waters.prefix(50))) { w in
-                        HStack { Label("\(w.amountMl) ml", systemImage: "drop"); Spacer(); Text(w.drankAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.secondary) }
-                            .swipeActions { Button("删除", role: .destructive) { store.remove(kind: "water", id: w.id) } }
-                    }
                 }
             }.navigationTitle("饮水").onAppear {
                 let settings = Notifications.shared.savedSettings(); start = settings.start; end = settings.end; interval = settings.interval
