@@ -59,7 +59,7 @@ final class ExerciseLibraryUITests: XCTestCase {
         for _ in 0..<6 where !old.isHittable { app.swipeUp() }
         old.tap(); XCTAssertTrue(app.staticTexts["杠铃卧推"].waitForExistence(timeout: 5))
         app.navigationBars["动作说明"].buttons.element(boundBy: 0).tap()
-        let addFromLibrary = app.buttons["从动作库添加"]
+        let addFromLibrary = app.buttons["从动作库选择动作"]
         for _ in 0..<12 where !addFromLibrary.isHittable { app.swipeUp() }
         XCTAssertTrue(addFromLibrary.isHittable); addFromLibrary.tap()
         let search = app.textFields["exercise-library-search"]; search.tap(); search.typeText("Dumbbell Bench Press")

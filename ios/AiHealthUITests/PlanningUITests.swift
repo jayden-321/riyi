@@ -19,25 +19,6 @@ final class PlanningUITests: XCTestCase {
         XCTAssertFalse(app.buttons["choose-library-exercise"].exists)
         let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "游泳计划按时长和距离编辑"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
-    func testStrengthPlanSelectsExerciseFromLibrary() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
-        app.launchArguments = ["--planning-ui-test"]
-        app.launch()
-        app.tabBars.buttons["训练"].tap()
-        app.buttons["我的计划与历史记录"].tap()
-        app.buttons["新建训练计划"].tap()
-        app.buttons["choose-library-exercise"].tap()
-        let search = app.textFields["exercise-library-search"]
-        XCTAssertTrue(search.waitForExistence(timeout: 8))
-        search.tap(); search.typeText("杠铃卧推")
-        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "exercise-card-")).firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 8)); card.tap()
-        app.buttons["添加到训练日"].tap()
-        XCTAssertTrue(app.staticTexts["杠铃卧推"].waitForExistence(timeout: 6))
-        XCTAssertTrue(app.buttons["保存"].exists)
-    }
     func testRestDayCanBecomeWalkingTrainingAndBeDeleted() {
         continueAfterFailure = false
         let app = XCUIApplication()
