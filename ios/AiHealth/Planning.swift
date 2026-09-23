@@ -18,7 +18,33 @@ struct NutritionMeal: Codable, Identifiable {
     var id = newID(); var slot = "snack"; var name: String; var foods: [String]; var preparation: String; var alternatives: [String]
 }
 struct CycleDay: Codable, Identifiable {
-    var id = newID(); var date: String; var rest = false; var recoveryActivity: String? = nil; var activity: TimedActivity? = nil; var plan: Plan?; var meals: [NutritionMeal] = []
+    var id = newID(); var date: String; var rest = false; var recoveryActivity: String? = nil; var activity: TimedActivity? = nil; var plan: Plan?; var sessions: [TrainingBlock]? = nil; var meals: [NutritionMeal] = []
+    var trainingBlocks: [TrainingBlock] {
+        if let sessions { return sessions }
+        if let plan { return [TrainingBlock(id: stableID(id + "/legacy-plan"), plan: plan)] }
+        if let activity { return [TrainingBlock(id: stableID(id + "/legacy-activity"), activity: activity)] }
+        return []
+    }
+    mutating func setTrainingBlocks(_ blocks: [TrainingBlock]) {
+        sessions = blocks
+        plan = nil; activity = nil; recoveryActivity = nil
+        rest = blocks.isEmpty
+    }
+}
+struct TrainingBlock: Codable, Identifiable {
+    var id = newID()
+    var plan: Plan? = nil
+    var activity: TimedActivity? = nil
+    var name: String { plan?.days.first?.name ?? activity?.name ?? "训练项目" }
+    var sport: String { plan?.resolvedCategory ?? activity?.resolvedSport ?? "other" }
+    var editorPlan: Plan {
+        if let plan { return plan }
+        guard let activity else { return Plan.draft() }
+        var result = Plan.draft()
+        result.name = activity.name; result.category = activity.resolvedSport
+        result.days = [PlanDay(name: activity.name, exercises: [], activity: activity)]
+        return result
+    }
 }
 struct PlanningCycle: Codable, Identifiable {
     var id = newID(); var name: String; var kind: String; var startDate: String; var endDate: String; var timezone: String
@@ -28,6 +54,25 @@ struct PlanningCycle: Codable, Identifiable {
         let c = DayKey.calendar(timezone); let offset = c.dateComponents([.day], from: old, to: c.startOfDay(for: date)).day ?? 0
         for i in days.indices { if let d = DayKey.date(days[i].date, zone: timezone), let changed = c.date(byAdding: .day, value: offset, to: d) { days[i].date = DayKey.string(changed, zone: timezone) } }
         startDate = days.map(\.date).min() ?? startDate; endDate = days.map(\.date).max() ?? endDate
+    }
+}
+func singleDayTrainingCycle(_ plan: Plan, date: String, timezone: String) -> PlanningCycle {
+    var snapshot = plan
+    snapshot.scheduledDate = date
+    snapshot.days = Array(plan.days.prefix(1))
+    return PlanningCycle(name: plan.name, kind: "training", startDate: date, endDate: date, timezone: timezone,
+                         days: [CycleDay(date: date, sessions: [TrainingBlock(plan: snapshot)])])
+}
+func manualTrainingDays(from start: Date, through end: Date, timezone: String, preserving existing: [CycleDay] = []) -> [CycleDay] {
+    let calendar = DayKey.calendar(timezone)
+    let first = calendar.startOfDay(for: start), last = calendar.startOfDay(for: end)
+    let count = (calendar.dateComponents([.day], from: first, to: last).day ?? -1) + 1
+    guard (1...31).contains(count) else { return [] }
+    let previous = Dictionary(uniqueKeysWithValues: existing.map { ($0.date, $0) })
+    return (0..<count).compactMap { offset in
+        guard let date = calendar.date(byAdding: .day, value: offset, to: first) else { return nil }
+        let key = DayKey.string(date, zone: timezone)
+        return previous[key] ?? CycleDay(date: key, rest: true)
     }
 }
 struct MealLog: Codable, Identifiable {
@@ -121,6 +166,83 @@ extension AppStore {
     func scheduled(_ kind: String, date: String) -> (PlanningCycle, CycleDay)? {
         for c in cycles where c.kind == kind { if let d = c.days.first(where: { $0.date == date }) { return (c,d) } }; return nil
     }
+    func trainingBlocks(on date: String) -> [TrainingBlock] {
+        if let (_, day) = scheduled("training", date: date) { return day.trainingBlocks }
+        if let legacy = plans.first(where: { $0.scheduledDate == date }) {
+            return [TrainingBlock(id: stableID("legacy-template/" + legacy.id + "/" + date), plan: legacy)]
+        }
+        return []
+    }
+    func workout(for block: TrainingBlock, on date: String) -> Workout? {
+        workouts(on: date).first { workout in
+            workout.scheduledBlockId == block.id || workout.scheduledBlockId == nil &&
+                (block.plan.map { workout.planId == $0.id } ?? (workout.activity != nil && workout.name == block.name))
+        }
+    }
+    func upsertTrainingBlock(on date: String, blockID: String? = nil, plan: Plan) async throws {
+        guard plan.validEditorDraft, plan.days.count == 1 else { throw AppError.message("请先完成这一个训练项目") }
+        var snapshot = plan; snapshot.scheduledDate = date
+        if let (cycle, day) = scheduled("training", date: date), let dayIndex = cycle.days.firstIndex(where: { $0.id == day.id }) {
+            var blocks = day.trainingBlocks
+            if let blockID {
+                guard let index = blocks.firstIndex(where: { $0.id == blockID }) else { throw AppError.message("训练项目已变化，请重新打开这一天") }
+                blocks[index] = TrainingBlock(id: blockID, plan: snapshot)
+            } else {
+                guard blocks.count < 8 else { throw AppError.message("同一天最多安排 8 个训练项目") }
+                blocks.append(TrainingBlock(plan: snapshot))
+            }
+            var changed = cycle; changed.days[dayIndex].setTrainingBlocks(blocks)
+            guard save(changed, kind: "cycle", id: cycle.id) else { throw AppError.message(error ?? "训练安排未保存") }
+            if !isDemo { await synchronize(showErrors: true) }
+        } else {
+            var blocks = trainingBlocks(on: date)
+            if let blockID {
+                guard let index = blocks.firstIndex(where: { $0.id == blockID }) else { throw AppError.message("训练项目已变化，请重新打开这一天") }
+                blocks[index] = TrainingBlock(id: blockID, plan: snapshot)
+            } else {
+                guard blocks.count < 8 else { throw AppError.message("同一天最多安排 8 个训练项目") }
+                blocks.append(TrainingBlock(plan: snapshot))
+            }
+            let cycle = PlanningCycle(name: snapshot.name, kind: "training", startDate: date, endDate: date, timezone: settings.timezone,
+                                      days: [CycleDay(date: date, sessions: blocks)])
+            if isDemo {
+                guard save(cycle, kind: "cycle", id: cycle.id) else { throw AppError.message(error ?? "训练安排未保存") }
+            } else {
+                _ = try await adoptCycle(cycle, replace: false, requestId: newID(), minimumAdopted: 1)
+            }
+            if var legacy = plans.first(where: { $0.scheduledDate == date }) {
+                legacy.scheduledDate = nil
+                _ = save(legacy, kind: "plan", id: legacy.id)
+                if !isDemo { await synchronize(showErrors: true) }
+            }
+        }
+    }
+    @discardableResult func deleteTrainingBlock(on date: String, blockID: String) -> Bool {
+        guard let (cycle, day) = scheduled("training", date: date) else {
+            if var legacy = plans.first(where: { $0.scheduledDate == date && stableID("legacy-template/" + $0.id + "/" + date) == blockID }) {
+                legacy.scheduledDate = nil
+                guard save(legacy, kind: "plan", id: legacy.id) else { return false }
+                if !isDemo { Task { await synchronize(showErrors: true) } }
+                return true
+            }
+            error = "训练项目已变化，请刷新后重试"; return false
+        }
+        guard
+              let dayIndex = cycle.days.firstIndex(where: { $0.id == day.id }),
+              day.trainingBlocks.contains(where: { $0.id == blockID }) else { error = "训练项目已变化，请刷新后重试"; return false }
+        var changed = cycle
+        let remaining = day.trainingBlocks.filter { $0.id != blockID }
+        if !remaining.isEmpty { changed.days[dayIndex].setTrainingBlocks(remaining) }
+        else if changed.days.count == 1 { remove(kind: "cycle", id: cycle.id); return scheduled("training", date: date) == nil }
+        else {
+            changed.days.remove(at: dayIndex)
+            changed.startDate = changed.days.map(\.date).min() ?? cycle.startDate
+            changed.endDate = changed.days.map(\.date).max() ?? cycle.endDate
+        }
+        guard save(changed, kind: "cycle", id: cycle.id) else { return false }
+        if !isDemo { Task { await synchronize(showErrors: true) } }
+        return true
+    }
     func promoteWalkingRecovery() {
         for cycle in cycles where cycle.kind == "training" {
             var changed = cycle
@@ -174,14 +296,23 @@ extension AppStore {
         if !isDemo { Task { await synchronize(showErrors: true) } }
         return true
     }
-    @discardableResult func updateActivity(on date: String, activity: TimedActivity) -> Bool {
+    @discardableResult func updateActivity(on date: String, activity: TimedActivity, blockID: String? = nil) -> Bool {
         let name = activity.name
         let sport = activity.resolvedSport
         let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, title.count <= 120, sportOptions.contains(where: { $0.code == sport && sport != "strength" }), activity.validConfiguration else { error = "请检查运动类型、目标及游泳地点／泳池长度"; return false }
-        guard let (cycle, day) = scheduled("training", date: date), day.activity != nil,
+        guard let (cycle, day) = scheduled("training", date: date),
               let index = cycle.days.firstIndex(where: { $0.id == day.id }) else { error = "这一天没有可修改的活动"; return false }
-        var changed = cycle; var updated = activity; updated.name = title; changed.days[index].activity = updated
+        var changed = cycle; var updated = activity; updated.name = title
+        if let blockID {
+            var blocks = day.trainingBlocks
+            guard let blockIndex = blocks.firstIndex(where: { $0.id == blockID && $0.activity != nil }) else { error = "训练项目已变化"; return false }
+            blocks[blockIndex].activity = updated
+            changed.days[index].setTrainingBlocks(blocks)
+        } else {
+            guard day.activity != nil else { error = "这一天没有可修改的活动"; return false }
+            changed.days[index].activity = updated
+        }
         guard save(changed, kind: "cycle", id: cycle.id) else { return false }
         if !isDemo { Task { await synchronize(showErrors: true) } }
         return true
@@ -196,6 +327,31 @@ extension AppStore {
         if !isDemo { Task { await synchronize(showErrors: true) } }
         return true
     }
+    @discardableResult func deleteScheduledTraining(on date: String, planID: String? = nil) -> Bool {
+        if let (_, day) = scheduled("training", date: date),
+           let block = day.trainingBlocks.first(where: { $0.plan != nil && (planID == nil || $0.plan?.id == planID) }) {
+            return deleteTrainingBlock(on: date, blockID: block.id)
+        }
+        if var legacy = plans.first(where: { $0.scheduledDate == date && (planID == nil || $0.id == planID) }) {
+            legacy.scheduledDate = nil
+            guard save(legacy, kind: "plan", id: legacy.id) else { return false }
+            if !isDemo { Task { await synchronize(showErrors: true) } }
+            return true
+        }
+        error = "这一天没有可删除的训练安排"
+        return false
+    }
+    func updateScheduledTraining(_ plan: Plan, on date: String) async throws {
+        guard plan.days.count == 1, plan.validEditorDraft else { throw AppError.message("请先完成当天训练项目") }
+        if let (_, day) = scheduled("training", date: date), let block = day.trainingBlocks.first(where: { $0.plan?.id == plan.id }) {
+            try await upsertTrainingBlock(on: date, blockID: block.id, plan: plan)
+        } else if isDemo, plans.contains(where: { $0.id == plan.id }) {
+            var changed = plan; changed.scheduledDate = date
+            guard save(changed, kind: "plan", id: plan.id) else { throw AppError.message(error ?? "安排未保存") }
+        } else {
+            try await upsertTrainingBlock(on: date, plan: plan)
+        }
+    }
     func meals(on date: String) -> [MealLog] { mealLogs.filter { DayKey.string($0.eatenAt, zone: settings.timezone) == date }.sorted { $0.eatenAt < $1.eatenAt } }
     func workouts(on date: String) -> [Workout] { workouts.filter { DayKey.string($0.startedAt, zone: settings.timezone) == date } }
     func water(on date: String) -> Int { waters.filter { DayKey.string($0.drankAt, zone: settings.timezone) == date }.reduce(0) { $0 + $1.amountMl } }
@@ -206,7 +362,7 @@ extension AppStore {
         else { text += "安排适当休息日，已有信息不要重复问；不清楚的条件先跟我沟通。" }
         coachPromptDraft = text; selectedTab = "coach"
     }
-    func adoptCycle(_ proposed: PlanningCycle, replace: Bool, requestId: String) async throws -> String {
+    func adoptCycle(_ proposed: PlanningCycle, replace: Bool, requestId: String, minimumAdopted: Int = 0) async throws -> String {
         guard !isDemo else { throw AppError.message("采用周期计划需要登录云端账号；本地仍可登记训练和饮食。") }
         guard !pending.contains(where: { $0.kind == "cycle" }) else { throw AppError.message("请先完成已有计划同步，再采用新安排") }
         let owner = scope, client = network
@@ -222,6 +378,7 @@ extension AppStore {
         } catch { context.rollback(); reload(); throw error }
         calendarDate = DayKey.date(proposed.startDate, zone: proposed.timezone) ?? Date()
         selectedTab = proposed.kind == "diet" ? "diet" : "training"
+        if reply.adopted < minimumAdopted { throw AppError.message("这一天已有受保护的训练记录，原安排已保留；请选择其他日期") }
         return "已采用 \(reply.adopted) 天，保留 \(reply.kept) 天已有或已开始的安排。"
     }
 }

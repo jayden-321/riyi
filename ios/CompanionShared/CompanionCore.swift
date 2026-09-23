@@ -23,6 +23,7 @@ struct CompanionStartOffer: Codable {
     var timezone: String
     var plan: Plan
     var day: PlanDay
+    var blockId: String? = nil
 }
 struct CompanionStartRequest: Codable, Identifiable {
     var id = newID()

@@ -44,25 +44,17 @@ struct TrainingView: View {
 
 struct PlanEditor: View {
     @Bindable var store: AppStore; @State var plan: Plan; @Environment(\.dismiss) var dismiss
+    var oneDayOnly = false
+    var onSave: ((Plan) async throws -> Void)? = nil
     @State private var selectingDayID: String?
     @State private var replacingExerciseID: String?
     @State private var requestedCategory: String?
     @State private var confirmCategoryChange = false
+    @State private var saving = false
+    @State private var saveError: String?
     private var strength: Bool { plan.resolvedCategory == "strength" }
     private var distanceSport: Bool { ["swimming", "running", "cycling", "walking", "hiking", "rowing"].contains(plan.resolvedCategory) }
-    var valid: Bool {
-        guard !plan.name.trimmingCharacters(in: .whitespaces).isEmpty, !plan.days.isEmpty else { return false }
-        return plan.days.allSatisfy { day in
-            guard !day.name.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
-            if !strength {
-                guard let activity = day.activity else { return false }
-                return activity.sport == plan.resolvedCategory && activity.validConfiguration
-            }
-            return day.activity == nil && !day.exercises.isEmpty && validGroups(day.groups ?? [], exerciseIds: day.exercises.map(\.id)) &&
-                (day.volumeTargetKg == nil || (1...1_000_000).contains(day.volumeTargetKg!)) &&
-                day.exercises.allSatisfy { !$0.name.isEmpty && !$0.sets.isEmpty && $0.sets.allSatisfy { $0.weight >= 0 && $0.weight <= 2000 && $0.reps > 0 && $0.reps <= 1000 } }
-        }
-    }
+    var valid: Bool { plan.validEditorDraft }
     var body: some View {
         NavigationStack {
             Form {
@@ -71,12 +63,10 @@ struct PlanEditor: View {
                         ForEach(sportOptions, id: \.code) { option in Label(option.title, systemImage: option.icon).tag(option.code) }
                     }.accessibilityIdentifier("plan-sport-category")
                 }
-                Section("计划") {
+                Section("训练项目") {
                     TextField("名称", text: $plan.name)
-                    if strength {
-                        Picker("力量训练目标", selection: $plan.trainingGoal) { Text("增肌").tag("hypertrophy"); Text("力量").tag("strength"); Text("容量").tag("volume"); Text("自定义").tag("custom") }
-                        Picker("默认组模式", selection: $plan.setPattern) { ForEach(patternOptions, id: \.0) { Text($0.1).tag($0.0) } }
-                    } else { Text("\(sportTitle(plan.resolvedCategory))按实际运动时长记录；游泳、跑步等也可设距离目标。").font(.caption).foregroundStyle(.secondary) }
+                    if strength { Text("选择动作后，在每个动作中填写组数、重量、次数和组模式。").font(.caption).foregroundStyle(.secondary) }
+                    else { Text("\(sportTitle(plan.resolvedCategory))按实际运动时长记录；游泳、跑步等也可设距离目标。").font(.caption).foregroundStyle(.secondary) }
                 }
                 ForEach($plan.days) { $day in
                     Section(day.name) {
@@ -104,7 +94,7 @@ struct PlanEditor: View {
                                 if !day.activity!.validConfiguration { Text("泳池游泳需填写实际泳池长度；开放水域不用填写泳池长度。").font(.caption).foregroundStyle(.orange) }
                             }
                         }
-                        Button("删除训练日", role: .destructive) { plan.days.removeAll { $0.id == day.id } }
+                        if !oneDayOnly { Button("删除训练日", role: .destructive) { plan.days.removeAll { $0.id == day.id } } }
                     }
                     if strength {
                         ForEach($day.exercises) { $exercise in
@@ -115,7 +105,10 @@ struct PlanEditor: View {
                                 NavigationLink { ExerciseGuideView(store: store, exerciseId: exercise.exerciseId, name: exercise.name) } label: { Label("动作图解与说明", systemImage: "figure.strengthtraining.traditional") }
                                 Picker("重量口径", selection: $exercise.loadBasis) { ForEach(loadNames.keys.sorted(), id: \.self) { Text(loadNames[$0]!).tag($0) } }
                                 if exercise.loadBasis == "per_hand" { Picker("容量计算", selection: Binding(get: { exercise.loadCount ?? 1 }, set: { exercise.loadCount = $0 })) { Text("单只 / 单侧").tag(1); Text("双只 / 双侧").tag(2) } }
-                                Picker("组模式", selection: Binding(get: { exercise.setPattern ?? "" }, set: { exercise.setPattern = $0.isEmpty ? nil : $0 })) { Text("跟随计划").tag(""); ForEach(patternOptions, id: \.0) { Text($0.1).tag($0.0) } }
+                                Picker("组模式", selection: Binding(get: { exercise.setPattern ?? "" }, set: { exercise.setPattern = $0.isEmpty ? nil : $0 })) {
+                                    Text("使用默认 · \(patternOptions.first { $0.0 == plan.setPattern }?.1 ?? "等重组")").tag("")
+                                    ForEach(patternOptions, id: \.0) { Text($0.1).tag($0.0) }
+                                }
                                 ForEach($exercise.sets) { $set in
                                     HStack {
                                         Picker("组类型", selection: $set.role) { Text("正式").tag("working"); Text("热身").tag("warmup") }.pickerStyle(.menu).buttonStyle(.borderless).labelsHidden().frame(width: 85)
@@ -130,8 +123,9 @@ struct PlanEditor: View {
                         }
                     }
                 }
-                Button("添加训练日") { plan.days.append(strength ? PlanDay(name: "力量训练", exercises: []) : PlanDay(name: sportTitle(plan.resolvedCategory), exercises: [], activity: TimedActivity(name: sportTitle(plan.resolvedCategory), sport: plan.resolvedCategory))) }
-            }.navigationTitle("编辑训练计划")
+                if !oneDayOnly { Button("添加训练日") { plan.days.append(strength ? PlanDay(name: "力量训练", exercises: []) : PlanDay(name: sportTitle(plan.resolvedCategory), exercises: [], activity: TimedActivity(name: sportTitle(plan.resolvedCategory), sport: plan.resolvedCategory))) } }
+                if let saveError { Section { Text(saveError).foregroundStyle(.red) } }
+            }.navigationTitle(oneDayOnly ? "编辑训练项目" : "编辑训练计划")
                 .sheet(isPresented: Binding(get: { selectingDayID != nil }, set: { if !$0 { selectingDayID = nil } })) {
                     NavigationStack {
                         ExerciseLibraryView(store: store, onSelect: { guide in
@@ -150,7 +144,14 @@ struct PlanEditor: View {
                     }
                 }.toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("保存") { if store.save(plan, kind: "plan", id: plan.id) { dismiss() } }.disabled(!valid) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "保存中…" : "保存") {
+                        if let onSave {
+                            saving = true; saveError = nil
+                            Task { defer { saving = false }; do { try await onSave(plan); dismiss() } catch { saveError = error.localizedDescription } }
+                        } else if store.save(plan, kind: "plan", id: plan.id) { dismiss() }
+                    }.disabled(!valid || saving || oneDayOnly && plan.days.count != 1)
+                }
             }
             .confirmationDialog("更换运动大类会重置此计划的训练日，继续吗？", isPresented: $confirmCategoryChange) {
                 Button("更换运动大类", role: .destructive) { if let requestedCategory { applyCategory(requestedCategory) }; requestedCategory = nil }

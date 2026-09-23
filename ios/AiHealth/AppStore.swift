@@ -269,15 +269,15 @@ import Observation
         var water = WaterLog(amountMl: amount, drankAt: date, source: source); water.id = id
         save(water, kind: "water", id: water.id)
     }
-    func start(plan: Plan, day: PlanDay, synthetic: Bool = false) {
+    func start(plan: Plan, day: PlanDay, synthetic: Bool = false, scheduledBlockId: String? = nil) {
         expireOvernightWorkouts()
         guard activeWorkout == nil else { error = "请先完成当前训练"; return }
-        var workout = Workout(plan: plan, day: day); workout.synthetic = synthetic; if save(workout, kind: "workout", id: workout.id) { companionStarted?() }
+        var workout = Workout(plan: plan, day: day, scheduledBlockId: scheduledBlockId); workout.synthetic = synthetic; if save(workout, kind: "workout", id: workout.id) { companionStarted?() }
     }
-    func start(activity: TimedActivity) {
+    func start(activity: TimedActivity, scheduledBlockId: String? = nil) {
         expireOvernightWorkouts()
         guard activeWorkout == nil else { error = "请先完成当前训练"; return }
-        let workout = Workout(activity: activity)
+        let workout = Workout(activity: activity, scheduledBlockId: scheduledBlockId)
         if save(workout, kind: "workout", id: workout.id) { companionStarted?() }
     }
     func synchronize(showErrors: Bool = true) async {
@@ -340,8 +340,13 @@ import Observation
                 if r.modelContext == nil { context.insert(r) }; r.payload = payload; r.version = c.version; r.tombstoned = c.deleted; r.updatedAt = c.updatedAt
             }
             try context.save(); reload(); lastSync = Date()
-            cloudSummary = try Wire.read(await client.request("/v1/summary"))
-            report = try Wire.read(await client.request("/v1/report"))
+            if error?.hasPrefix("同步未完成") == true { error = nil }
+            // The outbox has already committed. A summary or AI report failure
+            // must not be presented as a failed record upload.
+            do { cloudSummary = try Wire.read(await client.request("/v1/summary")) }
+            catch { if showErrors { self.error = "记录已同步，今日概览暂未更新：\(error.localizedDescription)" } }
+            do { report = try Wire.read(await client.request("/v1/report")) }
+            catch { if showErrors { self.error = "记录已同步，AI 报告暂未更新：\(error.localizedDescription)" } }
         } catch { context.rollback(); reload(); healthUploadStatus = "上传待重试，已保存断点：\(error.localizedDescription)"; if showErrors { self.error = "同步未完成，记录已留在本机：\(error.localizedDescription)" } }
     }
     func resolve(_ change: PendingChange, keepLocal: Bool) {

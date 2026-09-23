@@ -92,18 +92,21 @@ import Network
             lastScope = store.scope
         }
         let today = CompanionCore.dayKey(Date(), zone: store.settings.timezone)
-        var workout = store.signedIn ? (store.activeWorkout ?? store.workouts.first {
+        let offer = todayOffer(store: store)
+        let scheduled = store.scheduled("training", date: today)?.1
+        let pendingActivity = scheduled?.trainingBlocks.first(where: { block in
+            block.activity != nil && store.workout(for: block, on: today) == nil
+        })?.activity
+        var workout = store.signedIn ? (store.activeWorkout ?? (offer == nil && pendingActivity == nil ? store.workouts.first {
             CompanionCore.dayKey($0.startedAt, zone: store.settings.timezone) == today
-        }) : nil
+        } : nil)) : nil
         workout?.companionReceipts = nil // Receipts travel individually, never inflate snapshots.
         // Legacy guest/demo fixtures are not consent to start a real HealthKit workout.
         if workout?.synthetic == nil { workout?.synthetic = store.isDemo }
-        let offer = todayOffer(store: store)
-        let scheduled = store.scheduled("training", date: today)?.1
         let rest = scheduled?.rest ?? false
         let dayStatus = store.signedIn ? CompanionDayStatus(date: today, timezone: store.settings.timezone,
-            kind: rest ? "rest" : scheduled?.activity != nil ? "training" : offer == nil ? "unplanned" : "training",
-            activityName: scheduled?.activity?.name) : nil
+            kind: rest ? "rest" : scheduled?.trainingBlocks.isEmpty == false || offer != nil ? "training" : "unplanned",
+            activityName: pendingActivity?.name) : nil
         let payload = try? Wire.data(workout), offerPayload = try? Wire.data(offer), dayPayload = try? Wire.data(dayStatus)
         let changed = payload != lastPayload || offerPayload != lastOfferPayload || dayPayload != lastDayStatusPayload || current?.binding != binding
         if changed {
@@ -119,7 +122,8 @@ import Network
         let date = DayKey.string(Date(), zone: store.settings.timezone)
         if let (_, scheduled) = store.scheduled("training", date: date), scheduled.rest { return nil }
         guard let plan = store.todayPlan, let day = plan.days.first else { return nil }
-        return CompanionStartOffer(date: date, timezone: store.settings.timezone, plan: plan, day: day)
+        let blockID = store.trainingBlocks(on: date).first(where: { $0.plan?.id == plan.id && store.workout(for: $0, on: date) == nil })?.id
+        return CompanionStartOffer(date: date, timezone: store.settings.timezone, plan: plan, day: day, blockId: blockID)
     }
     private func receive(_ packet: CompanionPacket) {
         guard let store else { return }
@@ -180,7 +184,7 @@ import Network
             transport.send(CompanionPacket(startReceipt: CompanionStartReceipt(requestId: request.id, outcome: outcome, workoutId: nil)))
             publish(force: true); return
         }
-        var workout = Workout(plan: offer.plan, day: offer.day)
+        var workout = Workout(plan: offer.plan, day: offer.day, scheduledBlockId: offer.blockId)
         workout.id = request.id; workout.synthetic = store.isDemo
         guard store.save(workout, kind: "workout", id: workout.id) else { return } // No ACK before durable commit.
         publish(force: true)

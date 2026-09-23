@@ -3,6 +3,33 @@ import SwiftData
 @testable import AiHealth
 
 final class PlanningTests: XCTestCase {
+    func testSingleDayTrainingCycleUsesSelectedDateAndSnapshot() throws {
+        let original = Plan.starter()
+        let day = original.days[0]
+        let cycle = singleDayTrainingCycle(original, date: "2026-09-25", timezone: "Asia/Shanghai")
+        XCTAssertEqual(cycle.startDate, "2026-09-25")
+        XCTAssertEqual(cycle.endDate, "2026-09-25")
+        XCTAssertEqual(cycle.days.count, 1)
+        XCTAssertEqual(cycle.days[0].trainingBlocks.count, 1)
+        XCTAssertEqual(cycle.days[0].trainingBlocks[0].plan?.scheduledDate, "2026-09-25")
+        XCTAssertEqual(cycle.days[0].trainingBlocks[0].plan?.days[0].id, day.id)
+        XCTAssertNil(original.scheduledDate)
+    }
+    func testManualTrainingDateRangePreservesEditedDay() throws {
+        let zone = "Asia/Shanghai"
+        let start = try XCTUnwrap(DayKey.date("2026-09-23", zone: zone))
+        let end = try XCTUnwrap(DayKey.date("2026-09-25", zone: zone))
+        var days = manualTrainingDays(from: start, through: end, timezone: zone)
+        XCTAssertEqual(days.map(\.date), ["2026-09-23", "2026-09-24", "2026-09-25"])
+        XCTAssertTrue(days.allSatisfy(\.rest))
+        days[1].rest = false
+        days[1].plan = Plan.starter()
+        let shifted = manualTrainingDays(from: try XCTUnwrap(DayKey.date("2026-09-24", zone: zone)), through: try XCTUnwrap(DayKey.date("2026-09-26", zone: zone)), timezone: zone, preserving: days)
+        XCTAssertEqual(shifted.map(\.date), ["2026-09-24", "2026-09-25", "2026-09-26"])
+        XCTAssertEqual(shifted[0].id, days[1].id)
+        XCTAssertEqual(shifted[0].plan?.name, "增肌计划 A")
+        XCTAssertTrue(shifted[2].rest)
+    }
     @MainActor func testWalkingRecoveryBecomesTimedTrainingWithoutFakeSets() throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: db); store.scope = "local-demo"; store.reload()
@@ -30,6 +57,54 @@ final class PlanningTests: XCTestCase {
         let pending: PlanningCycle = try Wire.read(try XCTUnwrap(store.pending.first?.payload))
         XCTAssertFalse(pending.days[0].rest)
         XCTAssertEqual(pending.days[0].activity?.resolvedSport, "walking")
+    }
+    @MainActor func testDeletingScheduledTrainingKeepsActualWorkoutAndOtherDate() throws {
+        let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: db); store.scope = "local-demo"; store.reload()
+        let plan = Plan.starter(), first = CycleDay(date: "2026-09-23", plan: plan), second = CycleDay(date: "2026-09-24", rest: true)
+        let cycle = PlanningCycle(name: "两日周期", kind: "training", startDate: first.date, endDate: second.date, timezone: "Asia/Shanghai", days: [first, second])
+        XCTAssertTrue(store.save(cycle, kind: "cycle", id: cycle.id))
+        let workout = Workout(plan: plan, day: plan.days[0])
+        XCTAssertTrue(store.save(workout, kind: "workout", id: workout.id))
+        XCTAssertTrue(store.deleteScheduledTraining(on: first.date))
+        XCTAssertNil(store.scheduled("training", date: first.date))
+        XCTAssertNotNil(store.scheduled("training", date: second.date))
+        XCTAssertEqual(store.workouts.count, 1)
+    }
+    @MainActor func testAddingSwimmingAfterStrengthKeepsBothSessionsAndActualRecord() async throws {
+        let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: db); store.scope = "local-demo"; store.reload()
+        let date = DayKey.string(Date(), zone: "Asia/Shanghai")
+        let strength = Plan.starter(), first = TrainingBlock(plan: strength)
+        let cycle = PlanningCycle(name: "当天训练", kind: "training", startDate: date, endDate: date, timezone: "Asia/Shanghai",
+                                  days: [CycleDay(date: date, sessions: [first])])
+        XCTAssertTrue(store.save(cycle, kind: "cycle", id: cycle.id))
+        let actual = Workout(plan: strength, day: strength.days[0], scheduledBlockId: first.id)
+        XCTAssertTrue(store.save(actual, kind: "workout", id: actual.id))
+        var swim = Plan.draft(); swim.category = "swimming"; swim.name = "游泳"
+        swim.days = [PlanDay(name: "泳池游泳", exercises: [], activity: TimedActivity(name: "泳池游泳", sport: "swimming", swimLocation: "pool", poolLengthMeters: 25))]
+        try await store.upsertTrainingBlock(on: date, plan: swim)
+        let blocks = store.trainingBlocks(on: date)
+        XCTAssertEqual(blocks.count, 2)
+        XCTAssertEqual(blocks[0].id, first.id)
+        XCTAssertEqual(blocks[1].sport, "swimming")
+        XCTAssertEqual(store.workouts.count, 1)
+        XCTAssertTrue(store.deleteTrainingBlock(on: date, blockID: blocks[1].id))
+        XCTAssertEqual(store.trainingBlocks(on: date).map(\.id), [first.id])
+        XCTAssertEqual(store.workouts.count, 1)
+    }
+    @MainActor func testAddingSportToLegacyScheduledStrengthDoesNotReplaceIt() async throws {
+        let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: db); store.scope = "local-demo"; store.reload()
+        let date = DayKey.string(Date(), zone: "Asia/Shanghai")
+        var legacy = Plan.starter(); legacy.scheduledDate = date
+        XCTAssertTrue(store.save(legacy, kind: "plan", id: legacy.id))
+        XCTAssertEqual(store.trainingBlocks(on: date).count, 1)
+        var swim = Plan.draft(); swim.category = "swimming"; swim.name = "游泳"
+        swim.days = [PlanDay(name: "开放水域游泳", exercises: [], activity: TimedActivity(name: "开放水域游泳", sport: "swimming", swimLocation: "open_water"))]
+        try await store.upsertTrainingBlock(on: date, plan: swim)
+        XCTAssertEqual(store.trainingBlocks(on: date).map(\.sport), ["strength", "swimming"])
+        XCTAssertNil(store.plans.first(where: { $0.id == legacy.id })?.scheduledDate)
     }
     @MainActor func testRecoveryActivityAndDeletingOneRestDayPreserveOtherDates() throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))

@@ -1,6 +1,20 @@
 import XCTest
 
 final class PlanningUITests: XCTestCase {
+    func testSelectedDateCanCreateSportTrainingDirectly() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--planning-ui-test"]
+        app.launch()
+        app.tabBars.buttons["训练"].tap()
+        XCTAssertFalse(app.buttons["我的计划与历史记录"].exists)
+        app.buttons["schedule-training-day"].tap()
+        app.buttons["plan-sport-category"].tap()
+        app.buttons["普拉提"].tap()
+        app.buttons["保存"].tap()
+        XCTAssertTrue(app.staticTexts["普拉提"].waitForExistence(timeout: 6))
+    }
     func testPlanEditorChoosesSportBeforeExerciseLibrary() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -8,8 +22,8 @@ final class PlanningUITests: XCTestCase {
         app.launchArguments = ["--planning-ui-test"]
         app.launch()
         app.tabBars.buttons["训练"].tap()
-        app.buttons["我的计划与历史记录"].tap()
-        app.buttons["新建训练计划"].tap()
+        XCTAssertFalse(app.buttons["我的计划与历史记录"].exists)
+        app.buttons["schedule-training-day"].tap()
         XCTAssertTrue(app.buttons["plan-sport-category"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["choose-library-exercise"].exists)
         XCTAssertFalse(app.textFields["动作名称"].exists)
@@ -33,10 +47,11 @@ final class PlanningUITests: XCTestCase {
         app.buttons["安排为训练"].tap()
         XCTAssertTrue(app.staticTexts["饭后散步"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["今天是休息日"].exists)
-        app.buttons["调整安排"].tap()
+        app.tabBars.buttons["训练"].tap()
+        app.buttons["scheduled-activity"].tap()
         app.buttons["删除今天的安排"].tap()
         app.buttons["删除当天安排"].tap()
-        XCTAssertFalse(app.staticTexts["今天是休息日"].exists)
+        XCTAssertTrue(app.staticTexts["这一天尚未安排训练"].waitForExistence(timeout: 5))
     }
 
     func testTeamRankingCardOpensWithoutAddingBottomTab() {
@@ -61,19 +76,30 @@ final class PlanningUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["今天是休息日"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["从一份训练计划开始"].exists)
     }
-    func testExistingPlanCanBeArrangedForToday() {
+    func testManualCycleCanEditTrainingForSelectedDate() {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
         app.launchArguments = ["--planning-ui-test"]; app.launch()
         app.tabBars.buttons["训练"].tap()
-        let template = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "schedule-template-")).firstMatch
-        XCTAssertTrue(template.waitForExistence(timeout: 8)); template.tap()
-        XCTAssertTrue(app.navigationBars["安排已有计划"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["增肌计划 A"].exists)
-        XCTAssertTrue(app.buttons["安排所选 1 天到日历"].exists)
-        app.buttons["schedule-existing-plan"].tap()
-        XCTAssertTrue(app.staticTexts["胸 + 三头"].waitForExistence(timeout: 6))
-        let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "已有训练模板安排到今天"; attachment.lifetime = .keepAlways; add(attachment)
+        app.buttons["安排训练周期"].tap()
+        XCTAssertTrue(app.buttons["manual-training-cycle"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["ai-training-cycle"].exists)
+        app.buttons["manual-training-cycle"].tap()
+        XCTAssertTrue(app.navigationBars["手动编辑周期"].waitForExistence(timeout: 5))
+        let trainingDay = app.switches.matching(NSPredicate(format: "identifier BEGINSWITH %@", "manual-day-toggle-")).firstMatch
+        XCTAssertTrue(trainingDay.waitForExistence(timeout: 5))
+        XCTAssertTrue(trainingDay.isHittable)
+        trainingDay.tap()
+        XCTAssertEqual(trainingDay.value as? String, "1")
+        XCTAssertTrue(app.navigationBars["手动编辑周期"].exists)
+        let edit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "edit-cycle-day-")).firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 5)); edit.tap()
+        app.buttons["plan-sport-category"].tap()
+        app.buttons["普拉提"].tap()
+        app.buttons["保存"].tap()
+        app.buttons["save-manual-training-cycle"].tap()
+        XCTAssertTrue(app.staticTexts["普拉提"].waitForExistence(timeout: 6))
+        let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "手动周期安排到日历"; attachment.lifetime = .keepAlways; add(attachment)
     }
     func testAccountEntrancesAndProfileMetricsAreInside() {
         continueAfterFailure = false
@@ -109,7 +135,8 @@ final class PlanningUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["饮食周期"].waitForExistence(timeout: 5));XCTAssertTrue(app.buttons["一周"].exists)
         app.buttons["自定义"].tap();XCTAssertTrue(app.staticTexts["结束日期"].exists)
         app.buttons["取消"].tap();app.tabBars.buttons["训练"].tap()
-        XCTAssertTrue(app.navigationBars["训练"].waitForExistence(timeout: 5));XCTAssertTrue(app.buttons["我的计划与历史记录"].exists)
+        XCTAssertTrue(app.navigationBars["训练"].waitForExistence(timeout: 5));XCTAssertTrue(app.buttons["schedule-training-day"].exists)
+        XCTAssertTrue(app.buttons["安排训练周期"].exists)
         app.buttons["月历"].tap();XCTAssertTrue(app.buttons["收起"].exists)
     }
 }

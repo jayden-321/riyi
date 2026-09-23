@@ -43,7 +43,20 @@ struct Plan: Codable, Identifiable {
     var days: [PlanDay] = [PlanDay()]
     var scheduledDate: String?
     var resolvedCategory: String { category ?? "strength" }
-    static func draft() -> Plan { var p = Plan(); p.days = [PlanDay(name: "力量训练", exercises: [])]; return p }
+    static func draft() -> Plan { var p = Plan(); p.trainingGoal = "custom"; p.days = [PlanDay(name: "力量训练", exercises: [])]; return p }
+    var validEditorDraft: Bool {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !days.isEmpty, days.count <= 14 else { return false }
+        return days.allSatisfy { day in
+            guard !day.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+            if resolvedCategory != "strength" {
+                guard let activity = day.activity else { return false }
+                return activity.sport == resolvedCategory && activity.validConfiguration && day.exercises.isEmpty
+            }
+            return day.activity == nil && !day.exercises.isEmpty && validGroups(day.groups ?? [], exerciseIds: day.exercises.map(\.id)) &&
+                (day.volumeTargetKg == nil || (1...1_000_000).contains(day.volumeTargetKg!)) &&
+                day.exercises.allSatisfy { !$0.name.isEmpty && !$0.sets.isEmpty && $0.sets.allSatisfy { $0.weight >= 0 && $0.weight <= 2000 && $0.reps > 0 && $0.reps <= 1000 } }
+        }
+    }
     static func starter() -> Plan {
         var p = Plan(); p.name = "增肌计划 A"; p.days = [PlanDay(name: "胸 + 三头", exercises: [
             PlanExercise(exerciseId: "bench_press", name: "杠铃卧推", loadBasis: "total", sets: [PlanSet(weight: 40, reps: 12), PlanSet(weight: 50, reps: 10), PlanSet(weight: 55, reps: 8), PlanSet(weight: 55, reps: 8)]),
@@ -113,6 +126,7 @@ struct Workout: Codable, Identifiable {
     var synthetic: Bool?
     var activity: TimedActivity?
     var actualDistanceMeters: Double?
+    var scheduledBlockId: String?
     var autoExpiredAt: Date?
     var restUntil: Date?
     var companionReceipts: [CompanionReceipt]?
@@ -121,8 +135,9 @@ struct Workout: Codable, Identifiable {
     var exercises: [WorkoutExercise]; var feedback = Feedback()
     var planDayId: String?
     var volumeTargetKg: Double?; var groups: [ExerciseGroup]?
-    init(plan: Plan, day: PlanDay) {
+    init(plan: Plan, day: PlanDay, scheduledBlockId: String? = nil) {
         planId = plan.id; name = day.name
+        self.scheduledBlockId = scheduledBlockId
         planDayId = day.id
         volumeTargetKg = day.volumeTargetKg
         activity = day.activity
@@ -130,8 +145,9 @@ struct Workout: Codable, Identifiable {
         let ids = Dictionary(uniqueKeysWithValues: zip(day.exercises.map(\.id), exercises.map(\.id)))
         groups = day.groups?.map { group in var copy = group; copy.id = newID(); copy.exerciseIds = group.exerciseIds.compactMap { ids[$0] }; return copy }
     }
-    init(activity: TimedActivity) {
+    init(activity: TimedActivity, scheduledBlockId: String? = nil) {
         self.activity = activity
+        self.scheduledBlockId = scheduledBlockId
         name = activity.name
         exercises = []
     }

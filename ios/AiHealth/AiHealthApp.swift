@@ -210,23 +210,39 @@ struct TodayView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             Label("训练日记", systemImage: "dumbbell.fill").font(.subheadline).foregroundStyle(Theme.green)
                             if let w = store.activeWorkout {
-                                Text(w.name).font(.title.bold()); Text("已完成 \(w.completedSets) / \(w.totalSets) 组").foregroundStyle(.secondary)
+                                Text(w.name).font(.title.bold())
+                                Text(w.activity == nil ? "已完成 \(w.completedSets) / \(w.totalSets) 组" : "正在记录运动时长").foregroundStyle(.secondary)
                                 NavigationLink("继续训练") { WorkoutView(store: store, workout: w) }.buttonStyle(.borderedProminent)
-                            } else if let (_, scheduled) = store.scheduled("training", date: DayKey.string(Date(), zone: store.settings.timezone)), scheduled.rest {
-                                if let activity = scheduled.recoveryActivity, !activity.isEmpty {
-                                    Text(activity).font(.title.bold())
-                                    Text("力量训练休息日 · 今日恢复活动").foregroundStyle(.secondary)
+                            } else if let (_, scheduled) = store.scheduled("training", date: DayKey.string(Date(), zone: store.settings.timezone)) {
+                                if scheduled.rest {
+                                    if let activity = scheduled.recoveryActivity, !activity.isEmpty {
+                                        Text(activity).font(.title.bold())
+                                        Text("今日休息安排").foregroundStyle(.secondary)
+                                    } else {
+                                        Text("今天是休息日").font(.title.bold())
+                                        Text("训练日历已安排休息。").foregroundStyle(.secondary)
+                                    }
+                                    NavigationLink("查看／调整今天安排") { ScheduledRestDayView(store: store, date: scheduled.date) }.buttonStyle(.bordered)
                                 } else {
-                                    Text("今天是休息日").font(.title.bold())
-                                    Text("训练日历已安排休息，今天没有训练组。按计划恢复即可。").foregroundStyle(.secondary)
-                                }
-                                NavigationLink("查看／调整今天安排") { ScheduledRestDayView(store: store, date: scheduled.date) }.buttonStyle(.bordered)
-                            } else if let (_, scheduled) = store.scheduled("training", date: DayKey.string(Date(), zone: store.settings.timezone)), let activity = scheduled.activity {
-                                Text(activity.name).font(.title.bold())
-                                Text("\(sportTitle(activity.resolvedSport)) · \(activity.targetMinutes.map { "目标 \($0) 分钟" } ?? "按时长记录")").foregroundStyle(.secondary)
-                                HStack {
-                                    Button("开始训练") { store.start(activity: activity) }.buttonStyle(.borderedProminent)
-                                    NavigationLink("调整安排") { ScheduledActivityView(store: store, date: scheduled.date) }.buttonStyle(.bordered)
+                                    Text("今天安排 \(scheduled.trainingBlocks.count) 项训练").font(.title3.bold())
+                                    ForEach(Array(scheduled.trainingBlocks.enumerated()), id: \.element.id) { index, block in
+                                        HStack(alignment: .top) {
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text("\(index + 1). \(block.name)").font(.headline)
+                                                Text(sportTitle(block.sport)).font(.caption).foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            if let workout = store.workout(for: block, on: scheduled.date) {
+                                                Text(workout.status == "completed" ? "已完成" : workout.status == "in_progress" ? "进行中" : "已结束")
+                                                    .font(.caption).foregroundStyle(.secondary)
+                                            } else if let plan = block.plan, let day = plan.days.first {
+                                                Button("开始") { store.start(plan: plan, day: day, scheduledBlockId: block.id) }.buttonStyle(.bordered)
+                                            } else if let activity = block.activity {
+                                                Button("开始") { store.start(activity: activity, scheduledBlockId: block.id) }.buttonStyle(.bordered)
+                                            }
+                                        }
+                                    }
+                                    Button("调整今天安排") { store.calendarDate = Date(); store.selectedTab = "training" }.buttonStyle(.bordered)
                                 }
                             } else if let p = store.todayPlan, let d = p.days.first {
                                 Text(d.name).font(.title.bold())

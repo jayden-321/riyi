@@ -39,7 +39,13 @@ extension AppStore {
         return plans.first { $0.id == id }
     }
     var todayPlan: Plan? {
-        if let (_, day) = scheduled("training", date: DayKey.string(Date(), zone: settings.timezone)) { return day.rest ? nil : day.plan }
+        let key = DayKey.string(Date(), zone: settings.timezone)
+        if let (_, day) = scheduled("training", date: key) {
+            if day.rest { return nil }
+            return day.trainingBlocks.first(where: { block in
+                block.plan != nil && !["completed", "cancelled"].contains(workout(for: block, on: key)?.status ?? "")
+            })?.plan
+        }
         if let plan = coachTodayPlan { return plan }
         let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd"; formatter.timeZone = TimeZone(identifier: settings.timezone)
         let today = formatter.string(from: Date())

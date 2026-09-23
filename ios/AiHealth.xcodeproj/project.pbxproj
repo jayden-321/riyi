@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0194F7588D5703617A660AC3 /* WorkoutSport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */; };
 		031FA2747ED183D2BBCE4EFB /* SleepHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 038C997F06CF52CB00A9D4FE /* SleepHistoryTests.swift */; };
+		0467E6F9DF0F472D7C8DCA2A /* ManualTrainingCycleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 339A2AB8B7239E9B6E688496 /* ManualTrainingCycleViews.swift */; };
 		05415BF2F2FF7290DECB2CF7 /* FoodLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C03779D223E031C1E49D999 /* FoodLibrary.swift */; };
 		05E167C64733A929DD0D1B30 /* SleepUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9AE43CDFE004E98FC1CFBEC /* SleepUITests.swift */; };
 		0B55A5E8DE49A4EFEECF86B5 /* TeamViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC95710E4621A83480DFF1E4 /* TeamViews.swift */; };
@@ -124,6 +125,7 @@
 		20744C85F59A9D56BE9D3145 /* exercise_guides.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = exercise_guides.json; sourceTree = "<group>"; };
 		21FD14DB3E9437D92392885C /* AiHealth.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AiHealth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		25F2DD88F764B0EAFF1DD4D2 /* Coach.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Coach.swift; sourceTree = "<group>"; };
+		339A2AB8B7239E9B6E688496 /* ManualTrainingCycleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualTrainingCycleViews.swift; sourceTree = "<group>"; };
 		3AE6867E87F3D952849EA52F /* ExerciseMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMedia.swift; sourceTree = "<group>"; };
 		3B228492BE271F37FDABC2DD /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3DD0DBAEE2FCA3196B33A581 /* CoachViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachViews.swift; sourceTree = "<group>"; };
@@ -223,6 +225,7 @@
 				94B33C9B2B8D2C9642EC71FF /* HealthSync.swift */,
 				0440BF9CFAD46980C6622964 /* Info.plist */,
 				F64EE0D95C718E4169DB6614 /* LocalHealthOverview.swift */,
+				339A2AB8B7239E9B6E688496 /* ManualTrainingCycleViews.swift */,
 				84D5F3350DF5A906DE4EF153 /* Models.swift */,
 				C624F46302C82B541804BF7A /* Network.swift */,
 				AF2AD30CA089D6595B9AF8A3 /* Notifications.swift */,
@@ -535,6 +538,7 @@
 				A41F66A74BCB0A19DE1C0B54 /* HealthStorage.swift in Sources */,
 				1964276DB74BCBBD56398F52 /* HealthSync.swift in Sources */,
 				156E251B6FA6E8A30DFA4EF7 /* LocalHealthOverview.swift in Sources */,
+				0467E6F9DF0F472D7C8DCA2A /* ManualTrainingCycleViews.swift in Sources */,
 				E4451F1BD19276A5751C123C /* Models.swift in Sources */,
 				EE354A7008E88A43DF481269 /* Network.swift in Sources */,
 				B6F9EC96975E63F5E0A35B6C /* Notifications.swift in Sources */,
@@ -604,7 +608,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 40;
 				INFOPLIST_FILE = AiHealth/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -623,7 +627,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 40;
 				INFOPLIST_FILE = AiHealth/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -709,7 +713,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 40;
 				INFOPLIST_FILE = AiHealthWatch/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(RIYI_IOS_BUNDLE_ID).watchkitapp";
@@ -854,7 +858,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
-				CURRENT_PROJECT_VERSION = 38;
+				CURRENT_PROJECT_VERSION = 40;
 				INFOPLIST_FILE = AiHealthWatch/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(RIYI_IOS_BUNDLE_ID).watchkitapp";
