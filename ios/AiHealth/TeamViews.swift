@@ -21,6 +21,8 @@ private struct TeamRank: Decodable, Identifiable {
     var displayName: String
     var trainingDays: Int
     var trainingPoints: Int
+    var trainingSessions: Int?
+    var trainingDetails: [TrainingScoreDetail]?
     var dietPoints: Int
     var sleepNights: Int
     var sleepPoints: Int
@@ -28,6 +30,14 @@ private struct TeamRank: Decodable, Identifiable {
     var rank: Int
     var isMe: Bool
     var id: String { memberId }
+}
+
+private struct TrainingScoreDetail: Decodable, Identifiable {
+    var date: String
+    var name: String
+    var points: Int
+    var basis: String
+    var id: String { "\(date)|\(name)|\(basis)|\(points)" }
 }
 
 private struct TeamDetail: Decodable {
@@ -96,7 +106,7 @@ struct TodayTeamCard: View {
                         Spacer()
                         Text("\(mine.points) 分").font(.title2.bold()).foregroundStyle(Theme.green)
                     }
-                    Text("训练 \(mine.trainingPoints) · 饮食 \(mine.dietPoints) · 睡眠 \(mine.sleepPoints)")
+                    Text("训练 \(mine.trainingPoints)（\(mine.trainingSessions ?? 0) 场）· 饮食 \(mine.dietPoints) · 睡眠 \(mine.sleepPoints)")
                         .font(.caption).foregroundStyle(.secondary)
                     if visibleTeamCount > 1 { Text("另有 \(visibleTeamCount - 1) 个团队 · 查看全部").font(.caption).foregroundStyle(Theme.green) }
                 } else if loading {
@@ -287,8 +297,19 @@ private struct TeamDetailView: View {
                         }
                     }
                 }
+                if let mine = detail.ranking.first(where: \.isMe), let sessions = mine.trainingDetails, !sessions.isEmpty {
+                    Section("我的训练积分明细") {
+                        ForEach(Array(sessions.enumerated()), id: \.offset) { _, session in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack { Text("\(session.date) · \(session.name)"); Spacer(); Text("+\(session.points) 分").bold() }
+                                Text(session.basis).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
                 Section("计分规则") {
-                    Text("训练：每天完成至少一组有实际次数的训练，得 10 分。饮食：当天已记录的热量合计越接近个人目标，最多得 10 分；偏高或偏低都会减分。睡眠：有足够睡眠样本的夜晚，按记录时长最多得 10 分。每项每天最多计一次，本周总分排名；同分并列。")
+                    Text("训练按实际完成量累计，同一天多场也加分。力量训练按正式组、实际次数与记录的负重容量；游泳、HIIT 等按实际时长，游泳等有实际距离时额外计分。单场最多 40 分、每天最多 60 分；未完成、仅计划或过短的记录不计分。")
+                    Text("饮食：当天已记录的热量合计越接近个人目标，最多得 10 分；偏高或偏低都会减分。睡眠：有足够睡眠样本的夜晚，按记录时长最多得 10 分。按本周总分排名，同分并列。")
                     Text("没有饮食记录、热量未知或睡眠未上传，都不会获得对应分数；这不代表当天没吃或没睡。照片粗估按区间保守计分。只统计加入团队后的云端记录，按团队时区 \(detail.timezone) 的周一至周日计算。")
                 }.font(.subheadline).foregroundStyle(.secondary)
                 Section("我的饮食目标") {
