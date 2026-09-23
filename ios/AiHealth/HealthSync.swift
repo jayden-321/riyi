@@ -277,7 +277,20 @@ import SwiftData
             }
         }
         if let w = sample as? HKWorkout {
+            if let sessionID = w.metadata?[HKMetadataKeyExternalUUID] as? String,
+               store?.workouts.contains(where: { $0.id == sessionID }) == true {
+                store?.markHealthWorkoutSaved(sessionID)
+            }
             result.workoutJson = ["activity_type": .number(Double(w.workoutActivityType.rawValue)), "duration_seconds": .number(w.duration)]
+            let distanceType: HKQuantityType? = switch w.workoutActivityType {
+            case .swimming: HKQuantityType(.distanceSwimming)
+            case .cycling: HKQuantityType(.distanceCycling)
+            case .walking, .running, .hiking: HKQuantityType(.distanceWalkingRunning)
+            default: nil
+            }
+            if let distanceType, let distance = w.statistics(for: distanceType)?.sumQuantity() {
+                result.workoutJson?["distance_meters"] = .number(distance.doubleValue(for: .meter()))
+            }
             if let energy = w.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity() { result.workoutJson?["active_energy_kcal"] = .number(energy.doubleValue(for: .kilocalorie())) }
             // Workout energy is preserved but never added again to daily active energy.
         }

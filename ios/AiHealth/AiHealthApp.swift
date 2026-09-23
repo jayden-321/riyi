@@ -221,8 +221,16 @@ struct TodayView: View {
                                     Text("训练日历已安排休息，今天没有训练组。按计划恢复即可。").foregroundStyle(.secondary)
                                 }
                                 NavigationLink("查看／调整今天安排") { ScheduledRestDayView(store: store, date: scheduled.date) }.buttonStyle(.bordered)
+                            } else if let (_, scheduled) = store.scheduled("training", date: DayKey.string(Date(), zone: store.settings.timezone)), let activity = scheduled.activity {
+                                Text(activity.name).font(.title.bold())
+                                Text("\(sportTitle(activity.resolvedSport)) · \(activity.targetMinutes.map { "目标 \($0) 分钟" } ?? "按时长记录")").foregroundStyle(.secondary)
+                                HStack {
+                                    Button("开始训练") { store.start(activity: activity) }.buttonStyle(.borderedProminent)
+                                    NavigationLink("调整安排") { ScheduledActivityView(store: store, date: scheduled.date) }.buttonStyle(.bordered)
+                                }
                             } else if let p = store.todayPlan, let d = p.days.first {
-                                Text(d.name).font(.title.bold()); Text("\(d.exercises.count) 个动作 · \(d.exercises.reduce(0) { $0 + $1.sets.count }) 组计划").foregroundStyle(.secondary)
+                                Text(d.name).font(.title.bold())
+                                Text(d.activity == nil ? "\(d.exercises.count) 个动作 · \(d.exercises.reduce(0) { $0 + $1.sets.count }) 组计划" : "\(sportTitle(d.activity!.resolvedSport)) · \(d.activity!.targetMinutes.map { "目标 \($0) 分钟" } ?? "按时长记录")").foregroundStyle(.secondary)
                                 Button("开始训练") { store.start(plan: p, day: d) }.buttonStyle(.borderedProminent)
                             } else if !store.plans.isEmpty {
                                 Text("今天还没有安排训练").font(.title3.bold())

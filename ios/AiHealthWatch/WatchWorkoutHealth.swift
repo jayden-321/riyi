@@ -4,6 +4,7 @@ import Observation
 
 @MainActor @Observable final class WatchWorkoutHealth: NSObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuilderDelegate {
     var bpm: Double?
+    var distanceMeters: Double?
     var observedAt: Date?
     var status = "训练开始后自动记录心率"
     var needsAuthorization = false
@@ -27,6 +28,14 @@ import Observation
     @ObservationIgnored private var nextAttempt = Date.distantPast
     private let heart = HKQuantityType(.heartRate)
     private let unit = HKUnit.count().unitDivided(by: .minute())
+    private func distanceType(for workout: Workout) -> HKQuantityType? {
+        switch workout.activity?.resolvedSport {
+        case "swimming": HKQuantityType(.distanceSwimming)
+        case "cycling": HKQuantityType(.distanceCycling)
+        case "walking", "running", "hiking": HKQuantityType(.distanceWalkingRunning)
+        default: nil
+        }
+    }
     private var contextURL: URL { URL.applicationSupportDirectory.appendingPathComponent("active-workout.json") }
     struct Context: Codable { var binding: String; var workout: Workout; var stoppedAt: Date?; var collectionStartedAt: Date? }
     func start(binding: String, workout: Workout) async {
@@ -34,23 +43,31 @@ import Observation
         starting = true; defer { starting = false }
         guard HKHealthStore.isHealthDataAvailable() else { status = "此设备无法读取心率"; return }
         do {
-            // Only request types needed by this strength-training companion.
-            try await store.requestAuthorization(toShare: [HKObjectType.workoutType(), HKQuantityType(.activeEnergyBurned)], read: [heart, HKObjectType.workoutType()])
+            var writable: Set<HKSampleType> = [HKObjectType.workoutType(), HKQuantityType(.activeEnergyBurned)]
+            var readable: Set<HKObjectType> = [heart, HKObjectType.workoutType()]
+            if let distanceType = distanceType(for: workout) { writable.insert(distanceType); readable.insert(distanceType) }
+            try await store.requestAuthorization(toShare: writable, read: readable)
             guard store.authorizationStatus(for: HKObjectType.workoutType()) == .sharingAuthorized else {
                 needsAuthorization = true; nextAttempt = Date().addingTimeInterval(60); status = "需要在健康权限中允许记录训练"; return
             }
             guard desired?.binding == binding, desired?.workout.id == workout.id else { return }
             needsAuthorization = false
-            self.binding = binding; self.workout = workout; collectionStartedAt = Date()
+            self.binding = binding; self.workout = workout; distanceMeters = nil; collectionStartedAt = Date()
             try FileManager.default.createDirectory(at: contextURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try Wire.data(Context(binding: binding, workout: workout, collectionStartedAt: collectionStartedAt)).write(to: contextURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-            let config = HKWorkoutConfiguration(); config.activityType = .traditionalStrengthTraining; config.locationType = .indoor
+            let config = healthWorkoutConfiguration(for: workout)
             let session = try HKWorkoutSession(healthStore: store, configuration: config)
             configure(session)
             session.prepare()
             let start = collectionStartedAt ?? Date(); session.startActivity(with: start)
             try await builder!.beginCollection(at: start)
-            try await builder!.addMetadata([HKMetadataKeyExternalUUID: workout.id, "aijiankang_session_id": workout.id])
+            var metadata: [String: Any] = [HKMetadataKeyExternalUUID: workout.id, "riyi_session_id": workout.id]
+            if workout.activity?.resolvedSport == "swimming" {
+                let location: HKWorkoutSwimmingLocationType = workout.activity?.swimLocation == "pool" ? .pool : .openWater
+                metadata[HKMetadataKeySwimmingLocationType] = NSNumber(value: location.rawValue)
+                if let length = workout.activity?.poolLengthMeters { metadata[HKMetadataKeyLapLength] = HKQuantity(unit: .meter(), doubleValue: length) }
+            }
+            try await builder!.addMetadata(metadata)
             active = true; status = "等待心率样本（以系统授权为准）"; observeRaw()
         } catch { nextAttempt = Date().addingTimeInterval(20); status = "心率启动失败：\(error.localizedDescription)"; session?.end(); session = nil; builder = nil }
     }
@@ -111,6 +128,9 @@ import Observation
                                           sourceName: saved.sourceRevision.source.name, sourceBundleId: saved.sourceRevision.source.bundleIdentifier, deviceName: saved.device?.name ?? "")
                 sample.metadataJson["watch_session_id"] = .string(workout.id)
                 sample.workoutJson = ["activity_type": .number(Double(saved.workoutActivityType.rawValue)), "duration_seconds": .number(saved.duration)]
+                if let distanceType = distanceType(for: workout), let distance = saved.statistics(for: distanceType)?.sumQuantity() {
+                    sample.workoutJson?["distance_meters"] = .number(distance.doubleValue(for: .meter()))
+                }
                 if #available(watchOS 27.0, *), let group = saved.zoneGroupsByType?[heart] {
                     sample.metadataJson["heart_rate_zone_source"] = .string(String(describing: group.configuration.source))
                     sample.metadataJson["heart_rate_zones"] = .array(group.zoneDurations.map { duration in
@@ -205,11 +225,19 @@ import Observation
     }
     nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
     nonisolated func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
-        guard collectedTypes.contains(HKQuantityType(.heartRate)), let statistics = workoutBuilder.statistics(for: HKQuantityType(.heartRate)),
-              let quantity = statistics.mostRecentQuantity() else { return }
-        let value = quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
-        let observed = statistics.mostRecentQuantityDateInterval()?.end
-        Task { @MainActor [weak self] in guard self?.builder === workoutBuilder else { return }; self?.bpm = value; self?.observedAt = observed; self?.status = "正在记录心率" }
+        Task { @MainActor [weak self] in
+            guard let self, self.builder === workoutBuilder else { return }
+            if collectedTypes.contains(self.heart), let statistics = workoutBuilder.statistics(for: self.heart),
+               let quantity = statistics.mostRecentQuantity() {
+                self.bpm = quantity.doubleValue(for: self.unit)
+                self.observedAt = statistics.mostRecentQuantityDateInterval()?.end
+                self.status = "正在记录心率"
+            }
+            if let workout = self.workout, let distanceType = self.distanceType(for: workout), collectedTypes.contains(distanceType),
+               let value = workoutBuilder.statistics(for: distanceType)?.sumQuantity() {
+                self.distanceMeters = value.doubleValue(for: .meter())
+            }
+        }
     }
     @available(watchOS 27.0, *)
     nonisolated func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didUpdateWorkoutZone zoneUpdate: HKLiveWorkoutZoneUpdate) {

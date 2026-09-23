@@ -4,6 +4,22 @@ import SwiftData
 
 final class CompanionTests: XCTestCase {
     let now = Date(timeIntervalSince1970: 1_790_000_000.123)
+    func testWatchCanFinishTimedSportWithoutFakeSetsAndRetryIsIdempotent() throws {
+        var workout = Workout(activity: TimedActivity(name: "泳池游泳", targetMinutes: 30, sport: "swimming", swimLocation: "pool", poolLengthMeters: 25))
+        workout.startedAt = now.addingTimeInterval(-20 * 60)
+        let event = CompanionEvent(binding: "paired", sessionId: workout.id, exerciseId: "", setId: "", expectedSet: "", action: "finish_activity", observedAt: now)
+        var replica = CompanionReplica(snapshot: CompanionSnapshot(binding: "paired", revision: 1, workout: workout))
+        replica.events = [event]
+        XCTAssertEqual(replica.projected?.status, "in_progress", "Watch must wait for iPhone commit before stopping HealthKit")
+        let receipt = CompanionCore.apply(event, binding: "paired", to: &workout, now: now)
+        XCTAssertEqual(receipt.outcome, "applied")
+        XCTAssertEqual(workout.status, "completed")
+        XCTAssertEqual(workout.finishedAt, now)
+        XCTAssertTrue(workout.exercises.isEmpty)
+        XCTAssertEqual(CompanionCore.apply(event, binding: "paired", to: &workout, now: now.addingTimeInterval(1)).outcome, "applied")
+        replica.acknowledge(receipt)
+        XCTAssertTrue(replica.events.isEmpty)
+    }
     func fixture() -> Workout {
         let plan = Plan.starter(); var workout = Workout(plan: plan, day: plan.days[0]); workout.startedAt = now.addingTimeInterval(-60); return workout
     }

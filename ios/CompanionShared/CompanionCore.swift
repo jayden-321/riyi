@@ -49,6 +49,7 @@ struct CompanionDayStatus: Codable, Equatable {
     var date: String
     var timezone: String
     var kind: String // rest, training, or unplanned
+    var activityName: String? = nil
 }
 struct CompanionHeartBatch: Codable, Identifiable {
     var id = newID()
@@ -105,7 +106,7 @@ enum CompanionCore {
         workout.status = "in_progress"; workout.finishedAt = nil; workout.autoExpiredAt = nil
         let receipt = apply(event, binding: binding, to: &workout, now: now)
         if receipt.outcome == "applied" {
-            if anotherActive || isOvernightStale(workout, zone: zone, now: now) {
+            if workout.status == "in_progress" && (anotherActive || isOvernightStale(workout, zone: zone, now: now)) {
                 workout.status = "cancelled"; workout.finishedAt = lastActivity(workout); workout.autoExpiredAt = now; workout.restUntil = nil
             }
         } else {
@@ -147,6 +148,11 @@ enum CompanionCore {
         else if event.sessionId != workout.id { outcome = "wrong_session" }
         else if workout.status != "in_progress" { outcome = "session_finished" }
         else if event.observedAt < workout.startedAt || event.observedAt > now.addingTimeInterval(30) { outcome = "invalid_time" }
+        else if event.action == "finish_activity", workout.activity != nil,
+                event.exerciseId.isEmpty, event.setId.isEmpty, event.expectedSet.isEmpty,
+                event.observedAt > workout.startedAt {
+            workout.status = "completed"; workout.finishedAt = event.observedAt; workout.restUntil = nil; outcome = "applied"
+        }
         else if let i = workout.exercises.firstIndex(where: { $0.id == event.exerciseId }),
                 let j = workout.exercises[i].sets.firstIndex(where: { $0.id == event.setId }) {
             var set = workout.exercises[i].sets[j]
@@ -204,7 +210,7 @@ struct CompanionReplica: Codable {
     var message = "等待 iPhone 同步今日任务"
     var projected: Workout? {
         guard let snapshot, var workout = snapshot.workout else { return nil }
-        for event in events where event.binding == snapshot.binding && event.sessionId == workout.id {
+        for event in events where event.binding == snapshot.binding && event.sessionId == workout.id && event.action != "finish_activity" {
             _ = CompanionCore.apply(event, binding: snapshot.binding, to: &workout, now: max(Date(), event.observedAt))
         }
         return workout

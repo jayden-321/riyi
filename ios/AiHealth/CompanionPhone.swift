@@ -29,6 +29,7 @@ extension AppStore {
             }
         }
         if (try? Wire.data(base.feedback)) != (try? Wire.data(proposed.feedback)) { current.feedback = proposed.feedback }
+        if base.actualDistanceMeters != proposed.actualDistanceMeters { current.actualDistanceMeters = proposed.actualDistanceMeters }
         if base.volumeTargetKg != proposed.volumeTargetKg { current.volumeTargetKg = proposed.volumeTargetKg }
         if proposed.status != base.status {
             if conflict { error = "手表刚更新了训练，请核对后再次结束" }
@@ -40,7 +41,9 @@ extension AppStore {
             }
         }
         if conflict { error = "该组已在另一端更新，已保留确认后的结果，请核对" }
-        _ = save(current, kind: "workout", id: current.id)
+        if save(current, kind: "workout", id: current.id), current.status == "completed" {
+            Task { await writeWorkoutToHealth(current, automatic: true) }
+        }
     }
 }
 
@@ -96,9 +99,11 @@ import Network
         // Legacy guest/demo fixtures are not consent to start a real HealthKit workout.
         if workout?.synthetic == nil { workout?.synthetic = store.isDemo }
         let offer = todayOffer(store: store)
-        let rest = store.scheduled("training", date: today).map { $0.1.rest } ?? false
+        let scheduled = store.scheduled("training", date: today)?.1
+        let rest = scheduled?.rest ?? false
         let dayStatus = store.signedIn ? CompanionDayStatus(date: today, timezone: store.settings.timezone,
-            kind: rest ? "rest" : offer == nil ? "unplanned" : "training") : nil
+            kind: rest ? "rest" : scheduled?.activity != nil ? "training" : offer == nil ? "unplanned" : "training",
+            activityName: scheduled?.activity?.name) : nil
         let payload = try? Wire.data(workout), offerPayload = try? Wire.data(offer), dayPayload = try? Wire.data(dayStatus)
         let changed = payload != lastPayload || offerPayload != lastOfferPayload || dayPayload != lastDayStatusPayload || current?.binding != binding
         if changed {
@@ -132,6 +137,9 @@ import Network
                 now: Date())
             // save() commits workout + receipt + existing server outbox atomically before ACK.
             guard store.save(workout, kind: "workout", id: workout.id) else { return }
+            if event.action == "finish_activity", receipt.outcome == "applied" {
+                Task { await store.writeWorkoutToHealth(workout, automatic: true) }
+            }
             publish(force: true)
             transport.send(CompanionPacket(snapshot: current, receipt: receipt))
         }
@@ -144,6 +152,7 @@ import Network
             }) else { return }
             let scope = store.scope, upload = store.settings.healthConsent && !store.isDemo && !store.healthUploadPaused
             inFlightHealth.insert(batch.id)
+            if batch.samples.contains(where: { $0.type == "workout" }) { store.markHealthWorkoutSaved(batch.sessionId) }
             Task { [weak self] in
                 defer { self?.inFlightHealth.remove(batch.id) }
                 do {
@@ -191,7 +200,8 @@ import Network
     private func launchWatch() {
         publish(force: true)
         guard let store, store.activeWorkout?.synthetic != true else { return }
-        let config = HKWorkoutConfiguration(); config.activityType = .traditionalStrengthTraining; config.locationType = .indoor
+        guard let workout = store.activeWorkout else { return }
+        let config = healthWorkoutConfiguration(for: workout)
         HKHealthStore().startWatchApp(with: config) { [weak store] success, error in
             if !success { Task { @MainActor in store?.error = "手表未自动打开：\(error?.localizedDescription ?? "请在手表打开日益")。训练已在手机保存，手表打开后会同步。" } }
         }

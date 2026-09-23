@@ -92,6 +92,18 @@ import Observation
         } else { next.events.append(event); next.message = "已保存到手表，等待 iPhone 确认" }
         if commit(next) { flush() }
     }
+    func finishActivity() {
+        guard let snapshot = replica.snapshot, let workout = displayWorkout,
+              workout.activity != nil, workout.status == "in_progress",
+              !replica.events.contains(where: { $0.sessionId == workout.id && $0.action == "finish_activity" }) else { return }
+        let event = CompanionEvent(binding: snapshot.binding, sessionId: workout.id, exerciseId: "", setId: "", expectedSet: "", action: "finish_activity", observedAt: Date())
+        var next = replica
+        if demo {
+            var work = workout; let receipt = CompanionCore.apply(event, binding: snapshot.binding, to: &work, now: Date())
+            next.snapshot?.workout = work; next.message = receipt.outcome == "applied" ? "演示：运动已完成" : receipt.outcome
+        } else { next.events.append(event); next.message = "结束请求已保存在手表，等待 iPhone 确认" }
+        if commit(next) { flush() }
+    }
     func flush() {
         guard !demo else { return }
         if let snapshot = replica.snapshot { health.reconcile(binding: snapshot.binding, workout: displayWorkout) }

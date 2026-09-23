@@ -18,7 +18,7 @@ struct NutritionMeal: Codable, Identifiable {
     var id = newID(); var slot = "snack"; var name: String; var foods: [String]; var preparation: String; var alternatives: [String]
 }
 struct CycleDay: Codable, Identifiable {
-    var id = newID(); var date: String; var rest = false; var recoveryActivity: String? = nil; var plan: Plan?; var meals: [NutritionMeal] = []
+    var id = newID(); var date: String; var rest = false; var recoveryActivity: String? = nil; var activity: TimedActivity? = nil; var plan: Plan?; var meals: [NutritionMeal] = []
 }
 struct PlanningCycle: Codable, Identifiable {
     var id = newID(); var name: String; var kind: String; var startDate: String; var endDate: String; var timezone: String
@@ -121,6 +121,23 @@ extension AppStore {
     func scheduled(_ kind: String, date: String) -> (PlanningCycle, CycleDay)? {
         for c in cycles where c.kind == kind { if let d = c.days.first(where: { $0.date == date }) { return (c,d) } }; return nil
     }
+    func promoteWalkingRecovery() {
+        for cycle in cycles where cycle.kind == "training" {
+            var changed = cycle
+            var needsSave = false
+            for index in changed.days.indices {
+                let day = changed.days[index]
+                guard day.rest, day.activity == nil,
+                      let title = day.recoveryActivity?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      title.contains("散步") else { continue }
+                changed.days[index].rest = false
+                changed.days[index].recoveryActivity = nil
+                changed.days[index].activity = TimedActivity(name: title, sport: "walking")
+                needsSave = true
+            }
+            if needsSave { _ = save(changed, kind: "cycle", id: cycle.id) }
+        }
+    }
     @discardableResult func setRestDayRecovery(on date: String, activity: String) -> Bool {
         let value = activity.trimmingCharacters(in: .whitespacesAndNewlines)
         guard value.count <= 240 else { error = "恢复活动最多填写 240 字"; return false }
@@ -131,12 +148,47 @@ extension AppStore {
         if !isDemo { Task { await synchronize(showErrors: true) } }
         return true
     }
+    @discardableResult func convertRestToActivity(on date: String, name: String, targetMinutes: Int?) -> Bool {
+        let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, title.count <= 120, targetMinutes == nil || (1...1440).contains(targetMinutes!) else { error = "请填写活动名称；目标时长须为 1–1440 分钟"; return false }
+        guard let (cycle, day) = scheduled("training", date: date), day.rest,
+              let index = cycle.days.firstIndex(where: { $0.id == day.id }) else { error = "这一天没有可修改的休息安排"; return false }
+        var changed = cycle
+        changed.days[index].rest = false
+        changed.days[index].recoveryActivity = nil
+        changed.days[index].activity = TimedActivity(name: title, targetMinutes: targetMinutes, sport: "walking")
+        guard save(changed, kind: "cycle", id: cycle.id) else { return false }
+        if !isDemo { Task { await synchronize(showErrors: true) } }
+        return true
+    }
     @discardableResult func deleteRestDay(on date: String) -> Bool {
         guard let (cycle, day) = scheduled("training", date: date), day.rest else { error = "这一天没有可删除的休息安排"; return false }
         if cycle.days.count == 1 {
             remove(kind: "cycle", id: cycle.id)
             return scheduled("training", date: date) == nil
         }
+        var changed = cycle; changed.days.removeAll { $0.id == day.id }
+        changed.startDate = changed.days.map(\.date).min() ?? cycle.startDate
+        changed.endDate = changed.days.map(\.date).max() ?? cycle.endDate
+        guard save(changed, kind: "cycle", id: cycle.id) else { return false }
+        if !isDemo { Task { await synchronize(showErrors: true) } }
+        return true
+    }
+    @discardableResult func updateActivity(on date: String, activity: TimedActivity) -> Bool {
+        let name = activity.name
+        let sport = activity.resolvedSport
+        let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, title.count <= 120, sportOptions.contains(where: { $0.code == sport && sport != "strength" }), activity.validConfiguration else { error = "请检查运动类型、目标及游泳地点／泳池长度"; return false }
+        guard let (cycle, day) = scheduled("training", date: date), day.activity != nil,
+              let index = cycle.days.firstIndex(where: { $0.id == day.id }) else { error = "这一天没有可修改的活动"; return false }
+        var changed = cycle; var updated = activity; updated.name = title; changed.days[index].activity = updated
+        guard save(changed, kind: "cycle", id: cycle.id) else { return false }
+        if !isDemo { Task { await synchronize(showErrors: true) } }
+        return true
+    }
+    @discardableResult func deleteActivity(on date: String) -> Bool {
+        guard let (cycle, day) = scheduled("training", date: date), day.activity != nil else { error = "这一天没有可删除的活动"; return false }
+        if cycle.days.count == 1 { remove(kind: "cycle", id: cycle.id); return scheduled("training", date: date) == nil }
         var changed = cycle; changed.days.removeAll { $0.id == day.id }
         changed.startDate = changed.days.map(\.date).min() ?? cycle.startDate
         changed.endDate = changed.days.map(\.date).max() ?? cycle.endDate

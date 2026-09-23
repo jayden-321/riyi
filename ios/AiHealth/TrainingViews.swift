@@ -10,7 +10,7 @@ struct TrainingView: View {
                     Section(plan.name) {
                         ForEach(plan.days) { day in
                             HStack {
-                                VStack(alignment: .leading) { Text(day.name); Text("\(day.exercises.count) 个动作").font(.caption).foregroundStyle(.secondary) }
+                                VStack(alignment: .leading) { Text(day.name); Text(day.activity == nil ? "\(day.exercises.count) 个动作" : "\(sportTitle(day.activity!.resolvedSport)) · 按时长记录").font(.caption).foregroundStyle(.secondary) }
                                 Spacer()
                                 if let active = store.activeWorkout {
                                     if active.planId == plan.id && (active.planDayId == day.id || active.planDayId == nil && active.name == day.name) {
@@ -26,14 +26,14 @@ struct TrainingView: View {
                     }
                 }
                 Section("新计划") {
-                    Button { editing = Plan() } label: { Label("新建训练计划", systemImage: "plus") }
+                    Button { editing = Plan.draft() } label: { Label("新建训练计划", systemImage: "plus") }
                     if store.plans.isEmpty { Button("从示例模板开始") { editing = Plan.starter() }; Text("示例重量仅供编辑，请按自己的实际计划调整。").font(.caption).foregroundStyle(.secondary) }
                 }
                 Section("训练记录") {
                     if store.workouts.isEmpty { Text("完成的每一组，都会留在这里。").foregroundStyle(.secondary) }
                     ForEach(store.workouts) { w in
                         NavigationLink { WorkoutView(store: store, workout: w) } label: {
-                            VStack(alignment: .leading, spacing: 5) { Text(w.name).font(.headline); Text("\(w.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(w.completedSets) 组 · \(w.status == "completed" ? "已完成" : w.status == "cancelled" ? "已结束" : "进行中")").font(.caption).foregroundStyle(.secondary) }
+                            VStack(alignment: .leading, spacing: 5) { Text(w.name).font(.headline); Text("\(w.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(w.activity == nil ? "\(w.completedSets) 组 · " : "")\(w.status == "completed" ? "已完成" : w.status == "cancelled" ? "已结束" : "进行中")").font(.caption).foregroundStyle(.secondary) }
                         }
                     }
                 }
@@ -45,34 +45,77 @@ struct TrainingView: View {
 struct PlanEditor: View {
     @Bindable var store: AppStore; @State var plan: Plan; @Environment(\.dismiss) var dismiss
     @State private var selectingDayID: String?
-    var valid: Bool { !plan.name.trimmingCharacters(in: .whitespaces).isEmpty && !plan.days.isEmpty && plan.days.allSatisfy { !$0.name.isEmpty && !$0.exercises.isEmpty && validGroups($0.groups ?? [], exerciseIds: $0.exercises.map(\.id)) && ($0.volumeTargetKg == nil || (1...1_000_000).contains($0.volumeTargetKg!)) && $0.exercises.allSatisfy { !$0.name.isEmpty && !$0.sets.isEmpty && $0.sets.allSatisfy { $0.weight >= 0 && $0.weight <= 2000 && $0.reps > 0 && $0.reps <= 1000 } } } }
+    @State private var replacingExerciseID: String?
+    @State private var requestedCategory: String?
+    @State private var confirmCategoryChange = false
+    private var strength: Bool { plan.resolvedCategory == "strength" }
+    private var distanceSport: Bool { ["swimming", "running", "cycling", "walking", "hiking", "rowing"].contains(plan.resolvedCategory) }
+    var valid: Bool {
+        guard !plan.name.trimmingCharacters(in: .whitespaces).isEmpty, !plan.days.isEmpty else { return false }
+        return plan.days.allSatisfy { day in
+            guard !day.name.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+            if !strength {
+                guard let activity = day.activity else { return false }
+                return activity.sport == plan.resolvedCategory && activity.validConfiguration
+            }
+            return day.activity == nil && !day.exercises.isEmpty && validGroups(day.groups ?? [], exerciseIds: day.exercises.map(\.id)) &&
+                (day.volumeTargetKg == nil || (1...1_000_000).contains(day.volumeTargetKg!)) &&
+                day.exercises.allSatisfy { !$0.name.isEmpty && !$0.sets.isEmpty && $0.sets.allSatisfy { $0.weight >= 0 && $0.weight <= 2000 && $0.reps > 0 && $0.reps <= 1000 } }
+        }
+    }
     var body: some View {
         NavigationStack {
             Form {
+                Section("第一步 · 选择运动大类") {
+                    Picker("运动大类", selection: Binding(get: { plan.resolvedCategory }, set: { changeCategory($0) })) {
+                        ForEach(sportOptions, id: \.code) { option in Label(option.title, systemImage: option.icon).tag(option.code) }
+                    }.accessibilityIdentifier("plan-sport-category")
+                }
                 Section("计划") {
                     TextField("名称", text: $plan.name)
-                    Picker("训练目标", selection: $plan.trainingGoal) { Text("增肌").tag("hypertrophy"); Text("力量").tag("strength"); Text("容量").tag("volume"); Text("自定义").tag("custom") }
-                    Picker("默认组模式", selection: $plan.setPattern) { ForEach(patternOptions, id: \.0) { Text($0.1).tag($0.0) } }
-                    Text("目标与组模式独立；每组重量、次数以你填写的数值为准。").font(.caption).foregroundStyle(.secondary)
+                    if strength {
+                        Picker("力量训练目标", selection: $plan.trainingGoal) { Text("增肌").tag("hypertrophy"); Text("力量").tag("strength"); Text("容量").tag("volume"); Text("自定义").tag("custom") }
+                        Picker("默认组模式", selection: $plan.setPattern) { ForEach(patternOptions, id: \.0) { Text($0.1).tag($0.0) } }
+                    } else { Text("\(sportTitle(plan.resolvedCategory))按实际运动时长记录；游泳、跑步等也可设距离目标。").font(.caption).foregroundStyle(.secondary) }
                 }
                 ForEach($plan.days) { $day in
-                    Section {
+                    Section(day.name) {
                         TextField("训练日名称", text: $day.name)
-                        VolumeTargetEditor(value: $day.volumeTargetKg)
-                        NavigationLink("特殊组合 · \((day.groups ?? []).count) 个") { GroupEditor(day: $day) }
-                        if !validGroups(day.groups ?? [], exerciseIds: day.exercises.map(\.id)) { Text("请在特殊组合中补足动作，或移除不完整的组合后保存。").font(.caption).foregroundStyle(.red) }
-                    } header: { Text(day.name) }
-                    ForEach($day.exercises) { $exercise in
-                        Section {
-                                TextField("动作名称", text: $exercise.name).font(.headline)
-                                NavigationLink { ExerciseGuideView(store: store, exerciseId: exercise.exerciseId, name: exercise.name) } label: { Label("动作图解与说明", systemImage: "figure.strengthtraining.traditional") }.font(.subheadline)
+                        if strength {
+                            if day.exercises.isEmpty { Text("先从动作库选择动作").font(.caption).foregroundStyle(.secondary) }
+                            Button { selectingDayID = day.id; replacingExerciseID = nil } label: { Label("从动作库选择动作", systemImage: "square.grid.2x2") }
+                                .accessibilityIdentifier("choose-library-exercise")
+                            VolumeTargetEditor(value: $day.volumeTargetKg)
+                            if !day.exercises.isEmpty { NavigationLink("特殊组合 · \((day.groups ?? []).count) 个") { GroupEditor(day: $day) } }
+                        } else {
+                            TextField("运动项目", text: Binding(get: { day.activity?.name ?? "" }, set: { day.activity?.name = $0 }))
+                            TextField("目标分钟数（可选）", value: Binding(get: { day.activity?.targetMinutes }, set: { day.activity?.targetMinutes = $0 }), format: .number).keyboardType(.numberPad)
+                            if distanceSport {
+                                TextField("目标距离（米，可选）", value: Binding(get: { day.activity?.targetDistanceMeters }, set: { day.activity?.targetDistanceMeters = $0 }), format: .number).keyboardType(.decimalPad)
+                            }
+                            TextField("目标消耗（千卡，可选）", value: Binding(get: { day.activity?.targetEnergyKcal }, set: { day.activity?.targetEnergyKcal = $0 }), format: .number).keyboardType(.decimalPad)
+                            if plan.resolvedCategory == "swimming" {
+                                Picker("游泳地点", selection: Binding(get: { day.activity?.swimLocation ?? "" }, set: { value in day.activity?.swimLocation = value.isEmpty ? nil : value; if value != "pool" { day.activity?.poolLengthMeters = nil } })) {
+                                    Text("请选择").tag(""); Text("泳池游泳").tag("pool"); Text("开放水域游泳").tag("open_water")
+                                }
+                                if day.activity?.swimLocation == "pool" {
+                                    TextField("泳池长度（米）", value: Binding(get: { day.activity?.poolLengthMeters }, set: { day.activity?.poolLengthMeters = $0 }), format: .number).keyboardType(.decimalPad)
+                                }
+                                if !day.activity!.validConfiguration { Text("泳池游泳需填写实际泳池长度；开放水域不用填写泳池长度。").font(.caption).foregroundStyle(.orange) }
+                            }
+                        }
+                        Button("删除训练日", role: .destructive) { plan.days.removeAll { $0.id == day.id } }
+                    }
+                    if strength {
+                        ForEach($day.exercises) { $exercise in
+                            Section(exercise.name) {
+                                if exercise.exerciseId == "custom" { TextField("自定义动作名称", text: $exercise.name) }
+                                else { Text(exercise.name).font(.headline) }
+                                Button("从动作库更换动作") { selectingDayID = day.id; replacingExerciseID = exercise.id }
+                                NavigationLink { ExerciseGuideView(store: store, exerciseId: exercise.exerciseId, name: exercise.name) } label: { Label("动作图解与说明", systemImage: "figure.strengthtraining.traditional") }
                                 Picker("重量口径", selection: $exercise.loadBasis) { ForEach(loadNames.keys.sorted(), id: \.self) { Text(loadNames[$0]!).tag($0) } }
-                                if exercise.loadBasis == "per_hand" {
-                                    Picker("容量计算", selection: Binding(get: { exercise.loadCount ?? 1 }, set: { exercise.loadCount = $0 })) { Text("单只 / 单侧").tag(1); Text("双只 / 双侧").tag(2) }
-                                }
-                                Picker("组模式", selection: Binding(get: { exercise.setPattern ?? "" }, set: { exercise.setPattern = $0.isEmpty ? nil : $0 })) {
-                                    Text("跟随计划").tag(""); ForEach(patternOptions, id: \.0) { Text($0.1).tag($0.0) }
-                                }
+                                if exercise.loadBasis == "per_hand" { Picker("容量计算", selection: Binding(get: { exercise.loadCount ?? 1 }, set: { exercise.loadCount = $0 })) { Text("单只 / 单侧").tag(1); Text("双只 / 双侧").tag(2) } }
+                                Picker("组模式", selection: Binding(get: { exercise.setPattern ?? "" }, set: { exercise.setPattern = $0.isEmpty ? nil : $0 })) { Text("跟随计划").tag(""); ForEach(patternOptions, id: \.0) { Text($0.1).tag($0.0) } }
                                 ForEach($exercise.sets) { $set in
                                     HStack {
                                         Picker("组类型", selection: $set.role) { Text("正式").tag("working"); Text("热身").tag("warmup") }.pickerStyle(.menu).buttonStyle(.borderless).labelsHidden().frame(width: 85)
@@ -83,31 +126,47 @@ struct PlanEditor: View {
                                     }
                                 }
                                 HStack { Button("添加一组") { exercise.sets.append(PlanSet()) }; Spacer(); Button("删除动作", role: .destructive) { day.exercises.removeAll { $0.id == exercise.id } } }.buttonStyle(.borderless)
-                        } header: { Text(exercise.name) }
+                            }
+                        }
                     }
-                    Section {
-                        Button("从动作库添加") { selectingDayID = day.id }
-                        Button("添加动作") { day.exercises.append(PlanExercise()) }
-                        Button("删除训练日", role: .destructive) { plan.days.removeAll { $0.id == day.id } }
-                    } header: { Text(day.name) }
                 }
-                Button("添加训练日") { plan.days.append(PlanDay()) }
+                Button("添加训练日") { plan.days.append(strength ? PlanDay(name: "力量训练", exercises: []) : PlanDay(name: sportTitle(plan.resolvedCategory), exercises: [], activity: TimedActivity(name: sportTitle(plan.resolvedCategory), sport: plan.resolvedCategory))) }
             }.navigationTitle("编辑训练计划")
                 .sheet(isPresented: Binding(get: { selectingDayID != nil }, set: { if !$0 { selectingDayID = nil } })) {
                     NavigationStack {
-                        ExerciseLibraryView(store: store) { guide in
+                        ExerciseLibraryView(store: store, onSelect: { guide in
                             guard let dayID = selectingDayID, let index = plan.days.firstIndex(where: { $0.id == dayID }) else { return }
-                            var exercise = PlanExercise(exerciseId: guide.id, name: guide.name, loadBasis: guide.equipmentGroup == "自重" ? "bodyweight" : "total")
-                            exercise.sets = [PlanSet(weight: 0, reps: 12)]
-                            plan.days[index].exercises.append(exercise)
-                            selectingDayID = nil
-                        }.toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { selectingDayID = nil } } }
+                            if let replacingExerciseID, let old = plan.days[index].exercises.firstIndex(where: { $0.id == replacingExerciseID }) {
+                                plan.days[index].exercises[old].exerciseId = guide.id
+                                plan.days[index].exercises[old].name = guide.name
+                                plan.days[index].exercises[old].loadBasis = guide.equipmentGroup == "自重" ? "bodyweight" : "total"
+                            } else {
+                                var exercise = PlanExercise(exerciseId: guide.id, name: guide.name, loadBasis: guide.equipmentGroup == "自重" ? "bodyweight" : "total")
+                                exercise.sets = [PlanSet(weight: 0, reps: 12)]
+                                plan.days[index].exercises.append(exercise)
+                            }
+                            selectingDayID = nil; replacingExerciseID = nil
+                        }, selectRepBasedOnly: true).toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { selectingDayID = nil; replacingExerciseID = nil } } }
                     }
                 }.toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("保存") { if store.save(plan, kind: "plan", id: plan.id) { dismiss() } }.disabled(!valid) }
             }
+            .confirmationDialog("更换运动大类会重置此计划的训练日，继续吗？", isPresented: $confirmCategoryChange) {
+                Button("更换运动大类", role: .destructive) { if let requestedCategory { applyCategory(requestedCategory) }; requestedCategory = nil }
+                Button("取消", role: .cancel) { requestedCategory = nil }
+            }
         }
+    }
+    private func changeCategory(_ category: String) {
+        guard category != plan.resolvedCategory else { return }
+        if plan.days.contains(where: { !$0.exercises.isEmpty || $0.activity != nil }) { requestedCategory = category; confirmCategoryChange = true }
+        else { applyCategory(category) }
+    }
+    private func applyCategory(_ category: String) {
+        plan.category = category
+        if category != "strength" { plan.trainingGoal = "custom"; plan.setPattern = "straight" }
+        plan.days = [category == "strength" ? PlanDay(name: "力量训练", exercises: []) : PlanDay(name: sportTitle(category), exercises: [], activity: TimedActivity(name: sportTitle(category), sport: category))]
     }
 }
 
@@ -172,12 +231,22 @@ extension WorkoutExercise {
 
 struct WorkoutView: View {
     @Bindable var store: AppStore; @State var workout: Workout; @State private var endConfirm = false
+    @State private var phoneHealthConfirm = false
     var active: Bool { workout.status == "in_progress" }
     var lastCompleted: Date? { workout.exercises.flatMap(\.sets).compactMap(\.completedAt).max() }
     var body: some View {
         List {
             Section {
-                HStack { Label("\(workout.completedSets) / \(workout.totalSets) 组", systemImage: "checkmark.circle"); Spacer(); Text(active ? "训练中" : "已结束").foregroundStyle(Theme.green) }
+                HStack { Label(workout.activity == nil ? "\(workout.completedSets) / \(workout.totalSets) 组" : workout.name, systemImage: workout.activity == nil ? "checkmark.circle" : "figure.walk"); Spacer(); Text(active ? "训练中" : "已结束").foregroundStyle(Theme.green) }
+                if let activity = workout.activity {
+                    Text(activity.targetMinutes.map { "目标 \($0) 分钟" } ?? "按时长记录").foregroundStyle(.secondary)
+                    if let distance = activity.targetDistanceMeters { Text("距离目标 \(distance.formatted()) 米").foregroundStyle(.secondary) }
+                    if active { TimelineView(.periodic(from: .now, by: 1)) { context in Text("已运动 \(Int(context.date.timeIntervalSince(workout.startedAt) / 60)) 分钟").monospacedDigit() } }
+                    else if let end = workout.finishedAt { Text("实际 \(Int(end.timeIntervalSince(workout.startedAt) / 60)) 分钟") }
+                    if active {
+                        TextField("实际距离（米，可选）", value: $workout.actualDistanceMeters, format: .number).keyboardType(.decimalPad)
+                    } else if let distance = workout.actualDistanceMeters { Text("实际距离 \(distance.formatted()) 米") }
+                }
                 if active, workout.restUntil != nil {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         let remaining = CompanionCore.remaining(workout, now: context.date)
@@ -185,7 +254,7 @@ struct WorkoutView: View {
                     }
                 }
                 Text(workout.startedAt, format: .dateTime.year().month().day().hour().minute()).font(.caption).foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 8) {
+                if workout.activity == nil { VStack(alignment: .leading, spacing: 8) {
                     Text("已完成容量 \((workout.completedVolumeKg / 1000).formatted(.number.precision(.fractionLength(0...2)))) 吨").font(.headline)
                     if let target = workout.volumeTargetKg, target > 0 {
                         ProgressView(value: min(workout.completedVolumeKg, target), total: target).tint(Theme.green)
@@ -193,7 +262,7 @@ struct WorkoutView: View {
                     }
                     if active { DisclosureGroup("设置本次容量目标") { VolumeTargetEditor(value: $workout.volumeTargetKg) } }
                     Text("只计已完成的正式组；热身、自重及辅助重量不计入。每只重量按所选单只或双只累计。").font(.caption2).foregroundStyle(.secondary)
-                }
+                } }
             }
             ForEach(workout.exercises.indices, id: \.self) { index in
                 if let group = (workout.groups ?? []).first(where: { $0.exerciseIds.contains(workout.exercises[index].id) }) {
@@ -229,6 +298,16 @@ struct WorkoutView: View {
                 RatingPicker(title: "疲劳程度", value: $workout.feedback.fatigue)
                 TextField("备注", text: $workout.feedback.note, axis: .vertical)
             }.disabled(!active)
+            if workout.status == "completed" {
+                Section("Apple 健康") {
+                    if store.healthWorkoutSaved(workout.id) { Text("已写入 Apple 健康").foregroundStyle(Theme.green) }
+                    else if store.workoutHealth.hasPairedWatch {
+                        Text("由日益手表写入；等待手表记录同步。").font(.caption).foregroundStyle(.secondary)
+                        Button("本次未用手表，改由手机写入") { phoneHealthConfirm = true }
+                    } else { Button("写入 Apple 健康") { Task { await store.writeWorkoutToHealth(workout) } } }
+                    if let message = store.healthExportMessage { Text(message).font(.caption).foregroundStyle(.secondary) }
+                }
+            }
             if active {
                 Section {
                     Button("完成训练") {
@@ -253,6 +332,9 @@ struct WorkoutView: View {
                     for i in workout.exercises.indices { for j in workout.exercises[i].sets.indices where workout.exercises[i].sets[j].status == "pending" { workout.exercises[i].sets[j].status = "skipped" } }; finish()
                 }
             } message: { Text("已完成的组会保留，未完成的组不会计入完成量。") }
+            .confirmationDialog("确认本次没有用日益手表记录？", isPresented: $phoneHealthConfirm) {
+                Button("由手机写入") { Task { await store.writeWorkoutToHealth(workout) } }
+            } message: { Text("如果手表正在保存同一次训练，请等待同步，避免重复。") }
     }
     func finish() { workout.status = "completed"; workout.finishedAt = Date() }
 }

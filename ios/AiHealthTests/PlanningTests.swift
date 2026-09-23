@@ -3,6 +3,34 @@ import SwiftData
 @testable import AiHealth
 
 final class PlanningTests: XCTestCase {
+    @MainActor func testWalkingRecoveryBecomesTimedTrainingWithoutFakeSets() throws {
+        let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: db); store.scope = "local-demo"; store.reload()
+        let day = CycleDay(date: "2026-09-23", rest: true, recoveryActivity: "饭后散步")
+        let cycle = PlanningCycle(name: "今日安排", kind: "training", startDate: day.date, endDate: day.date, timezone: "Asia/Shanghai", days: [day])
+        XCTAssertTrue(store.save(cycle, kind: "cycle", id: cycle.id))
+        store.promoteWalkingRecovery()
+        let scheduled = try XCTUnwrap(store.scheduled("training", date: day.date)?.1)
+        XCTAssertFalse(scheduled.rest)
+        XCTAssertEqual(scheduled.activity?.name, "饭后散步")
+        XCTAssertNil(scheduled.plan)
+        let workout = Workout(activity: try XCTUnwrap(scheduled.activity))
+        XCTAssertTrue(workout.exercises.isEmpty)
+        XCTAssertEqual(workout.totalSets, 0)
+    }
+    @MainActor func testWalkingPromotionUpdatesPendingCloudPayload() throws {
+        let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: db); store.scope = "https://example.test/user"; store.reload()
+        let day = CycleDay(date: "2026-09-23", rest: true, recoveryActivity: "饭后散步")
+        let cycle = PlanningCycle(name: "今日安排", kind: "training", startDate: day.date, endDate: day.date, timezone: "Asia/Shanghai", days: [day])
+        XCTAssertTrue(store.save(cycle, kind: "cycle", id: cycle.id))
+        XCTAssertEqual(store.pending.count, 1)
+        store.promoteWalkingRecovery()
+        XCTAssertEqual(store.pending.count, 1)
+        let pending: PlanningCycle = try Wire.read(try XCTUnwrap(store.pending.first?.payload))
+        XCTAssertFalse(pending.days[0].rest)
+        XCTAssertEqual(pending.days[0].activity?.resolvedSport, "walking")
+    }
     @MainActor func testRecoveryActivityAndDeletingOneRestDayPreserveOtherDates() throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: db); store.scope = "local-demo"; store.reload()

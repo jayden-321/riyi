@@ -3,6 +3,22 @@ import SwiftData
 @testable import AiHealth
 
 final class ModelsTests: XCTestCase {
+    func testSportPlanCreatesTimeBasedWorkoutAndKeepsLegacyStrengthPlan() throws {
+        var sport = Plan.draft(); sport.category = "swimming"; sport.trainingGoal = "custom"
+        sport.days = [PlanDay(name: "周末游泳", exercises: [], activity: TimedActivity(name: "自由泳", targetMinutes: 30, sport: "swimming", targetDistanceMeters: 800, swimLocation: "pool", poolLengthMeters: 25))]
+        let restored = try Wire.read(Wire.data(sport), as: Plan.self)
+        XCTAssertEqual(restored.resolvedCategory, "swimming")
+        let workout = Workout(plan: restored, day: restored.days[0])
+        XCTAssertEqual(workout.activity?.resolvedSport, "swimming")
+        XCTAssertTrue(workout.exercises.isEmpty)
+        XCTAssertEqual(workout.totalSets, 0)
+        XCTAssertEqual(healthWorkoutConfiguration(for: workout).activityType, .swimming)
+        XCTAssertEqual(healthWorkoutConfiguration(for: workout).swimmingLocationType, .pool)
+        XCTAssertEqual(healthWorkoutConfiguration(for: workout).lapLength?.doubleValue(for: .meter()), 25)
+        let legacy = Plan.starter()
+        XCTAssertEqual(legacy.resolvedCategory, "strength")
+        XCTAssertEqual(healthWorkoutConfiguration(for: Workout(plan: legacy, day: legacy.days[0])).activityType, .traditionalStrengthTraining)
+    }
     @MainActor func testDeletedStarterIsNotRecreatedAndWorkoutSurvives() throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: db); store.startDemo()

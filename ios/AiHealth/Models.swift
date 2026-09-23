@@ -39,8 +39,11 @@ enum Wire {
 
 struct Plan: Codable, Identifiable {
     var id = newID(); var name = "我的训练计划"; var trainingGoal = "hypertrophy"; var setPattern = "straight"
+    var category: String? = nil
     var days: [PlanDay] = [PlanDay()]
     var scheduledDate: String?
+    var resolvedCategory: String { category ?? "strength" }
+    static func draft() -> Plan { var p = Plan(); p.days = [PlanDay(name: "力量训练", exercises: [])]; return p }
     static func starter() -> Plan {
         var p = Plan(); p.name = "增肌计划 A"; p.days = [PlanDay(name: "胸 + 三头", exercises: [
             PlanExercise(exerciseId: "bench_press", name: "杠铃卧推", loadBasis: "total", sets: [PlanSet(weight: 40, reps: 12), PlanSet(weight: 50, reps: 10), PlanSet(weight: 55, reps: 8), PlanSet(weight: 55, reps: 8)]),
@@ -67,6 +70,7 @@ func validGroups(_ groups: [ExerciseGroup], exerciseIds: [String]) -> Bool {
 }
 struct PlanDay: Codable, Identifiable {
     var id = newID(); var name = "训练日"; var exercises: [PlanExercise] = [PlanExercise()]
+    var activity: TimedActivity? = nil
     var volumeTargetKg: Double?; var groups: [ExerciseGroup]?
 }
 struct PlanExercise: Codable, Identifiable {
@@ -75,8 +79,40 @@ struct PlanExercise: Codable, Identifiable {
     var setPattern: String?; var loadCount: Int?
 }
 struct PlanSet: Codable, Identifiable { var id = newID(); var role = "working"; var weight: Double = 20; var reps = 10 }
+struct TimedActivity: Codable {
+    var name: String
+    var targetMinutes: Int? = nil
+    var sport: String? = nil
+    var targetDistanceMeters: Double? = nil
+    var targetEnergyKcal: Double? = nil
+    var swimLocation: String? = nil
+    var poolLengthMeters: Double? = nil
+    var resolvedSport: String { sport ?? "walking" }
+    var validConfiguration: Bool {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              targetMinutes == nil || (1...1440).contains(targetMinutes!),
+              targetDistanceMeters == nil || (1...1_000_000).contains(targetDistanceMeters!),
+              targetEnergyKcal == nil || (1...10_000).contains(targetEnergyKcal!) else { return false }
+        if resolvedSport == "swimming" {
+            if swimLocation == "open_water" { return poolLengthMeters == nil }
+            return swimLocation == "pool" && poolLengthMeters.map { (5...100).contains($0) } == true
+        }
+        return swimLocation == nil && poolLengthMeters == nil
+    }
+}
+let sportOptions: [(code: String, title: String, icon: String)] = [
+    ("strength", "力量训练", "dumbbell"), ("pilates", "普拉提", "figure.pilates"),
+    ("swimming", "游泳", "figure.pool.swim"), ("running", "跑步", "figure.run"),
+    ("cycling", "骑行", "bicycle"), ("walking", "散步", "figure.walk"),
+    ("yoga", "瑜伽", "figure.yoga"), ("hiking", "徒步", "figure.hiking"),
+    ("rowing", "划船", "figure.rower"), ("elliptical", "椭圆机", "figure.elliptical"),
+    ("other", "其他运动", "figure.mixed.cardio")
+]
+func sportTitle(_ code: String) -> String { sportOptions.first { $0.code == code }?.title ?? "其他运动" }
 struct Workout: Codable, Identifiable {
     var synthetic: Bool?
+    var activity: TimedActivity?
+    var actualDistanceMeters: Double?
     var autoExpiredAt: Date?
     var restUntil: Date?
     var companionReceipts: [CompanionReceipt]?
@@ -89,9 +125,15 @@ struct Workout: Codable, Identifiable {
         planId = plan.id; name = day.name
         planDayId = day.id
         volumeTargetKg = day.volumeTargetKg
+        activity = day.activity
         exercises = day.exercises.map { e in WorkoutExercise(exerciseId: e.exerciseId, name: e.name, loadBasis: e.loadBasis, sets: e.sets.map { WorkoutSet(role: $0.role, plannedWeight: $0.weight, plannedReps: $0.reps) }, setPattern: e.setPattern ?? plan.setPattern, loadCount: e.loadCount) }
         let ids = Dictionary(uniqueKeysWithValues: zip(day.exercises.map(\.id), exercises.map(\.id)))
         groups = day.groups?.map { group in var copy = group; copy.id = newID(); copy.exerciseIds = group.exerciseIds.compactMap { ids[$0] }; return copy }
+    }
+    init(activity: TimedActivity) {
+        self.activity = activity
+        name = activity.name
+        exercises = []
     }
     var completedSets: Int { exercises.flatMap(\.sets).filter { $0.status == "completed" }.count }
     var totalSets: Int { exercises.flatMap(\.sets).count }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0194F7588D5703617A660AC3 /* WorkoutSport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */; };
 		031FA2747ED183D2BBCE4EFB /* SleepHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 038C997F06CF52CB00A9D4FE /* SleepHistoryTests.swift */; };
 		05415BF2F2FF7290DECB2CF7 /* FoodLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C03779D223E031C1E49D999 /* FoodLibrary.swift */; };
 		05E167C64733A929DD0D1B30 /* SleepUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9AE43CDFE004E98FC1CFBEC /* SleepUITests.swift */; };
@@ -58,9 +59,11 @@
 		CC85AF3180687BBB8C30FA90 /* SleepRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15EA2FE52925D0A6C8A22B3C /* SleepRegressionTests.swift */; };
 		CE885F5BB92F000D76F80CBC /* CompanionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */; };
 		CEA7EF53A5203551D6F24787 /* WatchWorkoutHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B5798D0570BFA1F64E3313C /* WatchWorkoutHealth.swift */; };
+		DBF98A6A1A17B6EB0FDD5F21 /* WorkoutSport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */; };
 		E4451F1BD19276A5751C123C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D5F3350DF5A906DE4EF153 /* Models.swift */; };
 		EE354A7008E88A43DF481269 /* Network.swift in Sources */ = {isa = PBXBuildFile; fileRef = C624F46302C82B541804BF7A /* Network.swift */; };
 		F14AE43EA256A84025BAB3CE /* SleepHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64CB95C8BEF3F56CF69284F /* SleepHistory.swift */; };
+		F4A213A1ED3949E95006BE43 /* WorkoutHealthWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F636F76DA9E35701FEF48B98 /* WorkoutHealthWriter.swift */; };
 		FE357AD1338F6816524DF311 /* FoodEntryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B48261EF467D8ADC253587 /* FoodEntryUITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -162,8 +165,10 @@
 		DBF2824D9B1582D007E9FCA6 /* Planning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Planning.swift; sourceTree = "<group>"; };
 		E440E405C56FD4F8906A5816 /* ExerciseGuideViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseGuideViews.swift; sourceTree = "<group>"; };
 		E523E415461619FE53650740 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSport.swift; sourceTree = "<group>"; };
 		EE3F62C614F99CD53F68D8D1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F225BF55BD6F4B1B62BEDDB7 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F636F76DA9E35701FEF48B98 /* WorkoutHealthWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHealthWriter.swift; sourceTree = "<group>"; };
 		F64CB95C8BEF3F56CF69284F /* SleepHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepHistory.swift; sourceTree = "<group>"; };
 		F64EE0D95C718E4169DB6614 /* LocalHealthOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHealthOverview.swift; sourceTree = "<group>"; };
 		FB06FCA368D2B33E2A416DC3 /* SessionRecoveryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRecoveryUITests.swift; sourceTree = "<group>"; };
@@ -229,6 +234,7 @@
 				C5464433470A7DCEEF427D12 /* SleepViews.swift */,
 				CC95710E4621A83480DFF1E4 /* TeamViews.swift */,
 				91C732C1B3FA196A7631B3F9 /* TrainingViews.swift */,
+				F636F76DA9E35701FEF48B98 /* WorkoutHealthWriter.swift */,
 			);
 			path = AiHealth;
 			sourceTree = "<group>";
@@ -277,6 +283,7 @@
 			children = (
 				CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */,
 				FFF8430B982E232AE4515119 /* CompanionTransport.swift */,
+				E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */,
 			);
 			path = CompanionShared;
 			sourceTree = "<group>";
@@ -505,6 +512,7 @@
 				B4031A194B628B11BA9D2C61 /* Models.swift in Sources */,
 				4B6625116E878A3FA51CFC77 /* WatchStore.swift in Sources */,
 				CEA7EF53A5203551D6F24787 /* WatchWorkoutHealth.swift in Sources */,
+				DBF98A6A1A17B6EB0FDD5F21 /* WorkoutSport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -537,6 +545,8 @@
 				A817353DB98C90471DCECD35 /* SleepViews.swift in Sources */,
 				0B55A5E8DE49A4EFEECF86B5 /* TeamViews.swift in Sources */,
 				ABA8E975DF43F7A3148CE63B /* TrainingViews.swift in Sources */,
+				F4A213A1ED3949E95006BE43 /* WorkoutHealthWriter.swift in Sources */,
+				0194F7588D5703617A660AC3 /* WorkoutSport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -594,7 +604,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 38;
 				INFOPLIST_FILE = AiHealth/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -613,7 +623,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 38;
 				INFOPLIST_FILE = AiHealth/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -685,7 +695,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				RIYI_IOS_BUNDLE_ID = com.aijiankang.ios;
+				RIYI_IOS_BUNDLE_ID = com.riyi.ios;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -699,7 +709,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 38;
 				INFOPLIST_FILE = AiHealthWatch/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(RIYI_IOS_BUNDLE_ID).watchkitapp";
@@ -719,7 +729,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthWatchUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthWatchUITests;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 4;
@@ -737,7 +747,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AiHealth.app/AiHealth";
@@ -796,7 +806,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				RIYI_IOS_BUNDLE_ID = com.aijiankang.ios;
+				RIYI_IOS_BUNDLE_ID = com.riyi.ios;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -815,7 +825,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthUITests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = AiHealth;
@@ -832,7 +842,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthUITests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = AiHealth;
@@ -844,7 +854,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 38;
 				INFOPLIST_FILE = AiHealthWatch/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(RIYI_IOS_BUNDLE_ID).watchkitapp";
@@ -864,7 +874,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AiHealth.app/AiHealth";
@@ -881,7 +891,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthWatchUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthWatchUITests;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 4;

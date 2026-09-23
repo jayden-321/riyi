@@ -2,6 +2,13 @@ import Foundation
 import SwiftData
 import Observation
 
+#if os(macOS)
+@MainActor final class WorkoutHealthWriter {
+    var hasPairedWatch: Bool { false }
+    func write(_ workout: Workout, automatic: Bool) async throws -> Bool { false }
+}
+#endif
+
 @MainActor @Observable final class AppStore {
     @ObservationIgnored var companionChanged: (() -> Void)?
     @ObservationIgnored var companionRefreshRequested: (() -> Void)?
@@ -10,6 +17,7 @@ import Observation
     @ObservationIgnored let context: ModelContext
     @ObservationIgnored var network: Network
     @ObservationIgnored let healthStorage: Task<HealthStorage, Never>
+    @ObservationIgnored let workoutHealth = WorkoutHealthWriter()
     @ObservationIgnored private var syncAgain = false
     @ObservationIgnored private var overviewTask: Task<Void, Never>?
     @ObservationIgnored private var overviewRequested = false
@@ -62,6 +70,7 @@ import Observation
     var localHealthSampleCount = 0
     var recentHealthSamples: [HealthSample] = []
     var error: String?; var syncing = false; var reportLoading = false; var lastSync: Date?
+    var healthExportMessage: String?
     var healthStatus = "尚未读取健康数据"
     var healthAuthorizationNote = "实际读取范围以系统授权为准"
     var isDemo: Bool { scope == "local-demo" }
@@ -87,6 +96,18 @@ import Observation
         return waters.filter { calendar.isDate($0.drankAt, inSameDayAs: Date()) }.reduce(0) { $0 + $1.amountMl }
     }
     var activeWorkout: Workout? { workouts.first { $0.status == "in_progress" } }
+    private func healthWorkoutKey(_ id: String) -> String { "healthWorkoutSaved.\(scope).\(id)" }
+    func healthWorkoutSaved(_ id: String) -> Bool { UserDefaults.standard.bool(forKey: healthWorkoutKey(id)) }
+    func markHealthWorkoutSaved(_ id: String) { UserDefaults.standard.set(true, forKey: healthWorkoutKey(id)); healthExportMessage = "已写入 Apple 健康" }
+    func writeWorkoutToHealth(_ workout: Workout, automatic: Bool = false) async {
+        guard signedIn, !isDemo, workout.status == "completed", workout.finishedAt != nil, !healthWorkoutSaved(workout.id) else { return }
+        do {
+            let saved = try await workoutHealth.write(workout, automatic: automatic)
+            if saved { markHealthWorkoutSaved(workout.id) }
+        } catch {
+            if !automatic { healthExportMessage = "写入 Apple 健康失败：\(error.localizedDescription)" }
+        }
+    }
     var lastOvernightClosure: String?
     /// End a previous-day session at its last recorded action, preserving every set.
     func expireOvernightWorkouts(now: Date = Date()) {
@@ -105,7 +126,7 @@ import Observation
         observeSessionExpiry()
         if let t = network.tokens { scope = network.baseURL.absoluteString + "/" + t.userId }
         else if UserDefaults.standard.bool(forKey: "localDemo") { scope = "local-demo" }
-        restoreSettings(); reload(); Task { [weak self] in await self?.refreshLocalHealth() }
+        restoreSettings(); reload(); promoteWalkingRecovery(); Task { [weak self] in await self?.refreshLocalHealth() }
     }
     private func observeSessionExpiry() {
         network.onSessionExpired = { [weak self] in
@@ -253,6 +274,12 @@ import Observation
         guard activeWorkout == nil else { error = "请先完成当前训练"; return }
         var workout = Workout(plan: plan, day: day); workout.synthetic = synthetic; if save(workout, kind: "workout", id: workout.id) { companionStarted?() }
     }
+    func start(activity: TimedActivity) {
+        expireOvernightWorkouts()
+        guard activeWorkout == nil else { error = "请先完成当前训练"; return }
+        let workout = Workout(activity: activity)
+        if save(workout, kind: "workout", id: workout.id) { companionStarted?() }
+    }
     func synchronize(showErrors: Bool = true) async {
         guard signedIn && !isDemo else { return }
         if syncing { syncAgain = true; return }
@@ -267,7 +294,7 @@ import Observation
             let revision = settingsRevision
             let remoteSettings: CloudSettings = try Wire.read(await client.request("/v1/settings"))
             if revision == settingsRevision && !changingSettings { settings = remoteSettings; persistSettings() }
-            reload()
+            reload(); promoteWalkingRecovery()
             for q in pending {
                 guard scope == expected else { return }
                 if pending.contains(where: { $0.kind == q.kind && $0.recordId == q.recordId && $0.conflictData != nil }) { continue }

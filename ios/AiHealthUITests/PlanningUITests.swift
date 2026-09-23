@@ -1,7 +1,44 @@
 import XCTest
 
 final class PlanningUITests: XCTestCase {
-    func testRestDayCanShowRecoveryActivityAndBeDeleted() {
+    func testPlanEditorChoosesSportBeforeExerciseLibrary() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--planning-ui-test"]
+        app.launch()
+        app.tabBars.buttons["训练"].tap()
+        app.buttons["我的计划与历史记录"].tap()
+        app.buttons["新建训练计划"].tap()
+        XCTAssertTrue(app.buttons["plan-sport-category"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["choose-library-exercise"].exists)
+        XCTAssertFalse(app.textFields["动作名称"].exists)
+        app.buttons["plan-sport-category"].tap()
+        app.buttons["游泳"].tap()
+        XCTAssertTrue(app.textFields["目标距离（米，可选）"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["choose-library-exercise"].exists)
+        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "游泳计划按时长和距离编辑"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
+    func testStrengthPlanSelectsExerciseFromLibrary() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--planning-ui-test"]
+        app.launch()
+        app.tabBars.buttons["训练"].tap()
+        app.buttons["我的计划与历史记录"].tap()
+        app.buttons["新建训练计划"].tap()
+        app.buttons["choose-library-exercise"].tap()
+        let search = app.textFields["exercise-library-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 8))
+        search.tap(); search.typeText("杠铃卧推")
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "exercise-card-")).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 8)); card.tap()
+        app.buttons["添加到训练日"].tap()
+        XCTAssertTrue(app.staticTexts["杠铃卧推"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.buttons["保存"].exists)
+    }
+    func testRestDayCanBecomeWalkingTrainingAndBeDeleted() {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
@@ -9,13 +46,14 @@ final class PlanningUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["今天是休息日"].waitForExistence(timeout: 10))
         app.buttons["查看／调整今天安排"].tap()
-        let activity = app.descendants(matching: .any)["rest-recovery-activity"]
+        let activity = app.descendants(matching: .any)["activity-name"]
         XCTAssertTrue(activity.waitForExistence(timeout: 5))
-        activity.tap(); activity.typeText("饭后散步")
-        app.buttons["保存恢复活动"].tap()
+        XCTAssertEqual(activity.value as? String, "饭后散步")
+        app.buttons["安排为训练"].tap()
         XCTAssertTrue(app.staticTexts["饭后散步"].waitForExistence(timeout: 5))
-        app.buttons["查看／调整今天安排"].tap()
-        app.buttons["删除今天的休息安排"].tap()
+        XCTAssertFalse(app.staticTexts["今天是休息日"].exists)
+        app.buttons["调整安排"].tap()
+        app.buttons["删除今天的安排"].tap()
         app.buttons["删除当天安排"].tap()
         XCTAssertFalse(app.staticTexts["今天是休息日"].exists)
     }
