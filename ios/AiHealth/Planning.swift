@@ -76,6 +76,7 @@ struct MealEnergySummary {
     let unknownCount: Int
     var totalMinKcal: Double { singleKcal + rangeMinKcal }
     var totalMaxKcal: Double { singleKcal + rangeMaxKcal }
+    var totalMidpointKcal: Double { (totalMinKcal + totalMaxKcal) / 2 }
 
     init(_ logs: [MealLog]) {
         var singles = 0, ranges = 0, unknown = 0

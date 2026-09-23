@@ -27,6 +27,7 @@ final class FoodLibraryTests: XCTestCase {
         XCTAssertEqual(summary.unknownCount, 0)
         XCTAssertEqual(summary.totalMinKcal, 715)
         XCTAssertEqual(summary.totalMaxKcal, 1350)
+        XCTAssertEqual(summary.totalMidpointKcal, 1032.5)
         XCTAssertEqual(MealEnergySummary([breakfast, lunch, MealLog(description: "水果")]).unknownCount, 1)
     }
     #if canImport(UIKit)

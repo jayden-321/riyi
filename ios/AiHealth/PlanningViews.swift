@@ -219,7 +219,8 @@ struct DietView: View {
                 }
                 Section("\(store.calendarKey) · 实际摄入") {
                     if energy.rangeCount > 0 {
-                        Text("已记录约 \(energy.totalMinKcal.formatted(.number.precision(.fractionLength(0...1))))–\(energy.totalMaxKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
+                        Text("已记录热量约 \(energy.totalMidpointKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
+                        Text("AI 粗估区间 \(energy.totalMinKcal.formatted(.number.precision(.fractionLength(0...1))))–\(energy.totalMaxKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡；显示值按上下限平均计算。").font(.caption).foregroundStyle(.secondary)
                         Text("\(energy.singleCount) 笔单值热量，\(energy.rangeCount) 笔粗估范围，\(energy.unknownCount) 笔仍待估算。计划未吃不计入实际。").font(.caption).foregroundStyle(.secondary)
                         Text(energy.unknownCount > 0 ? "还有未估算记录，以上区间不代表全天总摄入。" : "这是已记录饮食的粗估区间，不是精确热量。").font(.caption).foregroundStyle(.secondary)
                     } else {
