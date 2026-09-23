@@ -18,8 +18,8 @@ struct DailyTrainingScheduleView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("\(index + 1). \(block.name)").font(.headline)
-                                let actual = store.workout(for: block, on: selectedDate)
-                                Text("\(sportTitle(block.sport)) · \(actual.map { $0.status == "completed" ? "已完成" : $0.status == "in_progress" ? "进行中" : "已结束" } ?? "尚未开始")")
+                                let sessions = store.workouts(for: block, on: selectedDate)
+                                Text("\(sportTitle(block.sport)) · \(sessions.isEmpty ? "尚未开始" : "已练 \(sessions.count) 次")")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -31,7 +31,7 @@ struct DailyTrainingScheduleView: View {
                         .accessibilityIdentifier("add-training-block")
                 }
                 let unmatched = store.workouts(on: selectedDate).filter { workout in
-                    !blocks.contains { store.workout(for: $0, on: selectedDate)?.id == workout.id }
+                    store.associatedBlockID(for: workout, on: selectedDate) == nil
                 }
                 if !unmatched.isEmpty {
                     Section("未关联安排的实际训练") {

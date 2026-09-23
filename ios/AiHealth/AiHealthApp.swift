@@ -227,22 +227,23 @@ struct TodayView: View {
                                 } else {
                                     Text("今天安排 \(scheduled.trainingBlocks.count) 项训练").font(.title3.bold())
                                     ForEach(Array(scheduled.trainingBlocks.enumerated()), id: \.element.id) { index, block in
+                                        let sessions = store.workouts(for: block, on: scheduled.date)
                                         HStack(alignment: .top) {
                                             VStack(alignment: .leading, spacing: 3) {
                                                 Text("\(index + 1). \(block.name)").font(.headline)
-                                                Text(sportTitle(block.sport)).font(.caption).foregroundStyle(.secondary)
+                                                Text("\(sportTitle(block.sport)) · \(sessions.isEmpty ? "尚未开始" : "已练 \(sessions.count) 次")").font(.caption).foregroundStyle(.secondary)
                                             }
                                             Spacer()
-                                            if let workout = store.workout(for: block, on: scheduled.date) {
-                                                if workout.status == "in_progress" {
-                                                    Button("继续") { training = workout }.buttonStyle(.bordered)
-                                                } else {
-                                                    Text("已完成").font(.caption).foregroundStyle(.secondary)
-                                                }
+                                            if let active = sessions.first(where: { $0.status == "in_progress" }) {
+                                                Button("继续") { training = active }.buttonStyle(.bordered)
                                             } else if let plan = block.plan, let day = plan.days.first {
-                                                Button("开始") { store.start(plan: plan, day: day, scheduledBlockId: block.id) }.buttonStyle(.bordered)
+                                                Button(sessions.isEmpty ? "开始" : "再练一次") {
+                                                    store.start(plan: plan, day: day, scheduledBlockId: block.id); training = store.activeWorkout
+                                                }.buttonStyle(.bordered).disabled(store.activeWorkout != nil)
                                             } else if let activity = block.activity {
-                                                Button("开始") { store.start(activity: activity, scheduledBlockId: block.id) }.buttonStyle(.bordered)
+                                                Button(sessions.isEmpty ? "开始" : "再练一次") {
+                                                    store.start(activity: activity, scheduledBlockId: block.id); training = store.activeWorkout
+                                                }.buttonStyle(.bordered).disabled(store.activeWorkout != nil)
                                             }
                                         }
                                     }

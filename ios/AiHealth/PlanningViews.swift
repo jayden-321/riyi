@@ -51,20 +51,20 @@ struct TrainingCalendarView: View {
     private var blocks: [TrainingBlock] { store.trainingBlocks(on: selectedDate) }
     private var unmatchedWorkouts: [Workout] {
         store.workouts(on: selectedDate).filter { workout in
-            !blocks.contains { store.workout(for: $0, on: selectedDate)?.id == workout.id }
+            store.associatedBlockID(for: workout, on: selectedDate) == nil
         }
     }
-    private func detail(_ workout: Workout?) -> String {
-        guard let workout else { return "尚未开始 · 查看训练内容" }
-        let state = workout.status == "completed" ? "已完成" : workout.status == "in_progress" ? "进行中" : "已结束"
-        return workout.activity == nil ? "实际 \(workout.completedSets)/\(workout.totalSets) 组 · \(state)" : "实际运动 · \(state)"
+    private func detail(_ sessions: [Workout]) -> String {
+        guard !sessions.isEmpty else { return "尚未开始 · 查看训练内容" }
+        let active = sessions.contains { $0.status == "in_progress" }
+        return "已练 \(sessions.count) 次\(active ? " · 进行中，可继续" : " · 查看详情可再练")"
     }
     var body: some View {
         NavigationStack {
             List {
                 Section { PlanningCalendar(store: store,kind: "training") }
                 if let active = store.activeWorkout,
-                   selectedDate != DayKey.string(Date(), zone: store.settings.timezone) || !blocks.contains(where: { store.workout(for: $0, on: selectedDate)?.id == active.id }) {
+                   selectedDate != DayKey.string(Date(), zone: store.settings.timezone) || store.associatedBlockID(for: active, on: selectedDate) == nil {
                     Section("正在训练") { NavigationLink("\(active.name) · 继续训练") { WorkoutView(store: store,workout: active) } }
                 }
                 Section(selectedDate) {
@@ -81,19 +81,19 @@ struct TrainingCalendarView: View {
                         }
                         else {
                             ForEach(Array(day.trainingBlocks.enumerated()), id: \.element.id) { index, block in
-                                let actual = store.workout(for: block, on: selectedDate)
+                                let sessions = store.workouts(for: block, on: selectedDate)
                                 if let plan = block.plan {
                                     NavigationLink { ScheduledTrainingView(store: store, plan: plan, date: day.date, blockID: block.id) } label: {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text("\(index + 1). \(block.name)").font(.headline)
-                                            Text("\(sportTitle(block.sport)) · \(detail(actual))").font(.caption).foregroundStyle(.secondary)
+                                            Text("\(sportTitle(block.sport)) · \(detail(sessions))").font(.caption).foregroundStyle(.secondary)
                                         }
                                     }
                                 } else if let activity = block.activity {
                                     NavigationLink { ScheduledActivityView(store: store, date: day.date, blockID: block.id) } label: {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Label("\(index + 1). \(activity.name)", systemImage: sportOptions.first { $0.code == activity.resolvedSport }?.icon ?? "figure.walk")
-                                            Text("\(sportTitle(activity.resolvedSport)) · \(detail(actual))").font(.caption).foregroundStyle(.secondary)
+                                            Text("\(sportTitle(activity.resolvedSport)) · \(detail(sessions))").font(.caption).foregroundStyle(.secondary)
                                         }
                                     }.accessibilityIdentifier("scheduled-activity")
                                 }
@@ -104,7 +104,19 @@ struct TrainingCalendarView: View {
                     } else if store.workouts(on: selectedDate).isEmpty {
                         Text("这一天尚未安排训练").foregroundStyle(.secondary)
                     }
-                    ForEach(unmatchedWorkouts) { w in NavigationLink { WorkoutView(store: store,workout: w) } label: { VStack(alignment: .leading) { Text(w.name); Text("未关联日历计划 · \(detail(w))").font(.caption).foregroundStyle(.secondary) } } }
+                }
+                if !unmatchedWorkouts.isEmpty {
+                    Section {
+                        ForEach(unmatchedWorkouts) { w in
+                            NavigationLink { WorkoutView(store: store, workout: w) } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(w.name)
+                                    Text("\(w.startedAt.formatted(date: .omitted, time: .shortened)) · \(w.status == "in_progress" ? "进行中" : "已练记录")")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    } header: { Text("未关联安排的已练记录") } footer: { Text("原安排删除或无法可靠对应时，实际训练仍保留在这里。") }
                 }
                 Section("周期") { Button("安排训练周期") { cycleOptions = true } }
             }.navigationTitle("训练")
@@ -154,18 +166,30 @@ struct ScheduledActivityView: View {
                                                  poolLengthMeters: sport == "swimming" && swimLocation == "pool" ? poolLengthMeters : nil)
                     if store.updateActivity(on: date, activity: activity, blockID: blockID) { dismiss() }
                 }
-                if let actual = blockID.flatMap({ id in store.trainingBlocks(on: date).first(where: { $0.id == id }).flatMap { store.workout(for: $0, on: date) } }) ?? store.workouts(on: date).first(where: { $0.scheduledBlockId == nil && $0.activity?.name == currentActivity?.name }) {
-                    NavigationLink(actual.status == "in_progress" ? "继续训练" : "查看已练记录") {
-                        WorkoutView(store: store, workout: actual)
-                    }
-                    if actual.status != "in_progress", date == DayKey.string(Date(), zone: store.settings.timezone) {
-                        Button("重新开始训练") { store.restartWorkout(actual); training = store.activeWorkout }
-                            .disabled(store.activeWorkout != nil)
-                    }
+            }
+            Section("训练控制") {
+                if let active = sessions.first(where: { $0.status == "in_progress" }) {
+                    NavigationLink("继续本次训练") { WorkoutView(store: store, workout: active) }
                 } else if date == DayKey.string(Date(), zone: store.settings.timezone) {
-                    Button("开始训练") {
+                    Button(sessions.isEmpty ? "开始训练" : "再次开始训练") {
                         if let activity = currentActivity { store.start(activity: activity, scheduledBlockId: blockID); training = store.activeWorkout }
                     }.disabled(store.activeWorkout != nil)
+                    if store.activeWorkout != nil { Text("请先停止当前训练，再开始下一次。") .font(.caption).foregroundStyle(.secondary) }
+                } else { Text("到了安排日期才可开始训练。").font(.caption).foregroundStyle(.secondary) }
+            }
+            if !sessions.isEmpty {
+                Section("已练记录 · \(sessions.count) 次") {
+                    ForEach(Array(sessions.reversed().enumerated()), id: \.element.id) { index, session in
+                        NavigationLink {
+                            WorkoutView(store: store, workout: session)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("第 \(index + 1) 次 · \(session.name) · \(session.startedAt.formatted(date: .omitted, time: .shortened))")
+                                Text(session.status == "in_progress" ? "进行中" : session.status == "completed" ? "已完成" : "已结束")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
             }
             Section("改为力量训练") {
@@ -197,6 +221,12 @@ struct ScheduledActivityView: View {
     private var currentActivity: TimedActivity? {
         if let blockID { return store.trainingBlocks(on: date).first(where: { $0.id == blockID })?.activity }
         return store.scheduled("training", date: date)?.1.activity
+    }
+    private var sessions: [Workout] {
+        if let blockID, let block = store.trainingBlocks(on: date).first(where: { $0.id == blockID }) {
+            return store.workouts(for: block, on: date)
+        }
+        return store.workouts(on: date).filter { $0.scheduledBlockId == nil && $0.activity?.name == currentActivity?.name }
     }
 }
 struct ScheduledRestDayView: View {
@@ -344,11 +374,11 @@ struct ScheduledTrainingView: View {
         if let (_, day) = store.scheduled("training", date: date), let planned = day.plan { return planned }
         return store.plans.first(where: { $0.id == plan.id }) ?? plan
     }
-    private var actualWorkout: Workout? {
+    private var sessions: [Workout] {
         if let blockID, let block = store.trainingBlocks(on: date).first(where: { $0.id == blockID }) {
-            return store.workout(for: block, on: date)
+            return store.workouts(for: block, on: date)
         }
-        return store.workouts(on: date).first { $0.planId == currentPlan.id && $0.scheduledBlockId == nil }
+        return store.workouts(on: date).filter { $0.planId == currentPlan.id && $0.scheduledBlockId == nil }
     }
     var body: some View {
         List {
@@ -366,15 +396,32 @@ struct ScheduledTrainingView: View {
                     NavigationLink("动作图解与说明") { ExerciseGuideView(store: store,exerciseId: exercise.exerciseId,name: exercise.name) }
                     ForEach(exercise.sets) { set in Text("\(set.weight.formatted()) kg × \(set.reps) 次") }
                 } }
-                Section {
-                    if let w = actualWorkout {
-                        NavigationLink(w.status == "in_progress" ? "继续训练" : "查看已练记录") { WorkoutView(store: store,workout: w) }
-                        if w.status != "in_progress", date == DayKey.string(Date(), zone: store.settings.timezone) {
-                            Button("重新开始训练") { store.restartWorkout(w); training = store.activeWorkout }.disabled(store.activeWorkout != nil)
+                Section("训练控制") {
+                    if let active = sessions.first(where: { $0.status == "in_progress" }) {
+                        NavigationLink("继续本次训练") { WorkoutView(store: store, workout: active) }
+                    } else if date == DayKey.string(Date(),zone: store.settings.timezone) {
+                        Button(sessions.isEmpty ? "开始训练" : "再次开始训练") {
+                            store.start(plan: currentPlan,day: day, scheduledBlockId: blockID); training = store.activeWorkout
+                        }.disabled(store.activeWorkout != nil)
+                        if store.activeWorkout != nil { Text("请先停止当前训练，再开始下一次。") .font(.caption).foregroundStyle(.secondary) }
+                    } else { Text("该页面是 \(date) 的安排，到了当天可开始训练。").font(.footnote).foregroundStyle(.secondary) }
+                }
+                if !sessions.isEmpty {
+                    Section("已练记录 · \(sessions.count) 次") {
+                        ForEach(Array(sessions.reversed().enumerated()), id: \.element.id) { index, session in
+                            NavigationLink {
+                                WorkoutView(store: store, workout: session)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("第 \(index + 1) 次 · \(session.name) · \(session.startedAt.formatted(date: .omitted, time: .shortened))")
+                                    Text(session.status == "in_progress" ? "进行中 · \(session.completedSets)/\(session.totalSets) 组" : "\(session.status == "completed" ? "已完成" : "已结束") · \(session.completedSets)/\(session.totalSets) 组")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
                         }
                     }
-                    else if date == DayKey.string(Date(),zone: store.settings.timezone) { Button("开始训练") { store.start(plan: currentPlan,day: day, scheduledBlockId: blockID); training = store.activeWorkout }.disabled(store.activeWorkout != nil) }
-                    else { Text("该页面是 \(date) 的安排，到了当天可开始训练。").font(.footnote).foregroundStyle(.secondary) }
+                }
+                Section {
                     Button("和教练讨论调整") { store.coachPromptDraft = "请调整我已采用的 \(date) 训练安排："; store.selectedTab = "coach" }
                     Button("调整训练安排") { editing = true }
                     Button("删除当天安排", role: .destructive) { confirmDelete = true }

@@ -46,7 +46,7 @@ struct WatchTrainingView: View {
     private let green = Color(red: 0.10, green: 0.37, blue: 0.27)
     private let cream = Color(red: 0.96, green: 0.98, blue: 0.94)
     var body: some View {
-        GeometryReader { geometry in
+        GeometryReader { _ in
             TimelineView(.periodic(from: .now, by: 1)) { timeline in
                 VStack(alignment: .leading, spacing: 5) {
                     if let workout = store.displayWorkout {
@@ -127,22 +127,31 @@ struct WatchTrainingView: View {
                             if !store.replica.events.isEmpty { Image(systemName: "arrow.triangle.2.circlepath") }
                         }.font(.system(size: 13, weight: .medium)).frame(height: 20)
                     } else {
-                        if let offer = selectedOffer {
-                            Text(offer.day.name).font(.system(size: 16, weight: .semibold)).lineLimit(2)
-                            Text("\(sportTitle(offer.plan.resolvedCategory)) · \(selectedOfferIndex + 1)/\(store.todayOffers.count) · 左右滑动切换").font(.caption2)
-                        } else if let name = store.todayStatus?.activityName {
-                            Text(name).font(.headline)
-                            Text("今日训练 · 请在 iPhone 开始").font(.caption)
-                        } else if store.todayStatus?.kind == "rest" {
-                            Text("今天是休息日").font(.headline)
-                            Text("今天没有训练任务，按计划恢复").font(.caption)
-                        } else if store.todayStatus?.kind == "unplanned" {
-                            Text("今天没有安排训练").font(.headline)
-                            Text("可在 iPhone 训练日历中安排").font(.caption)
-                        } else {
-                            Text("等待今日训练任务").font(.headline)
-                            Text("请保持与 iPhone 连接").font(.caption)
-                        }
+                        VStack(alignment: .leading, spacing: 5) {
+                            if let offer = selectedOffer {
+                                Text(offer.day.name).font(.system(size: 16, weight: .semibold)).lineLimit(2)
+                                Text("\(sportTitle(offer.plan.resolvedCategory)) · \(selectedOfferIndex + 1)/\(store.todayOffers.count) · 左右滑动切换").font(.caption2)
+                            } else if let name = store.todayStatus?.activityName {
+                                Text(name).font(.headline)
+                                Text("今日训练 · 请在 iPhone 开始").font(.caption)
+                            } else if store.todayStatus?.kind == "rest" {
+                                Text("今天是休息日").font(.headline)
+                                Text("今天没有训练任务，按计划恢复").font(.caption)
+                            } else if store.todayStatus?.kind == "unplanned" {
+                                Text("今天没有安排训练").font(.headline)
+                                Text("可在 iPhone 训练日历中安排").font(.caption)
+                            } else {
+                                Text("等待今日训练任务").font(.headline)
+                                Text("请保持与 iPhone 连接").font(.caption)
+                            }
+                        }.frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
+                            .contentShape(Rectangle())
+                            .gesture(DragGesture(minimumDistance: 25).onEnded { value in
+                                guard store.todayOffers.count > 1 else { return }
+                                if value.translation.width < -25 { selectedOfferIndex = min(store.todayOffers.count - 1, selectedOfferIndex + 1) }
+                                if value.translation.width > 25 { selectedOfferIndex = max(0, selectedOfferIndex - 1) }
+                            })
+                        Spacer(minLength: 12)
                         if selectedOffer != nil { todayStartButton }
                     }
                     Button { showStatus = true } label: {
@@ -152,16 +161,8 @@ struct WatchTrainingView: View {
                 }.padding(.horizontal, 10).padding(.top, 34).padding(.bottom, 6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .ignoresSafeArea(.container, edges: .top).background(cream).foregroundStyle(green)
-                    .overlay(alignment: .topTrailing) {
-                        RoundedRectangle(cornerRadius: 8).fill(green).frame(width: 66, height: 23)
-                            .padding(.trailing, 10).padding(.top, 15).offset(y: -geometry.safeAreaInsets.top).allowsHitTesting(false)
-                    }
             }
-        }.gesture(DragGesture(minimumDistance: 25).onEnded { value in
-            guard store.displayWorkout?.status != "in_progress", store.todayOffers.count > 1 else { return }
-            if value.translation.width < -25 { selectedOfferIndex = min(store.todayOffers.count - 1, selectedOfferIndex + 1) }
-            if value.translation.width > 25 { selectedOfferIndex = max(0, selectedOfferIndex - 1) }
-        })
+        }.preferredColorScheme(.light)
         .confirmationDialog("结束并保存这次力量训练？未完成的组将标为跳过。", isPresented: $strengthFinishConfirm) {
             Button("结束训练") { store.finishStrength() }
         }

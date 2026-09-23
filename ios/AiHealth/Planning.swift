@@ -173,17 +173,24 @@ extension AppStore {
         }
         return []
     }
+    func associatedBlockID(for workout: Workout, on date: String) -> String? {
+        let blocks = trainingBlocks(on: date)
+        if let id = workout.scheduledBlockId { return blocks.contains(where: { $0.id == id }) ? id : nil }
+        if let planID = workout.planId {
+            let matching = blocks.filter { $0.plan?.id == planID }
+            if matching.count == 1 { return matching[0].id }
+        }
+        // Historical timed activities can predate the calendar plan. Infer a
+        // display grouping only when that sport has exactly one planned block.
+        guard let activity = workout.activity else { return nil }
+        let sameSport = blocks.filter { $0.sport == activity.resolvedSport }
+        return sameSport.count == 1 ? sameSport[0].id : nil
+    }
+    func workouts(for block: TrainingBlock, on date: String) -> [Workout] {
+        workouts(on: date).filter { associatedBlockID(for: $0, on: date) == block.id }
+    }
     func workout(for block: TrainingBlock, on date: String) -> Workout? {
-        let actual = workouts(on: date)
-        if let exact = actual.first(where: { workout in
-            workout.scheduledBlockId == block.id || workout.scheduledBlockId == nil &&
-                (block.plan.map { workout.planId == $0.id } ?? (workout.activity != nil && workout.name == block.name))
-        }) { return exact }
-        // A user may add today's plan after recording the activity. Link only an
-        // unambiguous legacy record; never guess between repeated same-sport sessions.
-        guard trainingBlocks(on: date).filter({ $0.sport == block.sport }).count == 1 else { return nil }
-        let unmatched = actual.filter { $0.scheduledBlockId == nil && ($0.activity?.resolvedSport ?? "strength") == block.sport }
-        return unmatched.count == 1 ? unmatched.first : nil
+        workouts(for: block, on: date).first
     }
     func upsertTrainingBlock(on date: String, blockID: String? = nil, plan: Plan) async throws {
         guard plan.validEditorDraft, plan.days.count == 1 else { throw AppError.message("请先完成这一个训练项目") }
