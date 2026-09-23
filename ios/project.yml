@@ -10,6 +10,7 @@ settings:
     TARGETED_DEVICE_FAMILY: '1'
     CODE_SIGN_STYLE: Automatic
     DEFAULT_SERVER_URL: https://health.qyos.top
+    RIYI_IOS_BUNDLE_ID: com.aijiankang.ios
 targets:
   AiHealth:
     type: application
@@ -21,7 +22,7 @@ targets:
         buildPhase: resources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.aijiankang.ios
+        PRODUCT_BUNDLE_IDENTIFIER: $(RIYI_IOS_BUNDLE_ID)
         INFOPLIST_FILE: AiHealth/Info.plist
         CODE_SIGN_ENTITLEMENTS: AiHealth/AiHealth.entitlements
         MARKETING_VERSION: '0.1.0'
@@ -57,7 +58,7 @@ targets:
       - path: AiHealth/Models.swift
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.aijiankang.ios.watchkitapp
+        PRODUCT_BUNDLE_IDENTIFIER: $(RIYI_IOS_BUNDLE_ID).watchkitapp
         TARGETED_DEVICE_FAMILY: '4'
         INFOPLIST_FILE: AiHealthWatch/Info.plist
         CODE_SIGN_ENTITLEMENTS: AiHealthWatch/AiHealthWatch.entitlements
