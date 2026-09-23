@@ -9,6 +9,7 @@ settings:
     SWIFT_VERSION: '5.0'
     TARGETED_DEVICE_FAMILY: '1'
     CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: '' # 试用者在本地填写自己的 Personal Team ID，两端共用
     DEFAULT_SERVER_URL: https://health.qyos.top
     RIYI_IOS_BUNDLE_ID: com.aijiankang.ios
 targets:

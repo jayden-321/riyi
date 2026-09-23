@@ -372,20 +372,25 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					122A5092071A628F408C6DF4 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					38715FF70304EF41FE4DE5D8 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 						TestTargetID = 122A5092071A628F408C6DF4;
 					};
 					92587396F4065B0B97F0F15E = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					BEC077AF2CABFA76EB2D46E9 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 						TestTargetID = ECBCF57F50E9AC5197DBB791;
 					};
 					ECBCF57F50E9AC5197DBB791 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -602,6 +607,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFAULT_SERVER_URL = "https://health.qyos.top";
+				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -719,6 +725,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFAULT_SERVER_URL = "https://health.qyos.top";
+				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
