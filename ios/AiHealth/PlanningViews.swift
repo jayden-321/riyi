@@ -203,6 +203,11 @@ struct DietView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("饮水") {
+                    Text("\(store.water(on: store.calendarKey)) / \(store.profile.waterGoalMl) ml").font(.headline)
+                    HStack { Button("+ 250 ml") { water(250) }; Spacer(); Button("+ 500 ml") { water(500) } }.buttonStyle(.bordered).disabled(future)
+                    NavigationLink("饮水记录、补记与提醒") { WaterView(store: store) }
+                }
                 Section { PlanningCalendar(store: store,kind: "diet") }
                 Section {
                     HStack {
@@ -220,25 +225,16 @@ struct DietView: View {
                 Section("\(store.calendarKey) · 实际摄入") {
                     if energy.rangeCount > 0 {
                         Text("已记录热量约 \(energy.totalMidpointKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
-                        Text("AI 粗估区间 \(energy.totalMinKcal.formatted(.number.precision(.fractionLength(0...1))))–\(energy.totalMaxKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡；显示值按上下限平均计算。").font(.caption).foregroundStyle(.secondary)
-                        Text("\(energy.singleCount) 笔单值热量，\(energy.rangeCount) 笔粗估范围，\(energy.unknownCount) 笔仍待估算。计划未吃不计入实际。").font(.caption).foregroundStyle(.secondary)
-                        Text(energy.unknownCount > 0 ? "还有未估算记录，以上区间不代表全天总摄入。" : "这是已记录饮食的粗估区间，不是精确热量。").font(.caption).foregroundStyle(.secondary)
                     } else {
-                        Text("已记录热量小计 \(energy.singleKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
-                        Text("\(energy.singleCount) 笔有单值热量，\(energy.unknownCount) 笔待估算。计划未吃不计入实际；小计可能不完整。").font(.caption).foregroundStyle(.secondary)
+                        Text("已记录热量 \(energy.singleKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
                     }
-                    if logs.contains(where: { $0.energyMethod == "estimated" }) { Text("单值热量中包含估算值。").font(.caption).foregroundStyle(.secondary) }
+                    if energy.unknownCount > 0 { Text("另有 \(energy.unknownCount) 笔热量未估算").font(.caption).foregroundStyle(.secondary) }
                     ForEach(logs) { log in Button { editing = log } label: { MealLogRow(log: log) }.buttonStyle(.plain).swipeActions { Button("删除",role: .destructive) { store.remove(kind: "meal",id: log.id) } } }
                 }
                 Section("当天食谱计划") {
                     if let (_,day) = store.scheduled("diet",date: store.calendarKey) {
                         ForEach(day.meals) { meal in NavigationLink { MealPlanDetail(store: store,meal: meal,date: day.date) } label: { VStack(alignment: .leading,spacing: 5) { Text(meal.name).font(.headline); Text(meal.foods.joined(separator: "、")).font(.subheadline).foregroundStyle(.secondary) } } }
                     } else { Text("还没有采用食谱。没有计划也可以记录实际吃喝。").foregroundStyle(.secondary) }
-                }
-                Section("饮水") {
-                    Text("\(store.water(on: store.calendarKey)) / \(store.profile.waterGoalMl) ml").font(.headline)
-                    HStack { Button("+ 250 ml") { water(250) }; Spacer(); Button("+ 500 ml") { water(500) } }.buttonStyle(.bordered).disabled(future)
-                    NavigationLink("饮水记录、补记与提醒") { WaterView(store: store) }
                 }
             }.navigationTitle("饮食").sheet(item: $editing) { log in MealLogEditor(store: store,log: log) }.sheet(isPresented: $planning) { PlanningRequestView(store: store,kind: "diet") }
                 .sheet(isPresented: $common) { FoodCommonView(store: store, date: store.calendarDate) }
