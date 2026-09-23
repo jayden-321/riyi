@@ -192,6 +192,9 @@ extension AppStore {
     func workout(for block: TrainingBlock, on date: String) -> Workout? {
         workouts(for: block, on: date).first
     }
+    func hasProtectedTrainingRecords(for block: TrainingBlock, on date: String) -> Bool {
+        workouts(for: block, on: date).contains { $0.status == "completed" || $0.status == "in_progress" }
+    }
     func upsertTrainingBlock(on date: String, blockID: String? = nil, plan: Plan) async throws {
         guard plan.validEditorDraft, plan.days.count == 1 else { throw AppError.message("请先完成这一个训练项目") }
         var snapshot = plan; snapshot.scheduledDate = date
@@ -237,6 +240,12 @@ extension AppStore {
         }
     }
     @discardableResult func deleteTrainingBlock(on date: String, blockID: String) -> Bool {
+        guard let target = trainingBlocks(on: date).first(where: { $0.id == blockID }) else {
+            error = "训练项目已变化，请刷新后重试"; return false
+        }
+        guard !hasProtectedTrainingRecords(for: target, on: date) else {
+            error = "这项训练已有完成或进行中的记录，不能删除。请新增训练项目。"; return false
+        }
         guard let (cycle, day) = scheduled("training", date: date) else {
             if var legacy = plans.first(where: { $0.scheduledDate == date && stableID("legacy-template/" + $0.id + "/" + date) == blockID }) {
                 legacy.scheduledDate = nil
@@ -338,6 +347,9 @@ extension AppStore {
     }
     @discardableResult func deleteActivity(on date: String) -> Bool {
         guard let (cycle, day) = scheduled("training", date: date), day.activity != nil else { error = "这一天没有可删除的活动"; return false }
+        if let target = day.trainingBlocks.first, hasProtectedTrainingRecords(for: target, on: date) {
+            error = "这项训练已有完成或进行中的记录，不能删除。请新增训练项目。"; return false
+        }
         if cycle.days.count == 1 { remove(kind: "cycle", id: cycle.id); return scheduled("training", date: date) == nil }
         var changed = cycle; changed.days.removeAll { $0.id == day.id }
         changed.startDate = changed.days.map(\.date).min() ?? cycle.startDate
@@ -352,6 +364,9 @@ extension AppStore {
             return deleteTrainingBlock(on: date, blockID: block.id)
         }
         if var legacy = plans.first(where: { $0.scheduledDate == date && (planID == nil || $0.id == planID) }) {
+            if let target = trainingBlocks(on: date).first(where: { $0.plan?.id == legacy.id }), hasProtectedTrainingRecords(for: target, on: date) {
+                error = "这项训练已有完成或进行中的记录，不能删除。请新增训练项目。"; return false
+            }
             legacy.scheduledDate = nil
             guard save(legacy, kind: "plan", id: legacy.id) else { return false }
             if !isDemo { Task { await synchronize(showErrors: true) } }

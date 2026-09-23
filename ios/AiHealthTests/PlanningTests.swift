@@ -58,18 +58,22 @@ final class PlanningTests: XCTestCase {
         XCTAssertFalse(pending.days[0].rest)
         XCTAssertEqual(pending.days[0].activity?.resolvedSport, "walking")
     }
-    @MainActor func testDeletingScheduledTrainingKeepsActualWorkoutAndOtherDate() throws {
+    @MainActor func testCompletedTrainingCannotBeDeletedAndOtherDateSurvives() throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: db); store.scope = "local-demo"; store.reload()
         let plan = Plan.starter(), first = CycleDay(date: "2026-09-23", plan: plan), second = CycleDay(date: "2026-09-24", rest: true)
         let cycle = PlanningCycle(name: "两日周期", kind: "training", startDate: first.date, endDate: second.date, timezone: "Asia/Shanghai", days: [first, second])
         XCTAssertTrue(store.save(cycle, kind: "cycle", id: cycle.id))
-        let workout = Workout(plan: plan, day: plan.days[0])
+        var workout = Workout(plan: plan, day: plan.days[0])
+        workout.startedAt = try XCTUnwrap(DayKey.date(first.date, zone: store.settings.timezone)).addingTimeInterval(12 * 3600)
+        workout.status = "completed"; workout.finishedAt = workout.startedAt.addingTimeInterval(3600)
+        for i in workout.exercises.indices { for j in workout.exercises[i].sets.indices { workout.exercises[i].sets[j].status = "skipped" } }
         XCTAssertTrue(store.save(workout, kind: "workout", id: workout.id))
-        XCTAssertTrue(store.deleteScheduledTraining(on: first.date))
-        XCTAssertNil(store.scheduled("training", date: first.date))
+        XCTAssertFalse(store.deleteScheduledTraining(on: first.date))
+        XCTAssertNotNil(store.scheduled("training", date: first.date))
         XCTAssertNotNil(store.scheduled("training", date: second.date))
         XCTAssertEqual(store.workouts.count, 1)
+        XCTAssertTrue(store.error?.contains("请新增训练项目") == true)
     }
     @MainActor func testAddingSwimmingAfterStrengthKeepsBothSessionsAndActualRecord() async throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
@@ -115,7 +119,7 @@ final class PlanningTests: XCTestCase {
         XCTAssertTrue(store.workouts(for: block, on: date).isEmpty, "Two swimming plans make an old unlinked session ambiguous")
         XCTAssertNil(store.associatedBlockID(for: recorded, on: date))
     }
-    @MainActor func testRepeatedRunsStayGroupedAfterPlanEditAndSurviveDeletion() throws {
+    @MainActor func testRepeatedRunsStayGroupedAfterPlanEditAndBlockDeletionIsRejected() throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: db); store.scope = "local-demo"; store.reload()
         let date = DayKey.string(Date(), zone: store.settings.timezone)
@@ -139,10 +143,11 @@ final class PlanningTests: XCTestCase {
         XCTAssertEqual(store.workouts(for: block, on: date).count, 2)
         XCTAssertEqual(store.workouts(for: swimBlock, on: date).map(\.id), [swimRun.id])
         XCTAssertEqual(store.workouts.first(where: { $0.id == first.id })?.exercises[0].sets[0].plannedWeight, 40)
-        XCTAssertTrue(store.deleteTrainingBlock(on: date, blockID: block.id))
+        XCTAssertFalse(store.deleteTrainingBlock(on: date, blockID: block.id))
         XCTAssertEqual(store.workouts(on: date).count, 3)
-        XCTAssertNil(store.associatedBlockID(for: first, on: date))
+        XCTAssertEqual(store.associatedBlockID(for: first, on: date), block.id)
         XCTAssertEqual(store.workouts(for: swimBlock, on: date).map(\.id), [swimRun.id])
+        XCTAssertTrue(store.error?.contains("请新增训练项目") == true)
     }
     @MainActor func testAddingSportToLegacyScheduledStrengthDoesNotReplaceIt() async throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))

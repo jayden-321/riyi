@@ -24,7 +24,13 @@ struct DailyTrainingScheduleView: View {
                             }
                             Spacer()
                             Button("编辑") { editing = block }.buttonStyle(.borderless)
-                            Button { removing = block } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless).tint(.red)
+                            Button { removing = block } label: { Image(systemName: "minus.circle") }
+                                .buttonStyle(.borderless).tint(.red)
+                                .disabled(store.hasProtectedTrainingRecords(for: block, on: selectedDate))
+                        }
+                        if store.hasProtectedTrainingRecords(for: block, on: selectedDate) {
+                            Text("已有完成或进行中的记录，不能删除；请新增训练项目。")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     Button { adding = true } label: { Label("添加训练项目", systemImage: "plus.circle.fill") }

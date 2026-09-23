@@ -22,7 +22,13 @@ struct TrainingView: View {
                             }
                         }
                         Button("编辑计划") { editing = plan }
-                        Button("删除计划", role: .destructive) { store.remove(kind: "plan", id: plan.id) }.accessibilityIdentifier("delete-plan-\(plan.id)")
+                        Button("删除计划", role: .destructive) { store.remove(kind: "plan", id: plan.id) }
+                            .disabled(store.workouts.contains { $0.planId == plan.id && ($0.status == "completed" || $0.status == "in_progress") })
+                            .accessibilityIdentifier("delete-plan-\(plan.id)")
+                        if store.workouts.contains(where: { $0.planId == plan.id && ($0.status == "completed" || $0.status == "in_progress") }) {
+                            Text("已有完成或进行中的记录，不能删除。请新增训练计划。")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Section("新计划") {

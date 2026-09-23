@@ -195,18 +195,25 @@ struct ScheduledActivityView: View {
             Section("改为力量训练") {
                 ForEach(store.plans) { plan in Button("选用 \(plan.name)") { selectedPlan = plan } }
             }
-            Section { Button("删除今天的安排", role: .destructive) { confirmDelete = true } }
+            Section {
+                Button("删除当前训练", role: .destructive) { confirmDelete = true }
+                    .disabled(sessions.contains { $0.status == "completed" || $0.status == "in_progress" })
+                if sessions.contains(where: { $0.status == "completed" || $0.status == "in_progress" }) {
+                    Text("已有完成或进行中的记录，不能删除。请在当天新增训练项目。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
         }.navigationTitle("训练详情")
             .navigationDestination(isPresented: Binding(get: { training != nil }, set: { if !$0 { training = nil } })) {
                 if let training { WorkoutView(store: store, workout: training) }
             }
             .onAppear { let activity = currentActivity; name = activity?.name ?? ""; sport = activity?.resolvedSport ?? "walking"; targetMinutes = activity?.targetMinutes; targetDistanceMeters = activity?.targetDistanceMeters; targetEnergyKcal = activity?.targetEnergyKcal; swimLocation = activity?.swimLocation ?? ""; poolLengthMeters = activity?.poolLengthMeters }
-            .confirmationDialog("删除 \(date) 的训练安排？", isPresented: $confirmDelete) {
-                Button("删除当天安排", role: .destructive) {
+            .confirmationDialog("删除当前训练安排？", isPresented: $confirmDelete) {
+                Button("删除当前训练", role: .destructive) {
                     let removed = blockID.map { store.deleteTrainingBlock(on: date, blockID: $0) } ?? store.deleteActivity(on: date)
                     if removed { dismiss() }
                 }
-            } message: { Text("实际训练记录保留。") }
+            } message: { Text("仅删除这一个未产生完成记录的训练项目。") }
             .sheet(item: $selectedPlan) { plan in
                 if let blockID {
                     PlanEditor(store: store, plan: { var p = plan; p.days = Array(plan.days.prefix(1)); return p }(), oneDayOnly: true) { updated in
@@ -424,7 +431,12 @@ struct ScheduledTrainingView: View {
                 Section {
                     Button("和教练讨论调整") { store.coachPromptDraft = "请调整我已采用的 \(date) 训练安排："; store.selectedTab = "coach" }
                     Button("调整训练安排") { editing = true }
-                    Button("删除当天安排", role: .destructive) { confirmDelete = true }
+                    Button("删除当前训练", role: .destructive) { confirmDelete = true }
+                        .disabled(sessions.contains { $0.status == "completed" || $0.status == "in_progress" })
+                    if sessions.contains(where: { $0.status == "completed" || $0.status == "in_progress" }) {
+                        Text("已有完成或进行中的记录，不能删除。请在当天新增训练项目。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
         }.navigationTitle("训练详情")
@@ -433,12 +445,12 @@ struct ScheduledTrainingView: View {
                 if let blockID { try await store.upsertTrainingBlock(on: date, blockID: blockID, plan: changed) }
                 else { try await store.updateScheduledTraining(changed, on: date) }
             } }
-            .confirmationDialog("删除 \(date) 的训练安排？", isPresented: $confirmDelete) {
-                Button("删除安排", role: .destructive) {
+            .confirmationDialog("删除当前训练安排？", isPresented: $confirmDelete) {
+                Button("删除当前训练", role: .destructive) {
                     let removed = blockID.map { store.deleteTrainingBlock(on: date, blockID: $0) } ?? store.deleteScheduledTraining(on: date, planID: currentPlan.id)
                     if removed { dismiss() }
                 }
-            } message: { Text("只删除日历计划，已有实际训练记录保留。") }
+            } message: { Text("仅删除这一个未产生完成记录的训练项目。") }
     }
 }
 

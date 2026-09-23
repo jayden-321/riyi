@@ -246,6 +246,9 @@ import Observation
         catch { context.rollback(); reload(); self.error = "保存失败：\(error.localizedDescription)"; return false }
     }
     func remove(kind: String, id: String) {
+        if kind == "plan", workouts.contains(where: { $0.planId == id && ($0.status == "completed" || $0.status == "in_progress") }) {
+            error = "这份计划已有完成或进行中的记录，不能删除。请新增训练计划。"; return
+        }
         guard let r = records.first(where: { $0.kind == kind && $0.recordId == id }) else { return }
         do {
             try write(kind: kind, id: id, payload: r.payload, deleted: true)

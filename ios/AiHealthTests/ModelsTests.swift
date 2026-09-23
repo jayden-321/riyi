@@ -19,15 +19,18 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(legacy.resolvedCategory, "strength")
         XCTAssertEqual(healthWorkoutConfiguration(for: Workout(plan: legacy, day: legacy.days[0])).activityType, .traditionalStrengthTraining)
     }
-    @MainActor func testDeletedStarterIsNotRecreatedAndWorkoutSurvives() throws {
+    @MainActor func testStartedPlanCannotBeDeletedAndUnusedStarterCanBeRemoved() throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: db); store.startDemo()
         let plan = try XCTUnwrap(store.plans.first)
         store.start(plan: plan, day: plan.days[0]); store.remove(kind: "plan", id: plan.id)
-        XCTAssertTrue(store.plans.isEmpty); XCTAssertEqual(store.workouts.count, 1)
+        XCTAssertEqual(store.plans.count, 1); XCTAssertEqual(store.workouts.count, 1)
+        XCTAssertTrue(store.error?.contains("请新增训练计划") == true)
         XCTAssertEqual(store.activeWorkout?.planDayId, plan.days[0].id)
+        let unused = Plan.draft(); XCTAssertTrue(store.save(unused, kind: "plan", id: unused.id))
+        store.remove(kind: "plan", id: unused.id)
         store.startDemo(); store.reload()
-        XCTAssertTrue(store.plans.isEmpty, "Returning to demo must not recreate a deleted starter")
+        XCTAssertEqual(store.plans.map(\.id), [plan.id], "Deleting an unused draft must not affect the protected plan")
         XCTAssertEqual(store.workouts.first?.name, plan.days[0].name)
     }
     @MainActor func testHealthProfileDisplaysReadingsAndKeepsManualHistory() async throws {
@@ -214,15 +217,16 @@ final class ModelsTests: XCTestCase {
             XCTAssertEqual((root["records"] as? [Any])?.count, 3)
             XCTAssertNotNil(store.records.first { $0.kind == "plan" && $0.recordId == plan.id })
             store.remove(kind: "plan", id: plan.id)
+            XCTAssertTrue(store.error?.contains("请新增训练计划") == true)
             await store.synchronize()
             for _ in 0..<100 where store.syncing { try await Task.sleep(for: .milliseconds(30)) }
             await store.synchronize()
             for _ in 0..<100 where store.syncing { try await Task.sleep(for: .milliseconds(30)) }
-            XCTAssertFalse(store.syncing); XCTAssertTrue(store.pending.isEmpty); XCTAssertTrue(store.plans.isEmpty)
+            XCTAssertFalse(store.syncing); XCTAssertTrue(store.pending.isEmpty); XCTAssertEqual(store.plans.count, 1)
             XCTAssertEqual(store.workouts.count, 1)
             let after = try JSONSerialization.jsonObject(with: await client.request("/v1/records")) as! [String: Any]
             let deleted = (after["records"] as! [[String: Any]]).first { $0["id"] as? String == plan.id }
-            XCTAssertEqual(deleted?["deleted"] as? Bool, true)
+            XCTAssertEqual(deleted?["deleted"] as? Bool, false)
             _ = try await client.request("/v1/account", method: "DELETE", body: Wire.data(["password": password])); client.forget()
         } catch {
             _ = try? await client.request("/v1/account", method: "DELETE", body: Wire.data(["password": password])); client.forget(); throw error
