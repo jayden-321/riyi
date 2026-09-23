@@ -46,7 +46,7 @@ struct WatchTrainingView: View {
     private let green = Color(red: 0.10, green: 0.37, blue: 0.27)
     private let cream = Color(red: 0.96, green: 0.98, blue: 0.94)
     var body: some View {
-        GeometryReader { _ in
+        GeometryReader { geometry in
             TimelineView(.periodic(from: .now, by: 1)) { timeline in
                 VStack(alignment: .leading, spacing: 5) {
                     if let workout = store.displayWorkout {
@@ -161,6 +161,11 @@ struct WatchTrainingView: View {
                 }.padding(.horizontal, 10).padding(.top, 34).padding(.bottom, 6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .ignoresSafeArea(.container, edges: .top).background(cream).foregroundStyle(green)
+                    .overlay(alignment: .topTrailing) {
+                        RoundedRectangle(cornerRadius: 6).fill(green).frame(width: 44, height: 18)
+                            .padding(.trailing, 14).padding(.top, 17)
+                            .offset(y: -geometry.safeAreaInsets.top).allowsHitTesting(false)
+                    }
             }
         }.preferredColorScheme(.light)
         .confirmationDialog("结束并保存这次力量训练？未完成的组将标为跳过。", isPresented: $strengthFinishConfirm) {
