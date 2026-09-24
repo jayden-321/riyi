@@ -2,6 +2,13 @@ import Foundation
 import SwiftData
 import Observation
 
+#if os(macOS)
+@MainActor final class WorkoutHealthWriter {
+    var hasPairedWatch: Bool { false }
+    func write(_ workout: Workout, automatic: Bool) async throws -> Bool { false }
+}
+#endif
+
 @MainActor @Observable final class AppStore {
     @ObservationIgnored var companionChanged: (() -> Void)?
     @ObservationIgnored var companionRefreshRequested: (() -> Void)?
@@ -10,6 +17,7 @@ import Observation
     @ObservationIgnored let context: ModelContext
     @ObservationIgnored var network: Network
     @ObservationIgnored let healthStorage: Task<HealthStorage, Never>
+    @ObservationIgnored let workoutHealth = WorkoutHealthWriter()
     @ObservationIgnored private var syncAgain = false
     @ObservationIgnored private var overviewTask: Task<Void, Never>?
     @ObservationIgnored private var overviewRequested = false
@@ -62,6 +70,7 @@ import Observation
     var localHealthSampleCount = 0
     var recentHealthSamples: [HealthSample] = []
     var error: String?; var syncing = false; var reportLoading = false; var lastSync: Date?
+    var healthExportMessage: String?
     var healthStatus = "尚未读取健康数据"
     var healthAuthorizationNote = "实际读取范围以系统授权为准"
     var isDemo: Bool { scope == "local-demo" }
@@ -87,6 +96,18 @@ import Observation
         return waters.filter { calendar.isDate($0.drankAt, inSameDayAs: Date()) }.reduce(0) { $0 + $1.amountMl }
     }
     var activeWorkout: Workout? { workouts.first { $0.status == "in_progress" } }
+    private func healthWorkoutKey(_ id: String) -> String { "healthWorkoutSaved.\(scope).\(id)" }
+    func healthWorkoutSaved(_ id: String) -> Bool { UserDefaults.standard.bool(forKey: healthWorkoutKey(id)) }
+    func markHealthWorkoutSaved(_ id: String) { UserDefaults.standard.set(true, forKey: healthWorkoutKey(id)); healthExportMessage = "已写入 Apple 健康" }
+    func writeWorkoutToHealth(_ workout: Workout, automatic: Bool = false) async {
+        guard signedIn, !isDemo, workout.status == "completed", workout.finishedAt != nil, !healthWorkoutSaved(workout.id) else { return }
+        do {
+            let saved = try await workoutHealth.write(workout, automatic: automatic)
+            if saved { markHealthWorkoutSaved(workout.id) }
+        } catch {
+            if !automatic { healthExportMessage = "写入 Apple 健康失败：\(error.localizedDescription)" }
+        }
+    }
     var lastOvernightClosure: String?
     /// End a previous-day session at its last recorded action, preserving every set.
     func expireOvernightWorkouts(now: Date = Date()) {
@@ -105,7 +126,7 @@ import Observation
         observeSessionExpiry()
         if let t = network.tokens { scope = network.baseURL.absoluteString + "/" + t.userId }
         else if UserDefaults.standard.bool(forKey: "localDemo") { scope = "local-demo" }
-        restoreSettings(); reload(); Task { [weak self] in await self?.refreshLocalHealth() }
+        restoreSettings(); reload(); promoteWalkingRecovery(); Task { [weak self] in await self?.refreshLocalHealth() }
     }
     private func observeSessionExpiry() {
         network.onSessionExpired = { [weak self] in
@@ -225,6 +246,9 @@ import Observation
         catch { context.rollback(); reload(); self.error = "保存失败：\(error.localizedDescription)"; return false }
     }
     func remove(kind: String, id: String) {
+        if kind == "plan", workouts.contains(where: { $0.planId == id && ($0.status == "completed" || $0.status == "in_progress") }) {
+            error = "这份计划已有完成或进行中的记录，不能删除。请新增训练计划。"; return
+        }
         guard let r = records.first(where: { $0.kind == kind && $0.recordId == id }) else { return }
         do {
             try write(kind: kind, id: id, payload: r.payload, deleted: true)
@@ -248,10 +272,16 @@ import Observation
         var water = WaterLog(amountMl: amount, drankAt: date, source: source); water.id = id
         save(water, kind: "water", id: water.id)
     }
-    func start(plan: Plan, day: PlanDay, synthetic: Bool = false) {
+    func start(plan: Plan, day: PlanDay, synthetic: Bool = false, scheduledBlockId: String? = nil) {
         expireOvernightWorkouts()
         guard activeWorkout == nil else { error = "请先完成当前训练"; return }
-        var workout = Workout(plan: plan, day: day); workout.synthetic = synthetic; if save(workout, kind: "workout", id: workout.id) { companionStarted?() }
+        var workout = Workout(plan: plan, day: day, scheduledBlockId: scheduledBlockId); workout.synthetic = synthetic; if save(workout, kind: "workout", id: workout.id) { companionStarted?() }
+    }
+    func start(activity: TimedActivity, scheduledBlockId: String? = nil) {
+        expireOvernightWorkouts()
+        guard activeWorkout == nil else { error = "请先完成当前训练"; return }
+        let workout = Workout(activity: activity, scheduledBlockId: scheduledBlockId)
+        if save(workout, kind: "workout", id: workout.id) { companionStarted?() }
     }
     func synchronize(showErrors: Bool = true) async {
         guard signedIn && !isDemo else { return }
@@ -267,7 +297,7 @@ import Observation
             let revision = settingsRevision
             let remoteSettings: CloudSettings = try Wire.read(await client.request("/v1/settings"))
             if revision == settingsRevision && !changingSettings { settings = remoteSettings; persistSettings() }
-            reload()
+            reload(); promoteWalkingRecovery()
             for q in pending {
                 guard scope == expected else { return }
                 if pending.contains(where: { $0.kind == q.kind && $0.recordId == q.recordId && $0.conflictData != nil }) { continue }
@@ -313,8 +343,13 @@ import Observation
                 if r.modelContext == nil { context.insert(r) }; r.payload = payload; r.version = c.version; r.tombstoned = c.deleted; r.updatedAt = c.updatedAt
             }
             try context.save(); reload(); lastSync = Date()
-            cloudSummary = try Wire.read(await client.request("/v1/summary"))
-            report = try Wire.read(await client.request("/v1/report"))
+            if error?.hasPrefix("同步未完成") == true { error = nil }
+            // The outbox has already committed. A summary or AI report failure
+            // must not be presented as a failed record upload.
+            do { cloudSummary = try Wire.read(await client.request("/v1/summary")) }
+            catch { if showErrors { self.error = "记录已同步，今日概览暂未更新：\(error.localizedDescription)" } }
+            do { report = try Wire.read(await client.request("/v1/report")) }
+            catch { if showErrors { self.error = "记录已同步，AI 报告暂未更新：\(error.localizedDescription)" } }
         } catch { context.rollback(); reload(); healthUploadStatus = "上传待重试，已保存断点：\(error.localizedDescription)"; if showErrors { self.error = "同步未完成，记录已留在本机：\(error.localizedDescription)" } }
     }
     func resolve(_ change: PendingChange, keepLocal: Bool) {

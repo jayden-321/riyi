@@ -61,6 +61,87 @@ import SwiftData
         guard HKHealthStore.isHealthDataAvailable(), let sleep = specs.first(where: { $0.name == "sleep_analysis" }) else { return false }
         return (try? await authorizationRequestStatus(for: sleep.type)) == .shouldRequest
     }
+    func weightAuthorizationNeedsRequest() async -> Bool {
+        guard HKHealthStore.isHealthDataAvailable(), let weight = specs.first(where: { $0.name == "body_mass" }) else { return false }
+        return (try? await authorizationRequestStatus(for: weight.type)) == .shouldRequest
+    }
+
+    /// Refreshes only body mass; opening the history screen does not trigger
+    /// the all-type historical import that made large HealthKit libraries slow.
+    func refreshWeight(requestAuthorization: Bool = false, automatic: Bool = false) async {
+        guard let store, store.signedIn, HKHealthStore.isHealthDataAvailable(),
+              let spec = specs.first(where: { $0.name == "body_mass" }) else { return }
+        let owner = store.scope
+        let checkKey = "weightCheck.\(owner).\(store.healthHistoryWindow.rawValue)"
+        if automatic, let last = UserDefaults.standard.object(forKey: checkKey) as? Date,
+           Date() >= last, Date().timeIntervalSince(last) < 30 * 60 { return }
+        do {
+            if requestAuthorization {
+                guard !requesting else { return }; requesting = true
+                defer { requesting = false }
+                try await health.requestAuthorization(toShare: [], read: [spec.type])
+                guard store.scope == owner else { return }
+                store.setHealthReading(true)
+                await stop()
+                if #available(iOS 27.0, *), let boundaries = try? await health.earliestAuthorizedSampleDate(for: [spec.type]) { limitedDates[spec.type] = boundaries[spec.type] }
+                try await store.healthStorage.value.resetAnchor(key: owner + "/" + store.healthHistoryWindow.rawValue + "/body_mass")
+            }
+            guard store.healthReadingEnabled, store.scope == owner else { return }
+            if !requestAuthorization {
+                guard try await authorizationRequestStatus(for: spec.type) == .unnecessary else { return }
+            }
+            try await pull(spec)
+            guard store.scope == owner else { return }
+            UserDefaults.standard.set(Date(), forKey: checkKey)
+            await store.refreshLocalHealth(markRead: true)
+            if requestAuthorization { await activate() }
+            if store.settings.healthConsent && !store.isDemo && !automatic { await store.synchronize(showErrors: false) }
+        } catch {
+            if requestAuthorization { await activate() }
+            guard store.scope == owner else { return }
+            if !automatic { store.error = "体重读取未完成：\(error.localizedDescription)" }
+        }
+    }
+    func vitalAuthorizationNeedsRequest(_ type: String) async -> Bool {
+        guard ["resting_heart_rate", "hrv_sdnn"].contains(type),
+              HKHealthStore.isHealthDataAvailable(), let spec = specs.first(where: { $0.name == type }) else { return false }
+        return (try? await authorizationRequestStatus(for: spec.type)) == .shouldRequest
+    }
+    func refreshVital(_ type: String, requestAuthorization: Bool = false, automatic: Bool = false) async {
+        guard ["resting_heart_rate", "hrv_sdnn"].contains(type),
+              let store, store.signedIn, HKHealthStore.isHealthDataAvailable(),
+              let spec = specs.first(where: { $0.name == type }) else { return }
+        let owner = store.scope
+        let checkKey = "vitalCheck.\(owner).\(store.healthHistoryWindow.rawValue).\(type)"
+        if automatic, let last = UserDefaults.standard.object(forKey: checkKey) as? Date,
+           Date() >= last, Date().timeIntervalSince(last) < 30 * 60 { return }
+        do {
+            if requestAuthorization {
+                guard !requesting else { return }; requesting = true
+                defer { requesting = false }
+                try await health.requestAuthorization(toShare: [], read: [spec.type])
+                guard store.scope == owner else { return }
+                store.setHealthReading(true)
+                await stop()
+                if #available(iOS 27.0, *), let boundaries = try? await health.earliestAuthorizedSampleDate(for: [spec.type]) { limitedDates[spec.type] = boundaries[spec.type] }
+                try await store.healthStorage.value.resetAnchor(key: owner + "/" + store.healthHistoryWindow.rawValue + "/" + type)
+            }
+            guard store.healthReadingEnabled, store.scope == owner else { return }
+            if !requestAuthorization {
+                guard try await authorizationRequestStatus(for: spec.type) == .unnecessary else { return }
+            }
+            try await pull(spec)
+            guard store.scope == owner else { return }
+            UserDefaults.standard.set(Date(), forKey: checkKey)
+            await store.refreshLocalHealth(markRead: true)
+            if requestAuthorization { await activate() }
+            if store.settings.healthConsent && !store.isDemo && !automatic { await store.synchronize(showErrors: false) }
+        } catch {
+            if requestAuthorization { await activate() }
+            guard store.scope == owner else { return }
+            if !automatic { store.error = "\(LocalHealthOverview.names[type] ?? type)读取未完成：\(error.localizedDescription)" }
+        }
+    }
     func requestAndSync() async {
         guard let store else { return }
         guard !requesting else { return }; requesting = true; defer { requesting = false }
@@ -277,7 +358,20 @@ import SwiftData
             }
         }
         if let w = sample as? HKWorkout {
+            if let sessionID = w.metadata?[HKMetadataKeyExternalUUID] as? String,
+               store?.workouts.contains(where: { $0.id == sessionID }) == true {
+                store?.markHealthWorkoutSaved(sessionID)
+            }
             result.workoutJson = ["activity_type": .number(Double(w.workoutActivityType.rawValue)), "duration_seconds": .number(w.duration)]
+            let distanceType: HKQuantityType? = switch w.workoutActivityType {
+            case .swimming: HKQuantityType(.distanceSwimming)
+            case .cycling: HKQuantityType(.distanceCycling)
+            case .walking, .running, .hiking: HKQuantityType(.distanceWalkingRunning)
+            default: nil
+            }
+            if let distanceType, let distance = w.statistics(for: distanceType)?.sumQuantity() {
+                result.workoutJson?["distance_meters"] = .number(distance.doubleValue(for: .meter()))
+            }
             if let energy = w.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity() { result.workoutJson?["active_energy_kcal"] = .number(energy.doubleValue(for: .kilocalorie())) }
             // Workout energy is preserved but never added again to daily active energy.
         }

@@ -1,6 +1,38 @@
 import Foundation
 
 extension AppStore {
+    func controlWorkout(id: String, action: String) {
+        guard var current = workouts.first(where: { $0.id == id && $0.status == "in_progress" }),
+              ["pause_workout", "resume_workout", "finish_activity", "finish_workout"].contains(action) else { return }
+        let event = CompanionEvent(binding: "phone", sessionId: id, exerciseId: "", setId: "", expectedSet: "", action: action, observedAt: Date())
+        let receipt = CompanionCore.apply(event, binding: "phone", to: &current, now: Date())
+        guard receipt.outcome == "applied" else { error = "训练状态未更新：\(receipt.outcome)"; return }
+        if save(current, kind: "workout", id: id), current.status == "completed" {
+            Task { await writeWorkoutToHealth(current, automatic: true) }
+        }
+    }
+    func restartWorkout(_ previous: Workout) {
+        expireOvernightWorkouts()
+        guard previous.status != "in_progress", activeWorkout == nil else { error = "请先完成当前训练"; return }
+        var next = previous
+        next.id = newID(); next.status = "in_progress"; next.startedAt = Date(); next.finishedAt = nil
+        next.autoExpiredAt = nil; next.restUntil = nil; next.pausedAt = nil; next.pausedDurationSeconds = nil
+        next.companionReceipts = nil; next.actualDistanceMeters = nil; next.feedback = Feedback()
+        var exerciseIDs: [String: String] = [:]
+        for i in next.exercises.indices {
+            let old = next.exercises[i].id; next.exercises[i].id = newID(); exerciseIDs[old] = next.exercises[i].id
+            for j in next.exercises[i].sets.indices {
+                next.exercises[i].sets[j].id = newID(); next.exercises[i].sets[j].actualWeight = nil
+                next.exercises[i].sets[j].actualReps = nil; next.exercises[i].sets[j].status = "pending"
+                next.exercises[i].sets[j].startedAt = nil; next.exercises[i].sets[j].completedAt = nil
+                next.exercises[i].sets[j].rpe = nil; next.exercises[i].sets[j].note = ""
+            }
+        }
+        next.groups = next.groups?.map { group in
+            var updated = group; updated.id = newID(); updated.exerciseIds = group.exerciseIds.compactMap { exerciseIDs[$0] }; return updated
+        }
+        if save(next, kind: "workout", id: next.id) { companionStarted?() }
+    }
     /// Three-way merge protects confirmed Watch results from an open phone form's stale copy.
     func saveWorkoutEdits(base: Workout, proposed: Workout) {
         guard var current = workouts.first(where: { $0.id == proposed.id }), current.status == "in_progress" else { return }
@@ -29,6 +61,7 @@ extension AppStore {
             }
         }
         if (try? Wire.data(base.feedback)) != (try? Wire.data(proposed.feedback)) { current.feedback = proposed.feedback }
+        if base.actualDistanceMeters != proposed.actualDistanceMeters { current.actualDistanceMeters = proposed.actualDistanceMeters }
         if base.volumeTargetKg != proposed.volumeTargetKg { current.volumeTargetKg = proposed.volumeTargetKg }
         if proposed.status != base.status {
             if conflict { error = "手表刚更新了训练，请核对后再次结束" }
@@ -40,7 +73,9 @@ extension AppStore {
             }
         }
         if conflict { error = "该组已在另一端更新，已保留确认后的结果，请核对" }
-        _ = save(current, kind: "workout", id: current.id)
+        if save(current, kind: "workout", id: current.id), current.status == "completed" {
+            Task { await writeWorkoutToHealth(current, automatic: true) }
+        }
     }
 }
 
@@ -53,6 +88,7 @@ import Network
     private let pathMonitor = NWPathMonitor()
     private var lastPayload: Data?
     private var lastOfferPayload: Data?
+    private var lastOffersPayload: Data?
     private var lastDayStatusPayload: Data?
     private var current: CompanionSnapshot?
     private var binding = ""
@@ -89,32 +125,54 @@ import Network
             lastScope = store.scope
         }
         let today = CompanionCore.dayKey(Date(), zone: store.settings.timezone)
-        var workout = store.signedIn ? (store.activeWorkout ?? store.workouts.first {
+        let offers = todayOffers(store: store)
+        let offer = offers.first
+        let scheduled = store.scheduled("training", date: today)?.1
+        let pendingActivity = scheduled?.trainingBlocks.first(where: { block in
+            block.activity != nil && store.workout(for: block, on: today) == nil
+        })?.activity
+        var workout = store.signedIn ? (store.activeWorkout ?? (offer == nil && pendingActivity == nil ? store.workouts.first {
             CompanionCore.dayKey($0.startedAt, zone: store.settings.timezone) == today
-        }) : nil
+        } : nil)) : nil
         workout?.companionReceipts = nil // Receipts travel individually, never inflate snapshots.
         // Legacy guest/demo fixtures are not consent to start a real HealthKit workout.
         if workout?.synthetic == nil { workout?.synthetic = store.isDemo }
-        let offer = todayOffer(store: store)
-        let rest = store.scheduled("training", date: today).map { $0.1.rest } ?? false
+        let rest = scheduled?.rest ?? false
         let dayStatus = store.signedIn ? CompanionDayStatus(date: today, timezone: store.settings.timezone,
-            kind: rest ? "rest" : offer == nil ? "unplanned" : "training") : nil
+            kind: rest ? "rest" : scheduled?.trainingBlocks.isEmpty == false || offer != nil ? "training" : "unplanned",
+            activityName: pendingActivity?.name) : nil
         let payload = try? Wire.data(workout), offerPayload = try? Wire.data(offer), dayPayload = try? Wire.data(dayStatus)
-        let changed = payload != lastPayload || offerPayload != lastOfferPayload || dayPayload != lastDayStatusPayload || current?.binding != binding
+        let offersPayload = try? Wire.data(offers)
+        let changed = payload != lastPayload || offerPayload != lastOfferPayload || offersPayload != lastOffersPayload || dayPayload != lastDayStatusPayload || current?.binding != binding
         if changed {
             let revision = max(defaults.integer(forKey: "companion.revision") + 1, Int(Date().timeIntervalSince1970 * 1000))
             defaults.set(revision, forKey: "companion.revision")
-            current = CompanionSnapshot(binding: binding, revision: revision, workout: workout, offer: offer, timezone: store.settings.timezone, today: dayStatus)
-            lastPayload = payload; lastOfferPayload = offerPayload; lastDayStatusPayload = dayPayload
+            current = CompanionSnapshot(binding: binding, revision: revision, workout: workout, offer: offer, timezone: store.settings.timezone, today: dayStatus, offers: offers)
+            lastPayload = payload; lastOfferPayload = offerPayload; lastOffersPayload = offersPayload; lastDayStatusPayload = dayPayload
         }
         if force || changed { transport.send(CompanionPacket(snapshot: current), latest: true) }
     }
     private func todayOffer(store: AppStore) -> CompanionStartOffer? {
-        guard store.signedIn else { return nil }
+        todayOffers(store: store).first
+    }
+    private func todayOffers(store: AppStore) -> [CompanionStartOffer] {
+        guard store.signedIn else { return [] }
         let date = DayKey.string(Date(), zone: store.settings.timezone)
-        if let (_, scheduled) = store.scheduled("training", date: date), scheduled.rest { return nil }
-        guard let plan = store.todayPlan, let day = plan.days.first else { return nil }
-        return CompanionStartOffer(date: date, timezone: store.settings.timezone, plan: plan, day: day)
+        if let (_, scheduled) = store.scheduled("training", date: date), scheduled.rest { return [] }
+        let blocks = store.trainingBlocks(on: date)
+        if !blocks.isEmpty {
+            return blocks.compactMap { block in
+                var plan = block.editorPlan
+                if block.plan == nil {
+                    plan.id = stableID("watch-plan/" + block.id)
+                    plan.days[0].id = stableID("watch-day/" + block.id)
+                }
+                guard let day = plan.days.first else { return nil }
+                return CompanionStartOffer(date: date, timezone: store.settings.timezone, plan: plan, day: day, blockId: block.id, lastStatus: store.workout(for: block, on: date)?.status)
+            }
+        }
+        guard let plan = store.todayPlan, let day = plan.days.first else { return [] }
+        return [CompanionStartOffer(date: date, timezone: store.settings.timezone, plan: plan, day: day)]
     }
     private func receive(_ packet: CompanionPacket) {
         guard let store else { return }
@@ -132,6 +190,9 @@ import Network
                 now: Date())
             // save() commits workout + receipt + existing server outbox atomically before ACK.
             guard store.save(workout, kind: "workout", id: workout.id) else { return }
+            if ["finish_activity", "finish_workout"].contains(event.action), receipt.outcome == "applied" {
+                Task { await store.writeWorkoutToHealth(workout, automatic: true) }
+            }
             publish(force: true)
             transport.send(CompanionPacket(snapshot: current, receipt: receipt))
         }
@@ -144,6 +205,7 @@ import Network
             }) else { return }
             let scope = store.scope, upload = store.settings.healthConsent && !store.isDemo && !store.healthUploadPaused
             inFlightHealth.insert(batch.id)
+            if batch.samples.contains(where: { $0.type == "workout" }) { store.markHealthWorkoutSaved(batch.sessionId) }
             Task { [weak self] in
                 defer { self?.inFlightHealth.remove(batch.id) }
                 do {
@@ -164,14 +226,16 @@ import Network
             publish(force: true); return
         }
         store.expireOvernightWorkouts()
-        let offer = todayOffer(store: store)
+        let offer = todayOffers(store: store).first { candidate in
+            candidate.plan.id == request.planId && candidate.day.id == request.dayId && (request.blockId == nil || request.blockId == candidate.blockId)
+        }
         let outcome = CompanionCore.startOutcome(request, offer: offer, binding: binding,
                                                  active: store.activeWorkout, now: Date())
         guard outcome == "start", let offer else {
             transport.send(CompanionPacket(startReceipt: CompanionStartReceipt(requestId: request.id, outcome: outcome, workoutId: nil)))
             publish(force: true); return
         }
-        var workout = Workout(plan: offer.plan, day: offer.day)
+        var workout = Workout(plan: offer.plan, day: offer.day, scheduledBlockId: offer.blockId)
         workout.id = request.id; workout.synthetic = store.isDemo
         guard store.save(workout, kind: "workout", id: workout.id) else { return } // No ACK before durable commit.
         publish(force: true)
@@ -191,7 +255,8 @@ import Network
     private func launchWatch() {
         publish(force: true)
         guard let store, store.activeWorkout?.synthetic != true else { return }
-        let config = HKWorkoutConfiguration(); config.activityType = .traditionalStrengthTraining; config.locationType = .indoor
+        guard let workout = store.activeWorkout else { return }
+        let config = healthWorkoutConfiguration(for: workout)
         HKHealthStore().startWatchApp(with: config) { [weak store] success, error in
             if !success { Task { @MainActor in store?.error = "手表未自动打开：\(error?.localizedDescription ?? "请在手表打开日益")。训练已在手机保存，手表打开后会同步。" } }
         }

@@ -26,7 +26,7 @@
 	<key>NSHealthShareUsageDescription</key>
 	<string>读取你选择的体重、睡眠、心率、活动和训练数据，用于健康概览。云端同步和 AI 分析需另外同意。</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>当前版本只读取健康数据，不向 Apple 健康写入。</string>
+	<string>将你在日益实际完成的训练及运动距离写入 Apple 健康；计划安排不会写成已完成运动。</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>连接你配置的本地开发服务器。</string>
 	<key>NSCameraUsageDescription</key>

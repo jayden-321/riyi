@@ -68,11 +68,12 @@ struct ExercisePhoto: View {
 struct ExerciseLibraryView: View {
     @Bindable var store: AppStore
     var onSelect: ((ExerciseGuide) -> Void)? = nil
+    var selectRepBasedOnly = false
     @State private var query = ""
     @State private var part = "全部"
     @State private var equipment = "全部器械"
     private var filtered: [ExerciseGuide] {
-        ExerciseGuide.all.filter { (part == "全部" || $0.bodyParts.contains(part)) && (equipment == "全部器械" || $0.equipmentGroup == equipment) && $0.matches(query) }
+        ExerciseGuide.all.filter { (!selectRepBasedOnly || $0.repBased) && (part == "全部" || $0.bodyParts.contains(part)) && (equipment == "全部器械" || $0.equipmentGroup == equipment) && $0.matches(query) }
     }
     var body: some View {
         VStack(spacing: 0) {

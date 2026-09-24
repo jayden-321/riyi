@@ -4,6 +4,60 @@ import SwiftData
 
 final class CompanionTests: XCTestCase {
     let now = Date(timeIntervalSince1970: 1_790_000_000.123)
+    func testWatchCanFinishTimedSportWithoutFakeSetsAndRetryIsIdempotent() throws {
+        var workout = Workout(activity: TimedActivity(name: "泳池游泳", targetMinutes: 30, sport: "swimming", swimLocation: "pool", poolLengthMeters: 25))
+        workout.startedAt = now.addingTimeInterval(-20 * 60)
+        let event = CompanionEvent(binding: "paired", sessionId: workout.id, exerciseId: "", setId: "", expectedSet: "", action: "finish_activity", observedAt: now)
+        var replica = CompanionReplica(snapshot: CompanionSnapshot(binding: "paired", revision: 1, workout: workout))
+        replica.events = [event]
+        XCTAssertEqual(replica.projected?.status, "in_progress", "Watch must wait for iPhone commit before stopping HealthKit")
+        let receipt = CompanionCore.apply(event, binding: "paired", to: &workout, now: now)
+        XCTAssertEqual(receipt.outcome, "applied")
+        XCTAssertEqual(workout.status, "completed")
+        XCTAssertEqual(workout.finishedAt, now)
+        XCTAssertTrue(workout.exercises.isEmpty)
+        XCTAssertEqual(CompanionCore.apply(event, binding: "paired", to: &workout, now: now.addingTimeInterval(1)).outcome, "applied")
+        replica.acknowledge(receipt)
+        XCTAssertTrue(replica.events.isEmpty)
+    }
+    func testWatchPauseResumeStopKeepsCompletedSetsAndAllowsFreshStart() throws {
+        var workout = fixture()
+        let started = workout.startedAt
+        let pauseAt = started.addingTimeInterval(120)
+        let resumeAt = pauseAt.addingTimeInterval(180)
+        let stopAt = resumeAt.addingTimeInterval(120)
+        func control(_ action: String, _ when: Date) -> CompanionEvent {
+            CompanionEvent(binding: "paired", sessionId: workout.id, exerciseId: "", setId: "", expectedSet: "", action: action, observedAt: when)
+        }
+        XCTAssertEqual(CompanionCore.apply(control("pause_workout", pauseAt), binding: "paired", to: &workout, now: pauseAt).outcome, "applied")
+        XCTAssertEqual(workout.pausedAt, pauseAt)
+        XCTAssertEqual(workout.elapsedSeconds(at: resumeAt), 120)
+        XCTAssertEqual(CompanionCore.apply(event(workout, "start", at: pauseAt.addingTimeInterval(10)), binding: "paired", to: &workout, now: pauseAt.addingTimeInterval(10)).outcome, "paused")
+        XCTAssertEqual(CompanionCore.apply(control("resume_workout", resumeAt), binding: "paired", to: &workout, now: resumeAt).outcome, "applied")
+        XCTAssertEqual(workout.pausedDurationSeconds, 180)
+        XCTAssertEqual(CompanionCore.apply(control("finish_workout", stopAt), binding: "paired", to: &workout, now: stopAt).outcome, "applied")
+        XCTAssertEqual(workout.status, "completed")
+        XCTAssertTrue(workout.exercises.flatMap(\.sets).allSatisfy { $0.status == "skipped" })
+        XCTAssertEqual(workout.elapsedSeconds(at: stopAt), 240)
+        let restored: Workout = try Wire.read(Wire.data(workout))
+        XCTAssertEqual(restored.pausedDurationSeconds, 180)
+    }
+    @MainActor func testRestartCreatesSeparateWorkoutAndKeepsPreviousResult() throws {
+        let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: db); store.scope = "local-demo"; store.reload()
+        let plan = Plan.starter()
+        var previous = Workout(plan: plan, day: plan.days[0], scheduledBlockId: newID())
+        previous.status = "completed"; previous.finishedAt = Date()
+        for i in previous.exercises.indices { for j in previous.exercises[i].sets.indices { previous.exercises[i].sets[j].status = "skipped" } }
+        XCTAssertTrue(store.save(previous, kind: "workout", id: previous.id))
+        store.restartWorkout(previous)
+        let current = try XCTUnwrap(store.activeWorkout)
+        XCTAssertNotEqual(current.id, previous.id)
+        XCTAssertEqual(current.scheduledBlockId, previous.scheduledBlockId)
+        XCTAssertNotEqual(current.exercises[0].sets[0].id, previous.exercises[0].sets[0].id)
+        XCTAssertEqual(current.exercises[0].sets[0].status, "pending")
+        XCTAssertEqual(store.workouts.first(where: { $0.id == previous.id })?.status, "completed")
+    }
     func fixture() -> Workout {
         let plan = Plan.starter(); var workout = Workout(plan: plan, day: plan.days[0]); workout.startedAt = now.addingTimeInterval(-60); return workout
     }

@@ -45,32 +45,25 @@ final class FlowTests: XCTestCase {
     func testPlanGuideContinueAndDeletion() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
-        app.launchArguments = ["-localDemo", "NO"]; app.launch()
-        if app.tabBars.buttons["我的"].waitForExistence(timeout: 3) {
-            if app.alerts.buttons["知道了"].exists { app.alerts.buttons["知道了"].tap() }
-            app.tabBars.buttons["我的"].tap()
-            if !app.navigationBars["我的"].exists { app.tabBars.buttons["我的"].tap() }
-            let leave = app.buttons["退出本地体验"].exists ? app.buttons["退出本地体验"] : app.buttons["退出登录"]
-            for _ in 0..<10 where !leave.isHittable { app.swipeUp() }
-            leave.tap(); app.alerts.buttons["退出"].tap()
-        }
-        XCTAssertTrue(app.buttons["先体验本地记录"].waitForExistence(timeout: 6)); app.buttons["先体验本地记录"].tap()
-        app.tabBars.buttons["训练"].tap(); app.buttons["编辑计划"].tap()
+        app.launchArguments = ["--watch-start-pair-test"]; app.launch()
+        app.tabBars.buttons["训练"].tap()
+        app.staticTexts["胸 + 三头"].firstMatch.tap()
         let guide = app.buttons["动作图解与说明"].firstMatch
         for _ in 0..<5 where !guide.isHittable { app.swipeUp() }
         guide.tap(); XCTAssertTrue(app.navigationBars["动作说明"].waitForExistence(timeout: 5))
-        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "编辑计划中可打开动作说明"; screenshot.lifetime = .keepAlways; add(screenshot)
+        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "日历训练可打开动作说明"; screenshot.lifetime = .keepAlways; add(screenshot)
         app.navigationBars["动作说明"].buttons.element(boundBy: 0).tap()
-        app.buttons["取消"].tap()
-        app.buttons["开始"].tap(); XCTAssertTrue(app.navigationBars["胸 + 三头"].waitForExistence(timeout: 5))
+        app.buttons["开始训练"].tap(); XCTAssertTrue(app.navigationBars["胸 + 三头"].waitForExistence(timeout: 5))
         app.navigationBars["胸 + 三头"].buttons.element(boundBy: 0).tap()
+        app.navigationBars["训练详情"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.buttons["继续训练"].waitForExistence(timeout: 5)); app.buttons["继续训练"].tap()
         XCTAssertTrue(app.navigationBars["胸 + 三头"].waitForExistence(timeout: 5))
         app.navigationBars["胸 + 三头"].buttons.element(boundBy: 0).tap()
-        app.buttons["删除计划"].tap()
-        XCTAssertFalse(app.staticTexts["增肌计划 A"].exists)
+        app.staticTexts["胸 + 三头"].firstMatch.tap()
+        app.buttons["删除当天安排"].tap()
+        app.buttons["删除安排"].tap()
+        XCTAssertTrue(app.buttons["schedule-training-day"].exists)
         app.terminate(); app.launchArguments = []; app.launch(); app.tabBars.buttons["训练"].tap()
-        XCTAssertFalse(app.staticTexts["增肌计划 A"].exists)
         XCTAssertTrue(app.staticTexts["胸 + 三头"].exists || app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "胸 + 三头")).firstMatch.exists)
     }
     func testCloudCoachGeneratesEditablePlan() throws {
@@ -113,6 +106,11 @@ final class FlowTests: XCTestCase {
         planButton.tap()
         let planName = app.textFields["名称"].value as? String ?? ""
         XCTAssertFalse(planName.isEmpty); XCTAssertTrue(app.buttons["保存"].isEnabled); app.buttons["保存"].tap()
+        let arrange = app.buttons["安排到训练日历"].firstMatch
+        XCTAssertTrue(arrange.waitForExistence(timeout: 5)); arrange.tap()
+        let adopt = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "采用所选")).firstMatch
+        for _ in 0..<8 where !adopt.isHittable { app.swipeUp() }
+        XCTAssertTrue(adopt.isEnabled); adopt.tap()
         app.tabBars.buttons["训练"].tap()
         XCTAssertTrue(app.staticTexts[planName].waitForExistence(timeout: 5))
         app.tabBars.buttons["教练"].tap()
@@ -143,38 +141,21 @@ final class FlowTests: XCTestCase {
     func testTrainingMethodsAndVolumeTarget() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
-        app.launchArguments = ["-localDemo", "NO"]; app.launch()
-        XCTAssertTrue(app.buttons["先体验本地记录"].waitForExistence(timeout: 8)); app.buttons["先体验本地记录"].tap()
-        app.tabBars.buttons["训练"].tap(); app.staticTexts["增肌计划 A"].tap(); app.buttons["编辑计划"].tap()
+        app.launchArguments = ["--watch-start-pair-test"]; app.launch()
+        app.tabBars.buttons["训练"].tap(); app.staticTexts["胸 + 三头"].firstMatch.tap(); app.buttons["调整训练安排"].tap()
         let pattern = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "默认组模式")).firstMatch
         XCTAssertTrue(pattern.waitForExistence(timeout: 5)); pattern.tap(); app.buttons["金字塔组"].tap()
         app.buttons["10 吨"].tap()
-        let add = app.buttons["添加动作"]
-        for _ in 0..<10 where !add.isHittable { app.swipeUp() }
-        XCTAssertTrue(add.isHittable); add.tap()
-        let groupLink = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "特殊组合")).firstMatch
-        for _ in 0..<12 where !groupLink.isHittable { app.swipeDown() }
-        XCTAssertTrue(groupLink.isHittable); groupLink.tap(); app.buttons["巨人组"].tap()
-        for name in ["杠铃卧推", "上斜哑铃卧推", "绳索下压", "新动作"] {
-            let toggle = app.switches[name]
-            toggle.switches.firstMatch.tap()
-            XCTAssertEqual(toggle.value as? String, "1")
-        }
-        XCTAssertTrue(app.staticTexts["已选 4 个动作"].exists)
-        app.navigationBars["特殊组合"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.buttons["保存"].isHittable); XCTAssertTrue(app.buttons["保存"].isEnabled); app.buttons["保存"].tap()
-        XCTAssertTrue(app.buttons["开始"].waitForExistence(timeout: 5)); app.buttons["开始"].tap()
+        XCTAssertTrue(app.buttons["开始训练"].waitForExistence(timeout: 5)); app.buttons["开始训练"].tap()
         app.tabBars.buttons["今天"].tap()
         let ongoing = app.buttons["继续训练"]
         XCTAssertTrue(ongoing.waitForExistence(timeout: 5), app.debugDescription); ongoing.tap()
         XCTAssertTrue(app.staticTexts["目标 10 吨 · 还差 10 吨"].waitForExistence(timeout: 5))
-        let first = app.staticTexts["第 1 轮 · 杠铃卧推"]
-        for _ in 0..<4 where !first.isHittable { app.swipeUp() }
-        XCTAssertTrue(first.exists)
         let stars = app.buttons["主观难度，4 颗星"].firstMatch
         for _ in 0..<3 where !stars.isHittable { app.swipeUp() }
         stars.tap(); XCTAssertEqual(stars.value as? String, "已选")
-        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "巨人组与五星难度"; capture.lifetime = .keepAlways; self.add(capture)
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "金字塔组容量目标与五星难度"; capture.lifetime = .keepAlways; self.add(capture)
         app.terminate(); app.launchArguments = []; app.launch()
         XCTAssertTrue(app.buttons["继续训练"].waitForExistence(timeout: 5)); app.buttons["继续训练"].tap()
         XCTAssertTrue(app.staticTexts["目标 10 吨 · 还差 10 吨"].waitForExistence(timeout: 5))

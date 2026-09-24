@@ -6,10 +6,10 @@ final class ExerciseLibraryUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
         app.launchEnvironment["AIHEALTH_EXERCISE_MEDIA_BASE"] = "http://127.0.0.1:18091/media/exercises/fedb-a859101d633a"
-        app.launchArguments = ["-localDemo", "NO"]
+        app.launchArguments = ["--watch-start-pair-test"]
         app.launch()
-        XCTAssertTrue(app.buttons["先体验本地记录"].waitForExistence(timeout: 8))
-        app.buttons["先体验本地记录"].tap(); app.tabBars.buttons["训练"].tap()
+        XCTAssertTrue(app.tabBars.buttons["训练"].waitForExistence(timeout: 8))
+        app.tabBars.buttons["训练"].tap()
         return app
     }
     private func capture(_ app: XCUIApplication, _ name: String) {
@@ -17,6 +17,7 @@ final class ExerciseLibraryUITests: XCTestCase {
     }
     func testBrowseSearchPhotosAndCacheSettings() {
         let app = launch()
+        app.tabBars.buttons["我的"].tap()
         app.buttons["exercise-library-entry"].tap()
         XCTAssertTrue(app.navigationBars["动作库"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["876 个"].exists)
@@ -54,12 +55,13 @@ final class ExerciseLibraryUITests: XCTestCase {
     }
     func testChooseNewExerciseAndPreserveOldGuideLink() {
         let app = launch()
-        app.buttons["编辑计划"].firstMatch.tap()
+        app.staticTexts["胸 + 三头"].firstMatch.tap()
+        app.buttons["调整训练安排"].tap()
         let old = app.buttons["动作图解与说明"].firstMatch
         for _ in 0..<6 where !old.isHittable { app.swipeUp() }
         old.tap(); XCTAssertTrue(app.staticTexts["杠铃卧推"].waitForExistence(timeout: 5))
         app.navigationBars["动作说明"].buttons.element(boundBy: 0).tap()
-        let addFromLibrary = app.buttons["从动作库添加"]
+        let addFromLibrary = app.buttons["从动作库选择动作"]
         for _ in 0..<12 where !addFromLibrary.isHittable { app.swipeUp() }
         XCTAssertTrue(addFromLibrary.isHittable); addFromLibrary.tap()
         let search = app.textFields["exercise-library-search"]; search.tap(); search.typeText("Dumbbell Bench Press")
@@ -69,7 +71,10 @@ final class ExerciseLibraryUITests: XCTestCase {
         XCTAssertTrue(add.waitForExistence(timeout: 5)); XCTAssertTrue(add.isEnabled); add.tap()
         XCTAssertTrue(app.navigationBars["编辑训练计划"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(app.buttons["保存"].isEnabled); app.buttons["保存"].tap()
-        XCTAssertTrue(app.staticTexts["4 个动作"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["训练详情"].waitForExistence(timeout: 5))
+        app.navigationBars["训练详情"].buttons.element(boundBy: 0).tap()
+        app.staticTexts["胸 + 三头"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["平板哑铃卧推"].waitForExistence(timeout: 5))
         capture(app, "动作库选入训练日")
     }
 }

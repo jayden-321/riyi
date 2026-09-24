@@ -44,30 +44,33 @@ struct PlanningCalendar: View {
 }
 
 struct TrainingCalendarView: View {
-    @Bindable var store: AppStore; @State private var planning = false; @State private var template: Plan?
+    @Bindable var store: AppStore
+    @State private var cycleOptions = false
+    @State private var editingDate: TrainingDateSelection?
+    private var selectedDate: String { store.calendarKey }
+    private var blocks: [TrainingBlock] { store.trainingBlocks(on: selectedDate) }
+    private var unmatchedWorkouts: [Workout] {
+        store.workouts(on: selectedDate).filter { workout in
+            store.associatedBlockID(for: workout, on: selectedDate) == nil
+        }
+    }
+    private func detail(_ sessions: [Workout]) -> String {
+        guard !sessions.isEmpty else { return "尚未开始 · 查看训练内容" }
+        let active = sessions.contains { $0.status == "in_progress" }
+        return "已练 \(sessions.count) 次\(active ? " · 进行中，可继续" : " · 查看详情可再练")"
+    }
     var body: some View {
         NavigationStack {
             List {
                 Section { PlanningCalendar(store: store,kind: "training") }
-                Section {
-                    Button("和 AI 安排训练周期") { planning = true }
-                    NavigationLink("我的计划与历史记录") { TrainingView(store: store) }
+                if let active = store.activeWorkout,
+                   selectedDate != DayKey.string(Date(), zone: store.settings.timezone) || store.associatedBlockID(for: active, on: selectedDate) == nil {
+                    Section("正在训练") { NavigationLink("\(active.name) · 继续训练") { WorkoutView(store: store,workout: active) } }
                 }
-                if !store.plans.isEmpty {
-                    Section("从已有计划安排") {
-                        ForEach(store.plans) { plan in
-                            Button { template = plan } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(plan.name).font(.headline)
-                                    Text("\(plan.days.count) 个训练日 · 选择日期后才会显示在日历").font(.caption).foregroundStyle(.secondary)
-                                }
-                            }.accessibilityIdentifier("schedule-template-\(plan.id)")
-                        }
-                    }
-                }
-                if let active = store.activeWorkout { Section("正在训练") { NavigationLink("\(active.name) · 继续训练") { WorkoutView(store: store,workout: active) } } }
-                Section(store.calendarKey) {
-                    if let (_,day) = store.scheduled("training",date: store.calendarKey) {
+                Section(selectedDate) {
+                    Button { editingDate = TrainingDateSelection(date: selectedDate) } label: { Label("安排训练", systemImage: "plus.circle.fill") }
+                        .accessibilityIdentifier("schedule-training-day")
+                    if let (_,day) = store.scheduled("training",date: selectedDate) {
                         if day.rest {
                             NavigationLink { ScheduledRestDayView(store: store, date: day.date) } label: {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -76,35 +79,180 @@ struct TrainingCalendarView: View {
                                 }
                             }.accessibilityIdentifier("scheduled-rest-day")
                         }
-                        else if let plan = day.plan { NavigationLink { ScheduledTrainingView(store: store,plan: plan,date: day.date) } label: { VStack(alignment: .leading,spacing: 4) { Text(plan.days.first?.name ?? plan.name).font(.headline); Text("计划 · 点击查看动作和训练组").font(.caption).foregroundStyle(.secondary) } } }
-                    } else if let legacy = store.plans.first(where: { $0.scheduledDate == store.calendarKey }), legacy.days.count == 1 {
-                        NavigationLink { ScheduledTrainingView(store: store, plan: legacy, date: store.calendarKey) } label: { Text(legacy.days[0].name) }
-                    } else {
-                        Text("当天没有安排。上面的已有计划可选训练日并安排到这一天。").foregroundStyle(.secondary)
+                        else {
+                            ForEach(Array(day.trainingBlocks.enumerated()), id: \.element.id) { index, block in
+                                let sessions = store.workouts(for: block, on: selectedDate)
+                                if let plan = block.plan {
+                                    NavigationLink { ScheduledTrainingView(store: store, plan: plan, date: day.date, blockID: block.id) } label: {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("\(index + 1). \(block.name)").font(.headline)
+                                            Text("\(sportTitle(block.sport)) · \(detail(sessions))").font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                } else if let activity = block.activity {
+                                    NavigationLink { ScheduledActivityView(store: store, date: day.date, blockID: block.id) } label: {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Label("\(index + 1). \(activity.name)", systemImage: sportOptions.first { $0.code == activity.resolvedSport }?.icon ?? "figure.walk")
+                                            Text("\(sportTitle(activity.resolvedSport)) · \(detail(sessions))").font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }.accessibilityIdentifier("scheduled-activity")
+                                }
+                            }
+                        }
+                    } else if let legacy = store.plans.first(where: { $0.scheduledDate == selectedDate }), legacy.days.count == 1 {
+                        NavigationLink { ScheduledTrainingView(store: store, plan: legacy, date: selectedDate) } label: { Text(legacy.days[0].name) }
+                    } else if store.workouts(on: selectedDate).isEmpty {
+                        Text("这一天尚未安排训练").foregroundStyle(.secondary)
                     }
-                    ForEach(store.workouts(on: store.calendarKey)) { w in NavigationLink { WorkoutView(store: store,workout: w) } label: { VStack(alignment: .leading) { Text(w.name); Text("实际 \(w.completedSets) 组 · \(w.status == "in_progress" ? "进行中" : "已结束")").font(.caption).foregroundStyle(.secondary) } } }
                 }
+                if !unmatchedWorkouts.isEmpty {
+                    Section {
+                        ForEach(unmatchedWorkouts) { w in
+                            NavigationLink { WorkoutView(store: store, workout: w) } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(w.name)
+                                    Text("\(w.startedAt.formatted(date: .omitted, time: .shortened)) · \(w.status == "in_progress" ? "进行中" : "已练记录")")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    } header: { Text("未关联安排的已练记录") } footer: { Text("原安排删除或无法可靠对应时，实际训练仍保留在这里。") }
+                }
+                Section("周期") { Button("安排训练周期") { cycleOptions = true } }
             }.navigationTitle("训练")
-                .sheet(isPresented: $planning) { PlanningRequestView(store: store,kind: "training") }
-                .sheet(item: $template) { value in TemplateScheduleView(store: store, plan: value) }
+                .sheet(item: $editingDate) { selection in
+                    DailyTrainingScheduleView(store: store, date: selection.date)
+                }
+                .sheet(isPresented: $cycleOptions) { TrainingCycleOptionsView(store: store) }
         }
+    }
+}
+private struct TrainingDateSelection: Identifiable {
+    let date: String
+    var id: String { date }
+}
+struct ScheduledActivityView: View {
+    @Bindable var store: AppStore
+    let date: String
+    var blockID: String? = nil
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var sport = "walking"
+    @State private var targetMinutes: Int?
+    @State private var targetDistanceMeters: Double?
+    @State private var targetEnergyKcal: Double?
+    @State private var swimLocation = ""
+    @State private var poolLengthMeters: Double?
+    @State private var selectedPlan: Plan?
+    @State private var training: Workout?
+    @State private var confirmDelete = false
+    var body: some View {
+        List {
+            Section("\(date) · 训练安排") {
+                Picker("运动大类", selection: $sport) { ForEach(sportOptions.filter { $0.code != "strength" }, id: \.code) { option in Text(option.title).tag(option.code) } }
+                TextField("活动名称", text: $name)
+                TextField("目标分钟数（可选）", value: $targetMinutes, format: .number).keyboardType(.numberPad)
+                if ["swimming", "running", "cycling", "walking", "hiking", "rowing"].contains(sport) {
+                    TextField("目标距离（米，可选）", value: $targetDistanceMeters, format: .number).keyboardType(.decimalPad)
+                }
+                TextField("目标消耗（千卡，可选）", value: $targetEnergyKcal, format: .number).keyboardType(.decimalPad)
+                if sport == "swimming" {
+                    Picker("游泳地点", selection: $swimLocation) { Text("请选择").tag(""); Text("泳池游泳").tag("pool"); Text("开放水域游泳").tag("open_water") }
+                    if swimLocation == "pool" { TextField("泳池长度（米）", value: $poolLengthMeters, format: .number).keyboardType(.decimalPad) }
+                }
+                Button("保存调整") {
+                    let activity = TimedActivity(name: name, targetMinutes: targetMinutes, sport: sport, targetDistanceMeters: targetDistanceMeters,
+                                                 targetEnergyKcal: targetEnergyKcal, swimLocation: sport == "swimming" ? swimLocation : nil,
+                                                 poolLengthMeters: sport == "swimming" && swimLocation == "pool" ? poolLengthMeters : nil)
+                    if store.updateActivity(on: date, activity: activity, blockID: blockID) { dismiss() }
+                }
+            }
+            Section("训练控制") {
+                if let active = sessions.first(where: { $0.status == "in_progress" }) {
+                    NavigationLink("继续本次训练") { WorkoutView(store: store, workout: active) }
+                } else if date == DayKey.string(Date(), zone: store.settings.timezone) {
+                    Button(sessions.isEmpty ? "开始训练" : "再次开始训练") {
+                        if let activity = currentActivity { store.start(activity: activity, scheduledBlockId: blockID); training = store.activeWorkout }
+                    }.disabled(store.activeWorkout != nil)
+                    if store.activeWorkout != nil { Text("请先停止当前训练，再开始下一次。") .font(.caption).foregroundStyle(.secondary) }
+                } else { Text("到了安排日期才可开始训练。").font(.caption).foregroundStyle(.secondary) }
+            }
+            if !sessions.isEmpty {
+                Section("已练记录 · \(sessions.count) 次") {
+                    ForEach(Array(sessions.reversed().enumerated()), id: \.element.id) { index, session in
+                        NavigationLink {
+                            WorkoutView(store: store, workout: session)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("第 \(index + 1) 次 · \(session.name) · \(session.startedAt.formatted(date: .omitted, time: .shortened))")
+                                Text(session.status == "in_progress" ? "进行中" : session.status == "completed" ? "已完成" : "已结束")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            Section("改为力量训练") {
+                ForEach(store.plans) { plan in Button("选用 \(plan.name)") { selectedPlan = plan } }
+            }
+            Section {
+                Button("删除当前训练", role: .destructive) { confirmDelete = true }
+                    .disabled(sessions.contains { $0.status == "completed" || $0.status == "in_progress" })
+                if sessions.contains(where: { $0.status == "completed" || $0.status == "in_progress" }) {
+                    Text("已有完成或进行中的记录，不能删除。请在当天新增训练项目。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }.navigationTitle("训练详情")
+            .navigationDestination(isPresented: Binding(get: { training != nil }, set: { if !$0 { training = nil } })) {
+                if let training { WorkoutView(store: store, workout: training) }
+            }
+            .onAppear { let activity = currentActivity; name = activity?.name ?? ""; sport = activity?.resolvedSport ?? "walking"; targetMinutes = activity?.targetMinutes; targetDistanceMeters = activity?.targetDistanceMeters; targetEnergyKcal = activity?.targetEnergyKcal; swimLocation = activity?.swimLocation ?? ""; poolLengthMeters = activity?.poolLengthMeters }
+            .confirmationDialog("删除当前训练安排？", isPresented: $confirmDelete) {
+                Button("删除当前训练", role: .destructive) {
+                    let removed = blockID.map { store.deleteTrainingBlock(on: date, blockID: $0) } ?? store.deleteActivity(on: date)
+                    if removed { dismiss() }
+                }
+            } message: { Text("仅删除这一个未产生完成记录的训练项目。") }
+            .sheet(item: $selectedPlan) { plan in
+                if let blockID {
+                    PlanEditor(store: store, plan: { var p = plan; p.days = Array(plan.days.prefix(1)); return p }(), oneDayOnly: true) { updated in
+                        try await store.upsertTrainingBlock(on: date, blockID: blockID, plan: updated)
+                    }.onDisappear { if currentActivity == nil { dismiss() } }
+                } else {
+                    TemplateScheduleView(store: store, plan: plan, initialDate: DayKey.date(date, zone: store.settings.timezone), replaceExisting: true)
+                        .onDisappear { if store.scheduled("training", date: date)?.1.plan != nil { dismiss() } }
+                }
+            }
+    }
+    private var currentActivity: TimedActivity? {
+        if let blockID { return store.trainingBlocks(on: date).first(where: { $0.id == blockID })?.activity }
+        return store.scheduled("training", date: date)?.1.activity
+    }
+    private var sessions: [Workout] {
+        if let blockID, let block = store.trainingBlocks(on: date).first(where: { $0.id == blockID }) {
+            return store.workouts(for: block, on: date)
+        }
+        return store.workouts(on: date).filter { $0.scheduledBlockId == nil && $0.activity?.name == currentActivity?.name }
     }
 }
 struct ScheduledRestDayView: View {
     @Bindable var store: AppStore
     let date: String
     @Environment(\.dismiss) private var dismiss
-    @State private var activity = ""
+    @State private var activity = "饭后散步"
+    @State private var targetMinutes: Int?
     @State private var selectedPlan: Plan?
     @State private var confirmDelete = false
     var body: some View {
         List {
-            Section("\(date) · 力量训练休息日") {
-                TextField("恢复活动，例如饭后散步", text: $activity, axis: .vertical)
-                    .accessibilityIdentifier("rest-recovery-activity")
-                Button("保存恢复活动") { if store.setRestDayRecovery(on: date, activity: activity) { dismiss() } }
-                    .disabled(activity.count > 240)
-                Text("散步等轻活动会显示在今天；这一天仍是力量训练休息日。").font(.caption).foregroundStyle(.secondary)
+            Section("\(date) · 休息日") {
+                Text("今天未安排训练。")
+            }
+            Section("改为按时长训练") {
+                TextField("活动名称", text: $activity).accessibilityIdentifier("activity-name")
+                TextField("目标分钟数（可选）", value: $targetMinutes, format: .number).keyboardType(.numberPad)
+                Button("安排为训练") { if store.convertRestToActivity(on: date, name: activity, targetMinutes: targetMinutes) { dismiss() } }
             }
             Section("改为力量训练") {
                 if store.plans.isEmpty {
@@ -122,7 +270,7 @@ struct ScheduledRestDayView: View {
                 Button("删除今天的休息安排", role: .destructive) { confirmDelete = true }
             }
         }.navigationTitle("调整今天安排")
-            .onAppear { activity = store.scheduled("training", date: date)?.1.recoveryActivity ?? "" }
+            .onAppear { activity = store.scheduled("training", date: date)?.1.recoveryActivity ?? "饭后散步" }
             .confirmationDialog("删除 \(date) 的休息安排？", isPresented: $confirmDelete) {
                 Button("删除当天安排", role: .destructive) { if store.deleteRestDay(on: date) { dismiss() } }
             } message: { Text("只删除这一天的日历安排，已有实际训练记录保留。") }
@@ -223,24 +371,86 @@ struct TemplateScheduleView: View {
     }
 }
 struct ScheduledTrainingView: View {
-    @Bindable var store: AppStore; let plan: Plan; let date: String
+    @Bindable var store: AppStore; let plan: Plan; let date: String; var blockID: String? = nil
     @State private var training: Workout?
+    @State private var editing = false
+    @State private var confirmDelete = false
+    @Environment(\.dismiss) private var dismiss
+    private var currentPlan: Plan {
+        if let blockID, let planned = store.trainingBlocks(on: date).first(where: { $0.id == blockID })?.plan { return planned }
+        if let (_, day) = store.scheduled("training", date: date), let planned = day.plan { return planned }
+        return store.plans.first(where: { $0.id == plan.id }) ?? plan
+    }
+    private var sessions: [Workout] {
+        if let blockID, let block = store.trainingBlocks(on: date).first(where: { $0.id == blockID }) {
+            return store.workouts(for: block, on: date)
+        }
+        return store.workouts(on: date).filter { $0.planId == currentPlan.id && $0.scheduledBlockId == nil }
+    }
     var body: some View {
         List {
-            Section { Text(date); Text(plan.name).font(.headline) }
-            if let day = plan.days.first {
+            Section { Text(date); Text(currentPlan.name).font(.headline) }
+            if let day = currentPlan.days.first {
+                if let activity = day.activity {
+                    Section("运动项目") {
+                        Text(activity.name)
+                        Text(sportTitle(activity.resolvedSport))
+                        if let minutes = activity.targetMinutes { Text("目标 \(minutes) 分钟") }
+                        if let meters = activity.targetDistanceMeters { Text("目标 \(meters.formatted()) 米") }
+                    }
+                }
                 ForEach(day.exercises) { exercise in Section(exercise.name) {
                     NavigationLink("动作图解与说明") { ExerciseGuideView(store: store,exerciseId: exercise.exerciseId,name: exercise.name) }
                     ForEach(exercise.sets) { set in Text("\(set.weight.formatted()) kg × \(set.reps) 次") }
                 } }
+                Section("训练控制") {
+                    if let active = sessions.first(where: { $0.status == "in_progress" }) {
+                        NavigationLink("继续本次训练") { WorkoutView(store: store, workout: active) }
+                    } else if date == DayKey.string(Date(),zone: store.settings.timezone) {
+                        Button(sessions.isEmpty ? "开始训练" : "再次开始训练") {
+                            store.start(plan: currentPlan,day: day, scheduledBlockId: blockID); training = store.activeWorkout
+                        }.disabled(store.activeWorkout != nil)
+                        if store.activeWorkout != nil { Text("请先停止当前训练，再开始下一次。") .font(.caption).foregroundStyle(.secondary) }
+                    } else { Text("该页面是 \(date) 的安排，到了当天可开始训练。").font(.footnote).foregroundStyle(.secondary) }
+                }
+                if !sessions.isEmpty {
+                    Section("已练记录 · \(sessions.count) 次") {
+                        ForEach(Array(sessions.reversed().enumerated()), id: \.element.id) { index, session in
+                            NavigationLink {
+                                WorkoutView(store: store, workout: session)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("第 \(index + 1) 次 · \(session.name) · \(session.startedAt.formatted(date: .omitted, time: .shortened))")
+                                    Text(session.status == "in_progress" ? "进行中 · \(session.completedSets)/\(session.totalSets) 组" : "\(session.status == "completed" ? "已完成" : "已结束") · \(session.completedSets)/\(session.totalSets) 组")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
                 Section {
-                    if let w = store.workouts.first(where: { $0.planId == plan.id }) { NavigationLink(w.status == "in_progress" ? "继续训练" : "查看实际记录") { WorkoutView(store: store,workout: w) } }
-                    else if date == DayKey.string(Date(),zone: store.settings.timezone) { Button("开始训练") { store.start(plan: plan,day: day); training = store.activeWorkout }.disabled(store.activeWorkout != nil) }
-                    else { Text("该页面是 \(date) 的安排，到了当天可开始训练。").font(.footnote).foregroundStyle(.secondary) }
                     Button("和教练讨论调整") { store.coachPromptDraft = "请调整我已采用的 \(date) 训练安排："; store.selectedTab = "coach" }
+                    Button("调整训练安排") { editing = true }
+                    Button("删除当前训练", role: .destructive) { confirmDelete = true }
+                        .disabled(sessions.contains { $0.status == "completed" || $0.status == "in_progress" })
+                    if sessions.contains(where: { $0.status == "completed" || $0.status == "in_progress" }) {
+                        Text("已有完成或进行中的记录，不能删除。请在当天新增训练项目。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
-        }.navigationTitle("训练详情").navigationDestination(isPresented: Binding(get: { training != nil },set: { if !$0 { training = nil } })) { if let training { WorkoutView(store: store,workout: training) } }
+        }.navigationTitle("训练详情")
+            .navigationDestination(isPresented: Binding(get: { training != nil },set: { if !$0 { training = nil } })) { if let training { WorkoutView(store: store,workout: training) } }
+            .sheet(isPresented: $editing) { PlanEditor(store: store, plan: currentPlan, oneDayOnly: true) { changed in
+                if let blockID { try await store.upsertTrainingBlock(on: date, blockID: blockID, plan: changed) }
+                else { try await store.updateScheduledTraining(changed, on: date) }
+            } }
+            .confirmationDialog("删除当前训练安排？", isPresented: $confirmDelete) {
+                Button("删除当前训练", role: .destructive) {
+                    let removed = blockID.map { store.deleteTrainingBlock(on: date, blockID: $0) } ?? store.deleteScheduledTraining(on: date, planID: currentPlan.id)
+                    if removed { dismiss() }
+                }
+            } message: { Text("仅删除这一个未产生完成记录的训练项目。") }
     }
 }
 
@@ -383,6 +593,7 @@ struct MealLogEditor: View {
 
 struct PlanningRequestView: View {
     @Bindable var store: AppStore; let kind: String; @Environment(\.dismiss) private var dismiss
+    var onContinue: (() -> Void)? = nil
     @State private var mode = "week"; @State private var start = Date(); @State private var end = Date()
     private var last: Date { mode == "single" ? start : mode == "week" ? DayKey.calendar(store.settings.timezone).date(byAdding: .day,value: 6,to: start)! : end }
     private var count: Int { (DayKey.calendar(store.settings.timezone).dateComponents([.day],from: start,to: last).day ?? 0) + 1 }
@@ -394,7 +605,7 @@ struct PlanningRequestView: View {
                 if mode == "custom" { DatePicker("结束日期",selection: $end,in: start...,displayedComponents: .date) }
                 Text("\(DayKey.string(start,zone: store.settings.timezone)) 至 \(DayKey.string(last,zone: store.settings.timezone)) · \(count) 天")
                 Text("先回到聊天补充要求，AI 生成草稿后再选择采用。每次 AI 生成最多 31 天，可分段安排更长周期。").font(.footnote).foregroundStyle(.secondary)
-                Button("继续与教练沟通") { store.openPlanningChat(kind: kind,start: start,end: last); dismiss() }.disabled(count < 1 || count > 31)
+                Button("继续与教练沟通") { store.openPlanningChat(kind: kind,start: start,end: last); dismiss(); onContinue?() }.disabled(count < 1 || count > 31)
             }
         }.navigationTitle(kind == "diet" ? "饮食周期" : "训练周期").toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } }.onAppear { start = store.calendarDate; end = DayKey.calendar(store.settings.timezone).date(byAdding: .day,value: 6,to: start)! } }
     }
@@ -405,9 +616,16 @@ struct CyclePreviewView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var excluded = Set<String>(); @State private var replace = false; @State private var busy = false; @State private var message: String?
     @State private var requestID = newID()
+    @State private var editingTrainingBlock: PreviewTrainingBlockEditor?
     private var selected: PlanningCycle { var c = cycle; c.days.removeAll { excluded.contains($0.id) }; return c }
     private var duplicateDates: Bool { Set(cycle.days.map(\.date)).count != cycle.days.count }
     private var invalidRecovery: Bool { cycle.days.contains { ($0.recoveryActivity?.count ?? 0) > 240 || $0.recoveryActivity.map { !$0.isEmpty && $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } == true } }
+    private var invalidActivity: Bool { cycle.days.contains { day in
+        if day.activity.map({ !$0.validConfiguration }) == true { return true }
+        return day.trainingBlocks.contains { block in
+            block.plan.map { !$0.validEditorDraft } ?? (block.activity?.validConfiguration == false)
+        }
+    } }
     private var payloadRevision: String { (try? Wire.data(cycle).base64EncodedString()) ?? "" }
     var body: some View {
         NavigationStack { Form {
@@ -423,9 +641,48 @@ struct CyclePreviewView: View {
                     if store.scheduled(cycle.kind,date: day.date) != nil { Text("这一天已有安排").font(.caption).foregroundStyle(.orange) }
                     DatePicker("安排日期",selection: Binding(get: { DayKey.date(day.date,zone: cycle.timezone) ?? Date() },set: { day.date = DayKey.string($0,zone: cycle.timezone); updateRange() }),displayedComponents: .date)
                     if cycle.kind == "training" {
-                        if day.rest {
-                            Label("力量训练休息日",systemImage: "leaf")
-                            TextField("恢复活动（可选）", text: Binding(get: { day.recoveryActivity ?? "" }, set: { day.recoveryActivity = $0.isEmpty ? nil : $0 }), axis: .vertical)
+                        if day.sessions != nil {
+                            ForEach(Array(day.trainingBlocks.enumerated()), id: \.element.id) { index, block in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Text("\(index + 1). \(block.name) · \(sportTitle(block.sport))")
+                                        Spacer()
+                                        Button("编辑") { editingTrainingBlock = PreviewTrainingBlockEditor(dayID: day.id, blockID: block.id, plan: block.editorPlan) }.buttonStyle(.borderless)
+                                        Button { removeTrainingBlock(block.id, from: day.id) } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless).tint(.red)
+                                    }
+                                    if let exerciseDay = block.plan?.days.first {
+                                        Text("\(exerciseDay.exercises.count) 个动作 · \(exerciseDay.exercises.reduce(0) { $0 + $1.sets.count }) 组")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                        ForEach(exerciseDay.exercises) { exercise in
+                                            Text("\(exercise.name) · \(ExerciseGuide.find(id: exercise.exerciseId, name: exercise.name)?.equipmentGroup ?? "器械待确认") · \(exercise.sets.map { $0.weight > 0 ? "\($0.weight.formatted())kg×\($0.reps)" : "重量待确认×\($0.reps)" }.joined(separator: " / "))")
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                            Button("添加训练项目") { editingTrainingBlock = PreviewTrainingBlockEditor(dayID: day.id, blockID: nil, plan: Plan.draft()) }
+                        } else if day.rest {
+                            Label("休息日",systemImage: "leaf")
+                            Button("改为饭后散步训练") { day.rest = false; day.recoveryActivity = nil; day.activity = TimedActivity(name: "饭后散步", sport: "walking") }
+                        }
+                        else if day.activity != nil {
+                            Picker("运动大类", selection: Binding(get: { day.activity?.resolvedSport ?? "walking" }, set: { day.activity?.sport = $0 })) {
+                                ForEach(sportOptions.filter { $0.code != "strength" }, id: \.code) { option in Text(option.title).tag(option.code) }
+                            }
+                            TextField("运动项目", text: Binding(get: { day.activity?.name ?? "" }, set: { day.activity?.name = $0 }))
+                            TextField("目标分钟数（可选）", value: Binding(get: { day.activity?.targetMinutes }, set: { day.activity?.targetMinutes = $0 }), format: .number).keyboardType(.numberPad)
+                            if ["swimming", "running", "cycling", "walking", "hiking", "rowing"].contains(day.activity?.resolvedSport ?? "") {
+                                TextField("目标距离（米，可选）", value: Binding(get: { day.activity?.targetDistanceMeters }, set: { day.activity?.targetDistanceMeters = $0 }), format: .number).keyboardType(.decimalPad)
+                            }
+                            TextField("目标消耗（千卡，可选）", value: Binding(get: { day.activity?.targetEnergyKcal }, set: { day.activity?.targetEnergyKcal = $0 }), format: .number).keyboardType(.decimalPad)
+                            if day.activity?.resolvedSport == "swimming" {
+                                Picker("游泳地点", selection: Binding(get: { day.activity?.swimLocation ?? "" }, set: { value in day.activity?.swimLocation = value.isEmpty ? nil : value; if value != "pool" { day.activity?.poolLengthMeters = nil } })) {
+                                    Text("请选择").tag(""); Text("泳池游泳").tag("pool"); Text("开放水域游泳").tag("open_water")
+                                }
+                                if day.activity?.swimLocation == "pool" {
+                                    TextField("泳池长度（米）", value: Binding(get: { day.activity?.poolLengthMeters }, set: { day.activity?.poolLengthMeters = $0 }), format: .number).keyboardType(.decimalPad)
+                                }
+                            }
                         }
                         else if let plan = day.plan, let d = plan.days.first { Text(d.name).font(.headline); ForEach(d.exercises) { e in NavigationLink { ExerciseGuideView(store: store,exerciseId: e.exerciseId,name: e.name) } label: { Text("\(e.name) · \(e.sets.count) 组") } } }
                     } else {
@@ -436,9 +693,34 @@ struct CyclePreviewView: View {
             Section("遇到已有安排") { Toggle("替换可修改的计划",isOn: $replace); Text("关闭时只填空白日期。替换保留实际饮食记录；已开始或已结束的训练日期始终保留。整批采用在服务器一次完成。").font(.caption).foregroundStyle(.secondary) }
             if duplicateDates { Section { Text("有重复日期，请调整后再采用。").foregroundStyle(.red) } }
             if invalidRecovery { Section { Text("恢复活动最多 240 字，不能只填空格。").foregroundStyle(.red) } }
+            if invalidActivity { Section { Text("请核对运动目标；泳池游泳需选择地点并填写泳池长度。").foregroundStyle(.red) } }
             if let message { Section { Text(message).foregroundStyle(.red) } }
-            Section { Button(busy ? "正在采用…" : "采用所选 \(selected.days.count) 天") { Task { busy = true; defer { busy = false }; do { let result = try await store.adoptCycle(selected,replace: replace,requestId: requestID); dismiss(); store.error = result } catch { message = error.localizedDescription } } }.disabled(busy || selected.days.isEmpty || duplicateDates || invalidRecovery || cycle.name.isEmpty).accessibilityIdentifier("adopt-cycle") }
+            Section { Button(busy ? "正在采用…" : "采用所选 \(selected.days.count) 天") { Task { busy = true; defer { busy = false }; do { let result = try await store.adoptCycle(selected,replace: replace,requestId: requestID); dismiss(); store.error = result } catch { message = error.localizedDescription } } }.disabled(busy || selected.days.isEmpty || duplicateDates || invalidRecovery || invalidActivity || cycle.name.isEmpty).accessibilityIdentifier("adopt-cycle") }
         }.navigationTitle("计划预览").toolbar { ToolbarItem(placement: .cancellationAction) { Button("继续沟通") { dismiss() }.disabled(busy) } }.interactiveDismissDisabled(busy).onChange(of: payloadRevision) { _,_ in requestID = newID() }.onChange(of: replace) { _,_ in requestID = newID() } }
+        .sheet(item: $editingTrainingBlock) { entry in
+            PlanEditor(store: store, plan: entry.plan, oneDayOnly: true) { plan in
+                guard let index = cycle.days.firstIndex(where: { $0.id == entry.dayID }) else { throw AppError.message("这一天已移除") }
+                var blocks = cycle.days[index].trainingBlocks
+                if let blockID = entry.blockID {
+                    guard let item = blocks.firstIndex(where: { $0.id == blockID }) else { throw AppError.message("训练项目已变化") }
+                    blocks[item] = TrainingBlock(id: blockID, plan: plan)
+                } else {
+                    guard blocks.count < 8 else { throw AppError.message("同一天最多 8 个训练项目") }
+                    blocks.append(TrainingBlock(plan: plan))
+                }
+                cycle.days[index].setTrainingBlocks(blocks)
+            }
+        }
     }
     private func updateRange() { cycle.startDate = cycle.days.map(\.date).min() ?? cycle.startDate; cycle.endDate = cycle.days.map(\.date).max() ?? cycle.endDate }
+    private func removeTrainingBlock(_ id: String, from dayID: String) {
+        guard let index = cycle.days.firstIndex(where: { $0.id == dayID }) else { return }
+        cycle.days[index].setTrainingBlocks(cycle.days[index].trainingBlocks.filter { $0.id != id })
+    }
+}
+private struct PreviewTrainingBlockEditor: Identifiable {
+    var id = newID()
+    var dayID: String
+    var blockID: String?
+    var plan: Plan
 }

@@ -7,13 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0194F7588D5703617A660AC3 /* WorkoutSport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */; };
 		031FA2747ED183D2BBCE4EFB /* SleepHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 038C997F06CF52CB00A9D4FE /* SleepHistoryTests.swift */; };
+		0467E6F9DF0F472D7C8DCA2A /* ManualTrainingCycleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 339A2AB8B7239E9B6E688496 /* ManualTrainingCycleViews.swift */; };
 		05415BF2F2FF7290DECB2CF7 /* FoodLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C03779D223E031C1E49D999 /* FoodLibrary.swift */; };
 		05E167C64733A929DD0D1B30 /* SleepUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9AE43CDFE004E98FC1CFBEC /* SleepUITests.swift */; };
 		0B55A5E8DE49A4EFEECF86B5 /* TeamViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC95710E4621A83480DFF1E4 /* TeamViews.swift */; };
 		156E251B6FA6E8A30DFA4EF7 /* LocalHealthOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64EE0D95C718E4169DB6614 /* LocalHealthOverview.swift */; };
 		192006B30EE5619C4592B659 /* CompanionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1124A1C6FD4DECF440184A2 /* CompanionTests.swift */; };
 		1964276DB74BCBBD56398F52 /* HealthSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94B33C9B2B8D2C9642EC71FF /* HealthSync.swift */; };
+		1C7B8CDC7ECC891BD88D4DF0 /* WeightUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBC5C6C9AB6062808E840FEA /* WeightUITests.swift */; };
 		28620CBFFF387E6CDA4C0E89 /* PlanningViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAF1252F16A15B2382C89110 /* PlanningViews.swift */; };
 		29A4695DBB8ABF4BF0095FB5 /* AiHealthWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14AF61781D5D4117D6D6494 /* AiHealthWatchApp.swift */; };
 		2BCF6F2E815681AE645A8FE9 /* PlanningUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C49BF4F39BC7466EE052104 /* PlanningUITests.swift */; };
@@ -23,6 +26,7 @@
 		43633137F0768E82BFE458AD /* CompanionPhone.swift in Sources */ = {isa = PBXBuildFile; fileRef = 402FAE24C66EB9DECA80454E /* CompanionPhone.swift */; };
 		49D789D7954008C049999A27 /* Coach.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25F2DD88F764B0EAFF1DD4D2 /* Coach.swift */; };
 		4B6625116E878A3FA51CFC77 /* WatchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E6A394C65D5696D29A99187 /* WatchStore.swift */; };
+		4D9B53D502AFFA158FDD73E4 /* VitalViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C239408EF8FAD9922F44CA /* VitalViews.swift */; };
 		4DF3E79D2C1A061B40B8CF43 /* CompanionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */; };
 		51617E80179DF2CEEEB26B12 /* AiHealthWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 51505ECEC9315A197D1C58BE /* AiHealthWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5E973B5C42BC946DB7D3D76A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EE3F62C614F99CD53F68D8D1 /* Assets.xcassets */; };
@@ -39,8 +43,11 @@
 		8469FEF74811ECF8E1DFDFD1 /* CompanionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF8430B982E232AE4515119 /* CompanionTransport.swift */; };
 		862AA4DE454CE1A5021C93DD /* FlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8026F17243757F2553336799 /* FlowTests.swift */; };
 		880615A684BF4747F393CDF8 /* ExerciseMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AE6867E87F3D952849EA52F /* ExerciseMedia.swift */; };
+		914A7D1909CB57BA3DC3E012 /* WeightViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872CFED2759D584772D80DAC /* WeightViews.swift */; };
 		9278223C0E68CF642AEF0467 /* EnergySummaryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9A1B18F5CF4205D6952E051 /* EnergySummaryUITests.swift */; };
 		92C967284C85B4E7D53BFD0F /* ModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E1BAFF4B9B6762D9E630432 /* ModelsTests.swift */; };
+		95D19489C0FA56BEA51D0342 /* VitalHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7809492D3E749B79AAC0357 /* VitalHistory.swift */; };
+		96A7207D8BC279CC428B8F68 /* WatchRestAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F7F3C40BB1B307D437DA2E5 /* WatchRestAlerts.swift */; };
 		9B3530294CFF1B5F5CAC1A43 /* PlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8277DB1031D95EAB0D347A9E /* PlanningTests.swift */; };
 		A0E279B8CAC099A848B33820 /* FoodEntryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4FB7400509BA752505F9F66 /* FoodEntryViews.swift */; };
 		A41F66A74BCB0A19DE1C0B54 /* HealthStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A960B5ECBF186BA921FBC6 /* HealthStorage.swift */; };
@@ -55,12 +62,16 @@
 		BF993B684B79AC290FD7E37D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F225BF55BD6F4B1B62BEDDB7 /* PrivacyInfo.xcprivacy */; };
 		C2C3E61F589277D506E86EA5 /* SessionRecoveryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB06FCA368D2B33E2A416DC3 /* SessionRecoveryUITests.swift */; };
 		C43C9A7146BEC87E3631A2DA /* SettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25271E82167028CD9B08B47 /* SettingsViews.swift */; };
+		C52E19A29AB399FD50BC9F28 /* WeightHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520831C061F317EF44595779 /* WeightHistory.swift */; };
 		CC85AF3180687BBB8C30FA90 /* SleepRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15EA2FE52925D0A6C8A22B3C /* SleepRegressionTests.swift */; };
 		CE885F5BB92F000D76F80CBC /* CompanionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */; };
 		CEA7EF53A5203551D6F24787 /* WatchWorkoutHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B5798D0570BFA1F64E3313C /* WatchWorkoutHealth.swift */; };
+		D738BE1685A2EA8E400235AC /* WorkoutShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01FCCC78797EAE04738EF669 /* WorkoutShareCard.swift */; };
+		DBF98A6A1A17B6EB0FDD5F21 /* WorkoutSport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */; };
 		E4451F1BD19276A5751C123C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D5F3350DF5A906DE4EF153 /* Models.swift */; };
 		EE354A7008E88A43DF481269 /* Network.swift in Sources */ = {isa = PBXBuildFile; fileRef = C624F46302C82B541804BF7A /* Network.swift */; };
 		F14AE43EA256A84025BAB3CE /* SleepHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64CB95C8BEF3F56CF69284F /* SleepHistory.swift */; };
+		F4A213A1ED3949E95006BE43 /* WorkoutHealthWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F636F76DA9E35701FEF48B98 /* WorkoutHealthWriter.swift */; };
 		FE357AD1338F6816524DF311 /* FoodEntryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B48261EF467D8ADC253587 /* FoodEntryUITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -110,6 +121,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		01FCCC78797EAE04738EF669 /* WorkoutShareCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutShareCard.swift; sourceTree = "<group>"; };
 		038C997F06CF52CB00A9D4FE /* SleepHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepHistoryTests.swift; sourceTree = "<group>"; };
 		0440BF9CFAD46980C6622964 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		09B992421699A159668F8E68 /* ExerciseMediaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaTests.swift; sourceTree = "<group>"; };
@@ -118,9 +130,11 @@
 		1369354AA1CA23722AF79C21 /* DeleteMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteMigrationTests.swift; sourceTree = "<group>"; };
 		15EA2FE52925D0A6C8A22B3C /* SleepRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepRegressionTests.swift; sourceTree = "<group>"; };
 		1E6A28E9E05C890D1C236C7A /* AccountSecureField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSecureField.swift; sourceTree = "<group>"; };
+		1F7F3C40BB1B307D437DA2E5 /* WatchRestAlerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchRestAlerts.swift; sourceTree = "<group>"; };
 		20744C85F59A9D56BE9D3145 /* exercise_guides.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = exercise_guides.json; sourceTree = "<group>"; };
 		21FD14DB3E9437D92392885C /* AiHealth.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AiHealth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		25F2DD88F764B0EAFF1DD4D2 /* Coach.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Coach.swift; sourceTree = "<group>"; };
+		339A2AB8B7239E9B6E688496 /* ManualTrainingCycleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualTrainingCycleViews.swift; sourceTree = "<group>"; };
 		3AE6867E87F3D952849EA52F /* ExerciseMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMedia.swift; sourceTree = "<group>"; };
 		3B228492BE271F37FDABC2DD /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3DD0DBAEE2FCA3196B33A581 /* CoachViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachViews.swift; sourceTree = "<group>"; };
@@ -128,6 +142,7 @@
 		47E348504628C9E6F4C58CA2 /* FoodLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodLibraryTests.swift; sourceTree = "<group>"; };
 		4C49BF4F39BC7466EE052104 /* PlanningUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningUITests.swift; sourceTree = "<group>"; };
 		51505ECEC9315A197D1C58BE /* AiHealthWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AiHealthWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		520831C061F317EF44595779 /* WeightHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightHistory.swift; sourceTree = "<group>"; };
 		5B9974C55046DA72DB6486C1 /* ExerciseLibraryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibraryUITests.swift; sourceTree = "<group>"; };
 		5E6A394C65D5696D29A99187 /* WatchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchStore.swift; sourceTree = "<group>"; };
 		6C03779D223E031C1E49D999 /* FoodLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodLibrary.swift; sourceTree = "<group>"; };
@@ -138,10 +153,12 @@
 		84B81FA3ED5C8E7D36643FC0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		84D5F3350DF5A906DE4EF153 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		869A20FD18F1C9B309AC4488 /* WatchStartUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchStartUITests.swift; sourceTree = "<group>"; };
+		872CFED2759D584772D80DAC /* WeightViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightViews.swift; sourceTree = "<group>"; };
 		8B5798D0570BFA1F64E3313C /* WatchWorkoutHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchWorkoutHealth.swift; sourceTree = "<group>"; };
 		91C732C1B3FA196A7631B3F9 /* TrainingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingViews.swift; sourceTree = "<group>"; };
 		94B33C9B2B8D2C9642EC71FF /* HealthSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSync.swift; sourceTree = "<group>"; };
 		A14AF61781D5D4117D6D6494 /* AiHealthWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiHealthWatchApp.swift; sourceTree = "<group>"; };
+		A6C239408EF8FAD9922F44CA /* VitalViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitalViews.swift; sourceTree = "<group>"; };
 		AAF1252F16A15B2382C89110 /* PlanningViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningViews.swift; sourceTree = "<group>"; };
 		AB0EC116C4358F9D2001C4A3 /* AiHealthWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AiHealthWatch.entitlements; sourceTree = "<group>"; };
 		AF2AD30CA089D6595B9AF8A3 /* Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
@@ -154,6 +171,8 @@
 		B9AE43CDFE004E98FC1CFBEC /* SleepUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepUITests.swift; sourceTree = "<group>"; };
 		C5464433470A7DCEEF427D12 /* SleepViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepViews.swift; sourceTree = "<group>"; };
 		C624F46302C82B541804BF7A /* Network.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Network.swift; sourceTree = "<group>"; };
+		C7809492D3E749B79AAC0357 /* VitalHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitalHistory.swift; sourceTree = "<group>"; };
+		CBC5C6C9AB6062808E840FEA /* WeightUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightUITests.swift; sourceTree = "<group>"; };
 		CC185899F4BE5667C3B3BC10 /* AiHealthWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AiHealthWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC95710E4621A83480DFF1E4 /* TeamViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamViews.swift; sourceTree = "<group>"; };
 		CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCore.swift; sourceTree = "<group>"; };
@@ -162,8 +181,10 @@
 		DBF2824D9B1582D007E9FCA6 /* Planning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Planning.swift; sourceTree = "<group>"; };
 		E440E405C56FD4F8906A5816 /* ExerciseGuideViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseGuideViews.swift; sourceTree = "<group>"; };
 		E523E415461619FE53650740 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSport.swift; sourceTree = "<group>"; };
 		EE3F62C614F99CD53F68D8D1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F225BF55BD6F4B1B62BEDDB7 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F636F76DA9E35701FEF48B98 /* WorkoutHealthWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHealthWriter.swift; sourceTree = "<group>"; };
 		F64CB95C8BEF3F56CF69284F /* SleepHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepHistory.swift; sourceTree = "<group>"; };
 		F64EE0D95C718E4169DB6614 /* LocalHealthOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHealthOverview.swift; sourceTree = "<group>"; };
 		FB06FCA368D2B33E2A416DC3 /* SessionRecoveryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRecoveryUITests.swift; sourceTree = "<group>"; };
@@ -218,6 +239,7 @@
 				94B33C9B2B8D2C9642EC71FF /* HealthSync.swift */,
 				0440BF9CFAD46980C6622964 /* Info.plist */,
 				F64EE0D95C718E4169DB6614 /* LocalHealthOverview.swift */,
+				339A2AB8B7239E9B6E688496 /* ManualTrainingCycleViews.swift */,
 				84D5F3350DF5A906DE4EF153 /* Models.swift */,
 				C624F46302C82B541804BF7A /* Network.swift */,
 				AF2AD30CA089D6595B9AF8A3 /* Notifications.swift */,
@@ -229,6 +251,12 @@
 				C5464433470A7DCEEF427D12 /* SleepViews.swift */,
 				CC95710E4621A83480DFF1E4 /* TeamViews.swift */,
 				91C732C1B3FA196A7631B3F9 /* TrainingViews.swift */,
+				C7809492D3E749B79AAC0357 /* VitalHistory.swift */,
+				A6C239408EF8FAD9922F44CA /* VitalViews.swift */,
+				520831C061F317EF44595779 /* WeightHistory.swift */,
+				872CFED2759D584772D80DAC /* WeightViews.swift */,
+				F636F76DA9E35701FEF48B98 /* WorkoutHealthWriter.swift */,
+				01FCCC78797EAE04738EF669 /* WorkoutShareCard.swift */,
 			);
 			path = AiHealth;
 			sourceTree = "<group>";
@@ -251,6 +279,7 @@
 				4C49BF4F39BC7466EE052104 /* PlanningUITests.swift */,
 				FB06FCA368D2B33E2A416DC3 /* SessionRecoveryUITests.swift */,
 				B9AE43CDFE004E98FC1CFBEC /* SleepUITests.swift */,
+				CBC5C6C9AB6062808E840FEA /* WeightUITests.swift */,
 			);
 			path = AiHealthUITests;
 			sourceTree = "<group>";
@@ -277,6 +306,7 @@
 			children = (
 				CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */,
 				FFF8430B982E232AE4515119 /* CompanionTransport.swift */,
+				E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */,
 			);
 			path = CompanionShared;
 			sourceTree = "<group>";
@@ -298,6 +328,7 @@
 				EE3F62C614F99CD53F68D8D1 /* Assets.xcassets */,
 				E523E415461619FE53650740 /* Info.plist */,
 				F225BF55BD6F4B1B62BEDDB7 /* PrivacyInfo.xcprivacy */,
+				1F7F3C40BB1B307D437DA2E5 /* WatchRestAlerts.swift */,
 				5E6A394C65D5696D29A99187 /* WatchStore.swift */,
 				8B5798D0570BFA1F64E3313C /* WatchWorkoutHealth.swift */,
 			);
@@ -503,8 +534,10 @@
 				4DF3E79D2C1A061B40B8CF43 /* CompanionCore.swift in Sources */,
 				8098D1355E8A56D316CF42EC /* CompanionTransport.swift in Sources */,
 				B4031A194B628B11BA9D2C61 /* Models.swift in Sources */,
+				96A7207D8BC279CC428B8F68 /* WatchRestAlerts.swift in Sources */,
 				4B6625116E878A3FA51CFC77 /* WatchStore.swift in Sources */,
 				CEA7EF53A5203551D6F24787 /* WatchWorkoutHealth.swift in Sources */,
+				DBF98A6A1A17B6EB0FDD5F21 /* WorkoutSport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -527,6 +560,7 @@
 				A41F66A74BCB0A19DE1C0B54 /* HealthStorage.swift in Sources */,
 				1964276DB74BCBBD56398F52 /* HealthSync.swift in Sources */,
 				156E251B6FA6E8A30DFA4EF7 /* LocalHealthOverview.swift in Sources */,
+				0467E6F9DF0F472D7C8DCA2A /* ManualTrainingCycleViews.swift in Sources */,
 				E4451F1BD19276A5751C123C /* Models.swift in Sources */,
 				EE354A7008E88A43DF481269 /* Network.swift in Sources */,
 				B6F9EC96975E63F5E0A35B6C /* Notifications.swift in Sources */,
@@ -537,6 +571,13 @@
 				A817353DB98C90471DCECD35 /* SleepViews.swift in Sources */,
 				0B55A5E8DE49A4EFEECF86B5 /* TeamViews.swift in Sources */,
 				ABA8E975DF43F7A3148CE63B /* TrainingViews.swift in Sources */,
+				95D19489C0FA56BEA51D0342 /* VitalHistory.swift in Sources */,
+				4D9B53D502AFFA158FDD73E4 /* VitalViews.swift in Sources */,
+				C52E19A29AB399FD50BC9F28 /* WeightHistory.swift in Sources */,
+				914A7D1909CB57BA3DC3E012 /* WeightViews.swift in Sources */,
+				F4A213A1ED3949E95006BE43 /* WorkoutHealthWriter.swift in Sources */,
+				D738BE1685A2EA8E400235AC /* WorkoutShareCard.swift in Sources */,
+				0194F7588D5703617A660AC3 /* WorkoutSport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -559,6 +600,7 @@
 				2BCF6F2E815681AE645A8FE9 /* PlanningUITests.swift in Sources */,
 				C2C3E61F589277D506E86EA5 /* SessionRecoveryUITests.swift in Sources */,
 				05E167C64733A929DD0D1B30 /* SleepUITests.swift in Sources */,
+				1C7B8CDC7ECC891BD88D4DF0 /* WeightUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -594,7 +636,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 54;
 				INFOPLIST_FILE = AiHealth/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -613,7 +655,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 54;
 				INFOPLIST_FILE = AiHealth/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -685,7 +727,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				RIYI_IOS_BUNDLE_ID = com.aijiankang.ios;
+				RIYI_IOS_BUNDLE_ID = com.riyi.ios;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -699,7 +741,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 54;
 				INFOPLIST_FILE = AiHealthWatch/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(RIYI_IOS_BUNDLE_ID).watchkitapp";
@@ -719,7 +761,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthWatchUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthWatchUITests;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 4;
@@ -737,7 +779,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AiHealth.app/AiHealth";
@@ -796,7 +838,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				RIYI_IOS_BUNDLE_ID = com.aijiankang.ios;
+				RIYI_IOS_BUNDLE_ID = com.riyi.ios;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -815,7 +857,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthUITests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = AiHealth;
@@ -832,7 +874,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthUITests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = AiHealth;
@@ -844,7 +886,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 54;
 				INFOPLIST_FILE = AiHealthWatch/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(RIYI_IOS_BUNDLE_ID).watchkitapp";
@@ -864,7 +906,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AiHealth.app/AiHealth";
@@ -881,7 +923,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.aijiankang.AiHealthWatchUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.riyi.AiHealthWatchUITests;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 4;

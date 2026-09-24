@@ -39,8 +39,34 @@ enum Wire {
 
 struct Plan: Codable, Identifiable {
     var id = newID(); var name = "我的训练计划"; var trainingGoal = "hypertrophy"; var setPattern = "straight"
+    var category: String? = nil
     var days: [PlanDay] = [PlanDay()]
     var scheduledDate: String?
+    var resolvedCategory: String { category ?? "strength" }
+    func withCalculatedVolume() -> Plan {
+        var copy = self
+        let category = resolvedCategory
+        for index in copy.days.indices {
+            let volume = copy.days[index].plannedVolumeKg
+            copy.days[index].volumeTargetKg = volume > 0 ? volume : nil
+            if category != "strength" { copy.days[index].activity?.name = sportTitle(category) }
+        }
+        return copy
+    }
+    static func draft() -> Plan { var p = Plan(); p.trainingGoal = "custom"; p.days = [PlanDay(name: "力量训练", exercises: [])]; return p }
+    var validEditorDraft: Bool {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !days.isEmpty, days.count <= 14 else { return false }
+        return days.allSatisfy { day in
+            guard !day.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+            if resolvedCategory != "strength" {
+                guard let activity = day.activity else { return false }
+                return activity.sport == resolvedCategory && activity.validConfiguration && day.exercises.isEmpty
+            }
+            return day.activity == nil && !day.exercises.isEmpty && validGroups(day.groups ?? [], exerciseIds: day.exercises.map(\.id)) &&
+                (day.volumeTargetKg == nil || (1...1_000_000).contains(day.volumeTargetKg!)) &&
+                day.exercises.allSatisfy { !$0.name.isEmpty && !$0.sets.isEmpty && $0.sets.allSatisfy { $0.weight >= 0 && $0.weight <= 2000 && $0.reps > 0 && $0.reps <= 1000 } }
+        }
+    }
     static func starter() -> Plan {
         var p = Plan(); p.name = "增肌计划 A"; p.days = [PlanDay(name: "胸 + 三头", exercises: [
             PlanExercise(exerciseId: "bench_press", name: "杠铃卧推", loadBasis: "total", sets: [PlanSet(weight: 40, reps: 12), PlanSet(weight: 50, reps: 10), PlanSet(weight: 55, reps: 8), PlanSet(weight: 55, reps: 8)]),
@@ -67,7 +93,17 @@ func validGroups(_ groups: [ExerciseGroup], exerciseIds: [String]) -> Bool {
 }
 struct PlanDay: Codable, Identifiable {
     var id = newID(); var name = "训练日"; var exercises: [PlanExercise] = [PlanExercise()]
+    var activity: TimedActivity? = nil
     var volumeTargetKg: Double?; var groups: [ExerciseGroup]?
+    var plannedVolumeKg: Double {
+        exercises.reduce(0) { total, exercise in
+            guard ["total", "per_hand", "added"].contains(exercise.loadBasis) else { return total }
+            let count = exercise.loadBasis == "per_hand" ? (exercise.loadCount ?? 1) : 1
+            return total + exercise.sets.filter { $0.role == "working" }.reduce(0) {
+                $0 + $1.weight * Double($1.reps) * Double(count)
+            }
+        }
+    }
 }
 struct PlanExercise: Codable, Identifiable {
     var id = newID(); var exerciseId = "custom"; var name = "新动作"; var loadBasis = "total"
@@ -75,26 +111,72 @@ struct PlanExercise: Codable, Identifiable {
     var setPattern: String?; var loadCount: Int?
 }
 struct PlanSet: Codable, Identifiable { var id = newID(); var role = "working"; var weight: Double = 20; var reps = 10 }
+struct TimedActivity: Codable {
+    var name: String
+    var targetMinutes: Int? = nil
+    var sport: String? = nil
+    var targetDistanceMeters: Double? = nil
+    var targetEnergyKcal: Double? = nil
+    var swimLocation: String? = nil
+    var poolLengthMeters: Double? = nil
+    var resolvedSport: String { sport ?? "walking" }
+    var validConfiguration: Bool {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              targetMinutes == nil || (1...1440).contains(targetMinutes!),
+              targetDistanceMeters == nil || (1...1_000_000).contains(targetDistanceMeters!),
+              targetEnergyKcal == nil || (1...10_000).contains(targetEnergyKcal!) else { return false }
+        if resolvedSport == "swimming" {
+            if swimLocation == "open_water" { return poolLengthMeters == nil }
+            return swimLocation == "pool" && poolLengthMeters.map { (5...100).contains($0) } == true
+        }
+        return swimLocation == nil && poolLengthMeters == nil
+    }
+}
+let sportOptions: [(code: String, title: String, icon: String)] = [
+    ("strength", "力量训练", "dumbbell"), ("hiit", "HIIT 高强度间歇", "figure.mixed.cardio"), ("pilates", "普拉提", "figure.pilates"),
+    ("swimming", "游泳", "figure.pool.swim"), ("running", "跑步", "figure.run"),
+    ("cycling", "骑行", "bicycle"), ("walking", "散步", "figure.walk"),
+    ("yoga", "瑜伽", "figure.yoga"), ("hiking", "徒步", "figure.hiking"),
+    ("rowing", "划船", "figure.rower"), ("elliptical", "椭圆机", "figure.elliptical"),
+    ("other", "其他运动", "figure.mixed.cardio")
+]
+func sportTitle(_ code: String) -> String { sportOptions.first { $0.code == code }?.title ?? "其他运动" }
 struct Workout: Codable, Identifiable {
     var synthetic: Bool?
+    var activity: TimedActivity?
+    var actualDistanceMeters: Double?
+    var scheduledBlockId: String?
     var autoExpiredAt: Date?
     var restUntil: Date?
+    var pausedAt: Date?
+    var pausedDurationSeconds: Double? = nil
     var companionReceipts: [CompanionReceipt]?
     var id = newID(); var planId: String?; var name: String; var status = "in_progress"
     var startedAt = Date(); var finishedAt: Date?; var timezone = TimeZone.current.identifier
     var exercises: [WorkoutExercise]; var feedback = Feedback()
     var planDayId: String?
     var volumeTargetKg: Double?; var groups: [ExerciseGroup]?
-    init(plan: Plan, day: PlanDay) {
+    init(plan: Plan, day: PlanDay, scheduledBlockId: String? = nil) {
         planId = plan.id; name = day.name
+        self.scheduledBlockId = scheduledBlockId
         planDayId = day.id
-        volumeTargetKg = day.volumeTargetKg
+        volumeTargetKg = day.plannedVolumeKg > 0 ? day.plannedVolumeKg : nil
+        activity = day.activity
         exercises = day.exercises.map { e in WorkoutExercise(exerciseId: e.exerciseId, name: e.name, loadBasis: e.loadBasis, sets: e.sets.map { WorkoutSet(role: $0.role, plannedWeight: $0.weight, plannedReps: $0.reps) }, setPattern: e.setPattern ?? plan.setPattern, loadCount: e.loadCount) }
         let ids = Dictionary(uniqueKeysWithValues: zip(day.exercises.map(\.id), exercises.map(\.id)))
         groups = day.groups?.map { group in var copy = group; copy.id = newID(); copy.exerciseIds = group.exerciseIds.compactMap { ids[$0] }; return copy }
     }
+    init(activity: TimedActivity, scheduledBlockId: String? = nil) {
+        self.activity = activity
+        self.scheduledBlockId = scheduledBlockId
+        name = activity.name
+        exercises = []
+    }
     var completedSets: Int { exercises.flatMap(\.sets).filter { $0.status == "completed" }.count }
     var totalSets: Int { exercises.flatMap(\.sets).count }
+    func elapsedSeconds(at time: Date) -> TimeInterval {
+        max(0, (pausedAt ?? finishedAt ?? time).timeIntervalSince(startedAt) - (pausedDurationSeconds ?? 0))
+    }
     var completedVolumeKg: Double {
         exercises.reduce(0) { total, exercise in
             guard ["total", "per_hand", "added"].contains(exercise.loadBasis) else { return total }

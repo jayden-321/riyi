@@ -3,15 +3,35 @@ import SwiftData
 @testable import AiHealth
 
 final class ModelsTests: XCTestCase {
-    @MainActor func testDeletedStarterIsNotRecreatedAndWorkoutSurvives() throws {
+    func testSportPlanCreatesTimeBasedWorkoutAndKeepsLegacyStrengthPlan() throws {
+        var sport = Plan.draft(); sport.category = "swimming"; sport.trainingGoal = "custom"
+        sport.days = [PlanDay(name: "周末游泳", exercises: [], activity: TimedActivity(name: "自由泳", targetMinutes: 30, sport: "swimming", targetDistanceMeters: 800, swimLocation: "pool", poolLengthMeters: 25))]
+        let restored = try Wire.read(Wire.data(sport), as: Plan.self)
+        XCTAssertEqual(restored.resolvedCategory, "swimming")
+        let workout = Workout(plan: restored, day: restored.days[0])
+        XCTAssertEqual(workout.activity?.resolvedSport, "swimming")
+        XCTAssertTrue(workout.exercises.isEmpty)
+        XCTAssertEqual(workout.totalSets, 0)
+        XCTAssertEqual(healthWorkoutConfiguration(for: workout).activityType, .swimming)
+        XCTAssertEqual(healthWorkoutConfiguration(for: workout).swimmingLocationType, .pool)
+        XCTAssertEqual(healthWorkoutConfiguration(for: workout).lapLength?.doubleValue(for: .meter()), 25)
+        let legacy = Plan.starter()
+        XCTAssertEqual(legacy.resolvedCategory, "strength")
+        XCTAssertEqual(healthWorkoutConfiguration(for: Workout(plan: legacy, day: legacy.days[0])).activityType, .traditionalStrengthTraining)
+        XCTAssertEqual(healthWorkoutConfiguration(for: Workout(activity: TimedActivity(name: "HIIT", targetMinutes: 25, sport: "hiit"))).activityType, .highIntensityIntervalTraining)
+    }
+    @MainActor func testStartedPlanCannotBeDeletedAndUnusedStarterCanBeRemoved() throws {
         let db = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: db); store.startDemo()
         let plan = try XCTUnwrap(store.plans.first)
         store.start(plan: plan, day: plan.days[0]); store.remove(kind: "plan", id: plan.id)
-        XCTAssertTrue(store.plans.isEmpty); XCTAssertEqual(store.workouts.count, 1)
+        XCTAssertEqual(store.plans.count, 1); XCTAssertEqual(store.workouts.count, 1)
+        XCTAssertTrue(store.error?.contains("请新增训练计划") == true)
         XCTAssertEqual(store.activeWorkout?.planDayId, plan.days[0].id)
+        let unused = Plan.draft(); XCTAssertTrue(store.save(unused, kind: "plan", id: unused.id))
+        store.remove(kind: "plan", id: unused.id)
         store.startDemo(); store.reload()
-        XCTAssertTrue(store.plans.isEmpty, "Returning to demo must not recreate a deleted starter")
+        XCTAssertEqual(store.plans.map(\.id), [plan.id], "Deleting an unused draft must not affect the protected plan")
         XCTAssertEqual(store.workouts.first?.name, plan.days[0].name)
     }
     @MainActor func testHealthProfileDisplaysReadingsAndKeepsManualHistory() async throws {
@@ -53,7 +73,7 @@ final class ModelsTests: XCTestCase {
         workout.exercises[1].loadBasis = "assisted"
         XCTAssertEqual(workout.completedVolumeKg, 0)
         let restored = try Wire.read(Wire.data(workout), as: Workout.self)
-        XCTAssertEqual(restored.volumeTargetKg, 10_000)
+        XCTAssertEqual(restored.volumeTargetKg, day.plannedVolumeKg)
         XCTAssertEqual(restored.groups?.first?.style, "giant")
         day.groups![0].exerciseIds.removeLast()
         XCTAssertFalse(validGroups(day.groups!, exerciseIds: day.exercises.map(\.id)))
@@ -63,6 +83,20 @@ final class ModelsTests: XCTestCase {
         raw["exercises"] = (raw["exercises"] as! [[String: Any]]).map { e in var old = e; old.removeValue(forKey: "set_pattern"); old.removeValue(forKey: "load_count"); return old }
         let legacy = try Wire.read(JSONSerialization.data(withJSONObject: raw), as: Workout.self)
         XCTAssertNil(legacy.volumeTargetKg); XCTAssertNil(legacy.groups); XCTAssertNil(legacy.exercises[0].setPattern)
+    }
+    func testPlannedVolumeComesFromWorkingSetsAndSelectedLoadCount() {
+        var plan = Plan.draft()
+        plan.days[0].exercises = [
+            PlanExercise(name: "杠铃卧推", loadBasis: "total", sets: [PlanSet(role: "working", weight: 50, reps: 10), PlanSet(role: "warmup", weight: 20, reps: 10)]),
+            PlanExercise(name: "哑铃卧推", loadBasis: "per_hand", sets: [PlanSet(role: "working", weight: 20, reps: 10)], loadCount: 2),
+            PlanExercise(name: "自重动作", loadBasis: "bodyweight", sets: [PlanSet(role: "working", weight: 70, reps: 10)])
+        ]
+        plan.days[0].volumeTargetKg = 15_000 // Old manual value must not override the set details.
+        XCTAssertEqual(plan.days[0].plannedVolumeKg, 900)
+        XCTAssertEqual(plan.withCalculatedVolume().days[0].volumeTargetKg, 900)
+        XCTAssertEqual(Workout(plan: plan, day: plan.days[0]).volumeTargetKg, 900)
+        plan.days[0].exercises[0].sets[0].weight = 60
+        XCTAssertEqual(plan.days[0].plannedVolumeKg, 1000)
     }
     @MainActor func testAddingLocalHealthStoragePreservesExistingRecords() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("aihealth-migration-" + newID())
@@ -165,6 +199,77 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(try reopened.fetch(FetchDescriptor<HealthCursor>()).count, 1)
     }
 
+    @MainActor func testWorkoutEnergyEnrichesExistingWatchSample() async throws {
+        let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let worker = HealthStorage(modelContainer: container)
+        let observed = Date()
+        var sample = HealthSample(healthkitUuid: newID(), type: "workout", unit: "workout", startAt: observed, endAt: observed.addingTimeInterval(60), sourceBundleId: "synthetic.watch")
+        sample.metadataJson["watch_session_id"] = .string(newID())
+        sample.workoutJson = ["duration_seconds": .number(60)]
+        try await worker.persist(samples: [sample], anchor: nil, cursorKey: "test/watch", scope: "test", upload: false)
+        sample.workoutJson = ["active_energy_kcal": .number(123.4)]
+        try await worker.persist(samples: [sample], anchor: nil, cursorKey: "test/phone", scope: "test", upload: false)
+        let rows = try ModelContext(container).fetch(FetchDescriptor<LocalHealthRecord>())
+        let stored: HealthSample = try Wire.read(try XCTUnwrap(rows.first?.payload))
+        if case .number(let duration)? = stored.workoutJson?["duration_seconds"] { XCTAssertEqual(duration, 60) }
+        else { XCTFail("Watch duration was lost") }
+        if case .number(let energy)? = stored.workoutJson?["active_energy_kcal"] { XCTAssertEqual(energy, 123.4) }
+        else { XCTFail("measured energy enrichment was lost") }
+    }
+
+    func testWeightTrendKeepsOneSourceAndNeedsEnoughDays() throws {
+        let zone = "Asia/Shanghai"
+        let calendar = DayKey.calendar(zone)
+        let today = calendar.startOfDay(for: Date())
+        let readings: [WeightReading] = (0..<8).map { offset in
+            let at = calendar.date(byAdding: .day, value: -offset, to: today)!.addingTimeInterval(1)
+            return WeightReading(id: "scale-\(offset)", kg: 76 + Double(offset) * 0.1,
+                                 observedAt: at, sourceName: "体重秤", sourceBundleId: "scale")
+        } + [WeightReading(id: "manual", kg: 99, observedAt: today.addingTimeInterval(2),
+                           sourceName: "手动", sourceBundleId: "manual")]
+        XCTAssertEqual(WeightHistory.preferredSource(readings, zone: zone), "scale")
+        let selected = WeightHistory.dailyLatest(readings, source: "scale", zone: zone,
+                                                 from: calendar.date(byAdding: .day, value: -7, to: today)!, to: Date())
+        XCTAssertEqual(selected.count, 8)
+        XCTAssertTrue(selected.allSatisfy { $0.kg < 80 })
+        XCTAssertNil(WeightHistory.sevenDayMeanChange(readings, source: "scale", zone: zone, now: Date()))
+        let merged = WeightHistory.merge(local: [readings[0]], cloud: [readings[0], readings[1]])
+        XCTAssertEqual(merged.count, 2)
+    }
+
+    @MainActor func testWeightHistoryStorageFiltersScopeTypeAndDeletion() async throws {
+        let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let worker = HealthStorage(modelContainer: container)
+        let at = Date().addingTimeInterval(-60)
+        let valid = HealthSample(healthkitUuid: newID(), type: "body_mass", value: 76.4, unit: "kg", startAt: at, endAt: at, sourceBundleId: "scale")
+        let heart = HealthSample(healthkitUuid: newID(), type: "heart_rate", value: 70, unit: "bpm", startAt: at, endAt: at, sourceBundleId: "watch")
+        var deleted = HealthSample(healthkitUuid: newID(), type: "body_mass", value: 88, unit: "kg", startAt: at, endAt: at, sourceBundleId: "scale")
+        try await worker.persist(samples: [valid, heart, deleted], anchor: nil, cursorKey: "owner/weight", scope: "owner", upload: false)
+        try await worker.persist(samples: [valid], anchor: nil, cursorKey: "other/weight", scope: "other", upload: false)
+        deleted.deleted = true
+        try await worker.persist(samples: [deleted], anchor: nil, cursorKey: "owner/delete", scope: "owner", upload: false)
+        let owner = try await worker.weightReadings(scope: "owner", since: at.addingTimeInterval(-1), now: Date())
+        XCTAssertEqual(owner.map(\.kg), [76.4])
+        let other = try await worker.weightReadings(scope: "other", since: at.addingTimeInterval(-1), now: Date())
+        XCTAssertEqual(other.count, 1)
+    }
+
+    func testHRVTrendUsesDailyMedianAndRestingHeartUsesLastReading() {
+        let zone = "Asia/Shanghai"
+        let day = DayKey.calendar(zone).startOfDay(for: Date())
+        let values = [30.0, 50.0, 100.0].enumerated().map { index, value in
+            VitalReading(id: "v\(index)", value: value, observedAt: day.addingTimeInterval(Double(index + 1)),
+                         sourceName: "手表", sourceBundleId: "watch")
+        }
+        let hrv = VitalHistory.dailyPoints(values, type: "hrv_sdnn", source: "watch", zone: zone, from: day, to: Date())
+        XCTAssertEqual(hrv.count, 1)
+        XCTAssertEqual(hrv.first?.value, 50)
+        XCTAssertEqual(hrv.first?.samples, 3)
+        let resting = VitalHistory.dailyPoints(values, type: "resting_heart_rate", source: "watch", zone: zone, from: day, to: Date())
+        XCTAssertEqual(resting.first?.value, 100)
+        XCTAssertEqual(VitalHistory.merge(local: [values[0]], cloud: values).count, 3)
+    }
+
     @MainActor func testLiveClientSyncContract() async throws {
         guard let endpoint = ProcessInfo.processInfo.environment["AICORE_TEST_API"], let url = URL(string: endpoint) else { throw XCTSkip("AICORE_TEST_API required for local HTTP integration") }
         let client = Network(baseURL: url)
@@ -184,15 +289,16 @@ final class ModelsTests: XCTestCase {
             XCTAssertEqual((root["records"] as? [Any])?.count, 3)
             XCTAssertNotNil(store.records.first { $0.kind == "plan" && $0.recordId == plan.id })
             store.remove(kind: "plan", id: plan.id)
+            XCTAssertTrue(store.error?.contains("请新增训练计划") == true)
             await store.synchronize()
             for _ in 0..<100 where store.syncing { try await Task.sleep(for: .milliseconds(30)) }
             await store.synchronize()
             for _ in 0..<100 where store.syncing { try await Task.sleep(for: .milliseconds(30)) }
-            XCTAssertFalse(store.syncing); XCTAssertTrue(store.pending.isEmpty); XCTAssertTrue(store.plans.isEmpty)
+            XCTAssertFalse(store.syncing); XCTAssertTrue(store.pending.isEmpty); XCTAssertEqual(store.plans.count, 1)
             XCTAssertEqual(store.workouts.count, 1)
             let after = try JSONSerialization.jsonObject(with: await client.request("/v1/records")) as! [String: Any]
             let deleted = (after["records"] as! [[String: Any]]).first { $0["id"] as? String == plan.id }
-            XCTAssertEqual(deleted?["deleted"] as? Bool, true)
+            XCTAssertEqual(deleted?["deleted"] as? Bool, false)
             _ = try await client.request("/v1/account", method: "DELETE", body: Wire.data(["password": password])); client.forget()
         } catch {
             _ = try? await client.request("/v1/account", method: "DELETE", body: Wire.data(["password": password])); client.forget(); throw error
