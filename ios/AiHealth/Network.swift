@@ -21,6 +21,15 @@ enum Keychain {
     static func remove(key: String) { SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "com.aijiankang.session", kSecAttrAccount as String: key] as CFDictionary) }
 }
 
+enum CloudAccountScope {
+    static let previousURL = "https://health.qyos.top"
+    static func aliasKey(userID: String) -> String { "riyi.accountScope.\(userID)" }
+    static func value(currentURL: String, userID: String, rememberedAlias: String?) -> String {
+        let original = previousURL + "/" + userID
+        return rememberedAlias == original ? original : currentURL + "/" + userID
+    }
+}
+
 @MainActor final class Network {
     static var defaultURL: String { Bundle.main.object(forInfoDictionaryKey: "AIHealthDefaultServerURL") as? String ?? "http://localhost:18089" }
     static func permits(_ base: URL) -> Bool {

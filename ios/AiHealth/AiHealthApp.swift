@@ -228,8 +228,8 @@ struct ReauthenticationView: View {
 
 struct WelcomeView: View {
     @Bindable var store: AppStore
-    @State private var url = UserDefaults.standard.string(forKey: "serverURL") ?? Network.defaultURL
     @State private var email = ""; @State private var password = ""; @State private var register = true
+    @State private var showPasswordReset = false
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -237,20 +237,22 @@ struct WelcomeView: View {
                     Image(systemName: "leaf.circle.fill").font(.system(size: 64)).foregroundStyle(Theme.green)
                     VStack(alignment: .leading, spacing: 10) { Text("日益").font(.largeTitle.bold()); Text("让每一次训练，\n成为看得见的积累。").font(.title2).foregroundStyle(Theme.muted) }
                     VStack(spacing: 14) {
-                        TextField("服务器地址", text: $url).textContentType(.URL).keyboardType(.URL).textInputAutocapitalization(.never)
                         TextField("邮箱", text: $email).textContentType(.username).keyboardType(.emailAddress).textInputAutocapitalization(.never)
                         AccountSecureField(placeholder: "密码（12–72 字节）", text: $password, contentType: register ? nil : .password).frame(height: 36)
                     }.textFieldStyle(.roundedBorder)
-                    Button { dismissInputKeyboard(); Task { await store.authenticate(url: url, email: email, password: password, register: register) } } label: {
+                    Button { dismissInputKeyboard(); Task { await store.authenticate(url: store.network.baseURL.absoluteString, email: email, password: password, register: register) } } label: {
                         HStack { Spacer(); if store.syncing { ProgressView().tint(.white) }; Text(register ? "创建账号，开始记录" : "登录").bold(); Spacer() }.padding(.vertical, 10)
                     }.buttonStyle(.borderedProminent).disabled(store.syncing || email.isEmpty || password.isEmpty)
                     Button(register ? "已有账号？登录" : "没有账号？注册") { register.toggle() }
-                    if !register { Link("忘记密码？联系支持", destination: URL(string: "https://health.qyos.top/support")!) }
-                    Divider()
-                    Button("先体验本地记录") { store.startDemo() }
-                    Text("本地体验的数据只保存在这台设备，不上传、不调用 AI；与云端账号的数据分开保存。").font(.footnote).foregroundStyle(.secondary)
+                    if !register { Button("忘记密码？") { showPasswordReset = true } }
+                    #if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--allow-local-demo-ui-test") {
+                        Button("先体验本地记录") { store.startDemo() }
+                    }
+                    #endif
                 }.padding(28)
             }.background(Theme.cream)
+                .sheet(isPresented: $showPasswordReset) { PasswordResetView(store: store, email: email) }
         }
     }
 }

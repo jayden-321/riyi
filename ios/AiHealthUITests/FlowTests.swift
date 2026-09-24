@@ -1,6 +1,26 @@
 import XCTest
 
 final class FlowTests: XCTestCase {
+    func testFixedCloudWelcomeAndRecoveryEntry() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launch()
+        if app.tabBars.buttons["我的"].waitForExistence(timeout: 3) {
+            app.tabBars.buttons["我的"].tap()
+            app.buttons["account-data"].tap()
+            let leave = app.buttons["退出本地体验"].exists ? app.buttons["退出本地体验"] : app.buttons["退出登录"]
+            for _ in 0..<8 where !leave.isHittable { app.swipeUp() }
+            leave.tap(); app.alerts.buttons["退出"].tap()
+        }
+        XCTAssertTrue(app.buttons["已有账号？登录"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.textFields["服务器地址"].exists)
+        XCTAssertFalse(app.buttons["先体验本地记录"].exists)
+        app.buttons["已有账号？登录"].tap()
+        app.buttons["忘记密码？"].tap()
+        XCTAssertTrue(app.navigationBars["找回密码"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["发送找回验证码"].exists)
+    }
+
     func testClearRestoreConversationFromFixture() throws {
         continueAfterFailure = false
         struct Fixture: Decodable { let email: String; let password: String; let planName: String; let message: String }
@@ -17,10 +37,6 @@ final class FlowTests: XCTestCase {
             for _ in 0..<10 where !leave.isHittable { app.swipeUp() }
             leave.tap(); app.alerts.buttons["退出"].tap()
         }
-        XCTAssertTrue(app.textFields["服务器地址"].waitForExistence(timeout: 6))
-        let server = app.textFields["服务器地址"]; server.tap()
-        if let old = server.value as? String { server.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count)) }
-        server.typeText("https://health.qyos.top")
         app.buttons["已有账号？登录"].tap()
         app.textFields["邮箱"].tap(); app.textFields["邮箱"].typeText(fixture.email)
         app.secureTextFields.firstMatch.tap(); app.secureTextFields.firstMatch.typeText(fixture.password)
@@ -80,10 +96,6 @@ final class FlowTests: XCTestCase {
             for _ in 0..<8 where !leave.isHittable { app.swipeUp() }
             leave.tap(); app.alerts.buttons["退出"].tap()
         }
-        let server = app.textFields["服务器地址"]
-        XCTAssertTrue(server.waitForExistence(timeout: 8)); server.tap()
-        if let old = server.value as? String { server.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count)) }
-        server.typeText("https://health.qyos.top")
         app.textFields["邮箱"].tap(); app.textFields["邮箱"].typeText(email)
         app.secureTextFields.firstMatch.tap(); app.secureTextFields.firstMatch.typeText(password)
         app.buttons["创建账号，开始记录"].tap()
@@ -128,7 +140,7 @@ final class FlowTests: XCTestCase {
     }
     private func cleanupCoachAccount(email: String, password: String) {
         func call(_ path: String, method: String, token: String? = nil) -> Data? {
-            var request = URLRequest(url: URL(string: "https://health.qyos.top" + path)!); request.httpMethod = method; request.timeoutInterval = 12
+            var request = URLRequest(url: URL(string: "https://health.gzqy.xyz" + path)!); request.httpMethod = method; request.timeoutInterval = 12
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             if let token { request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
             request.httpBody = try? JSONSerialization.data(withJSONObject: method == "DELETE" ? ["password": password] : ["email": email, "password": password, "timezone": "Asia/Shanghai"])
@@ -165,7 +177,7 @@ final class FlowTests: XCTestCase {
     }
     func testLightAppearanceAndHistoryWindow() throws {
         continueAfterFailure = false
-        let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString; app.launch()
+        let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString; app.launchArguments = ["--allow-local-demo-ui-test"]; app.launch()
         if app.buttons["先体验本地记录"].waitForExistence(timeout: 5) { app.buttons["先体验本地记录"].tap() }
         XCTAssertTrue(app.tabBars.buttons["我的"].waitForExistence(timeout: 5)); app.tabBars.buttons["我的"].tap()
         let picker = app.descendants(matching: .any).matching(identifier: "health-history-window").firstMatch
@@ -181,7 +193,7 @@ final class FlowTests: XCTestCase {
     }
     func testLocalHealthEntryDoesNotRequireAccountOrServer() throws {
         continueAfterFailure = false
-        let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString; app.launch()
+        let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString; app.launchArguments = ["--allow-local-demo-ui-test"]; app.launch()
         if app.buttons["先体验本地记录"].waitForExistence(timeout: 5) { app.buttons["先体验本地记录"].tap() }
         XCTAssertTrue(app.tabBars.buttons["我的"].waitForExistence(timeout: 5)); app.tabBars.buttons["我的"].tap()
         let read = app.buttons["read-local-health"]
@@ -193,7 +205,7 @@ final class FlowTests: XCTestCase {
         try runCloudConfiguration(server: "http://localhost:18089")
     }
     func testBWGRegistrationAndAIConfiguration() throws {
-        try runCloudConfiguration(server: "https://health.qyos.top")
+        try runCloudConfiguration(server: "https://health.gzqy.xyz")
     }
     private func runCloudConfiguration(server: String) throws {
         continueAfterFailure = false
@@ -202,7 +214,7 @@ final class FlowTests: XCTestCase {
             if alert.buttons["Not Now"].exists { alert.buttons["Not Now"].tap(); return true }
             return false
         }
-        let app = XCUIApplication(); app.launch()
+        let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_TEST_SERVER_URL"] = server; app.launch()
         if app.tabBars.buttons["我的"].waitForExistence(timeout: 4) {
             app.tabBars.buttons["我的"].tap()
             let leave = app.buttons["退出本地体验"].exists ? app.buttons["退出本地体验"] : app.buttons["退出登录"]
@@ -211,10 +223,6 @@ final class FlowTests: XCTestCase {
         }
         let email = UUID().uuidString.lowercased() + "@example.test"
         let password = "UiTestPass" + String(UUID().uuidString.prefix(8))
-        let serverField = app.textFields["服务器地址"]
-        XCTAssertTrue(serverField.waitForExistence(timeout: 6)); serverField.tap()
-        if let old = serverField.value as? String { serverField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count)) }
-        serverField.typeText(server)
         let emailField = app.textFields["邮箱"]; XCTAssertTrue(emailField.waitForExistence(timeout: 6)); emailField.tap(); emailField.typeText(email)
         let passwordField = app.secureTextFields.firstMatch; passwordField.tap()
         if let current = passwordField.value as? String, current != passwordField.placeholderValue { passwordField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count)) }
@@ -253,7 +261,7 @@ final class FlowTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
         // The fresh database must also enter demo mode afresh to create its starter plan.
-        app.launchArguments = ["-localDemo", "NO"]; app.launch()
+        app.launchArguments = ["-localDemo", "NO", "--allow-local-demo-ui-test"]; app.launch()
         if app.tabBars.buttons["我的"].waitForExistence(timeout: 3) {
             if app.alerts.buttons["知道了"].exists { app.alerts.buttons["知道了"].tap() }
             app.tabBars.buttons["我的"].tap()

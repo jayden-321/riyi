@@ -10,7 +10,7 @@ settings:
     TARGETED_DEVICE_FAMILY: '1'
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: '' # 试用者在本地填写自己的 Personal Team ID，两端共用
-    DEFAULT_SERVER_URL: https://health.qyos.top
+    DEFAULT_SERVER_URL: https://health.gzqy.xyz
     RIYI_IOS_BUNDLE_ID: com.riyi.ios
 targets:
   AiHealth:
@@ -27,7 +27,7 @@ targets:
         INFOPLIST_FILE: AiHealth/Info.plist
         CODE_SIGN_ENTITLEMENTS: AiHealth/AiHealth.entitlements
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '58'
+        CURRENT_PROJECT_VERSION: '59'
     dependencies:
       - target: AiHealthWatch
     scheme:
@@ -64,7 +64,7 @@ targets:
         INFOPLIST_FILE: AiHealthWatch/Info.plist
         CODE_SIGN_ENTITLEMENTS: AiHealthWatch/AiHealthWatch.entitlements
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '58'
+        CURRENT_PROJECT_VERSION: '59'
     scheme:
       testTargets: [AiHealthWatchUITests]
   AiHealthWatchUITests:
