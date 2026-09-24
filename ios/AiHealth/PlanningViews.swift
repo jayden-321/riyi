@@ -1,4 +1,5 @@
 import SwiftUI
+import HealthKit
 
 struct PlanningCalendar: View {
     @Bindable var store: AppStore; let kind: String
@@ -13,7 +14,21 @@ struct PlanningCalendar: View {
         let first = calendar.date(byAdding: .day, value: -(calendar.component(.weekday, from: store.calendarDate) + 5) % 7, to: calendar.startOfDay(for: store.calendarDate))!
         return (0..<7).map { calendar.date(byAdding: .day, value: $0, to: first) }
     }
+    private var markers: [String: String] {
+        let zone = store.settings.timezone
+        var values: [String: String] = [:]
+        for cycle in store.cycles where cycle.kind == kind {
+            for day in cycle.days { values[day.date] = day.rest ? "休" : "○" }
+        }
+        if kind == "training" {
+            for workout in store.workouts { values[DayKey.string(workout.startedAt, zone: zone)] = "✓" }
+        } else {
+            for meal in store.mealLogs { values[DayKey.string(meal.eatenAt, zone: zone)] = "✓" }
+        }
+        return values
+    }
     var body: some View {
+        let markerByDate = markers
         VStack(spacing: 12) {
             HStack {
                 Button { move(-1) } label: { Image(systemName: "chevron.left").frame(width: 32,height: 40) }.accessibilityLabel(expanded ? "上个月" : "上一周")
@@ -28,17 +43,13 @@ struct PlanningCalendar: View {
                         let key = DayKey.string(date,zone: store.settings.timezone)
                         let selected = key == store.calendarKey
                         Button { store.calendarDate = date } label: {
-                            VStack(spacing: 3) { Text("\(calendar.component(.day,from: date))").font(.subheadline); Text(marker(key)).font(.caption2).frame(height: 12) }.frame(maxWidth: .infinity,minHeight: 42).foregroundStyle(selected ? .white : Theme.ink).background(selected ? Theme.green : .clear,in: RoundedRectangle(cornerRadius: 10))
-                        }.buttonStyle(.borderless).accessibilityLabel("\(key) \(marker(key))").accessibilityIdentifier("calendar-\(key)")
+                            VStack(spacing: 3) { Text("\(calendar.component(.day,from: date))").font(.subheadline); Text(markerByDate[key] ?? " ").font(.caption2).frame(height: 12) }.frame(maxWidth: .infinity,minHeight: 42).foregroundStyle(selected ? .white : Theme.ink).background(selected ? Theme.green : .clear,in: RoundedRectangle(cornerRadius: 10))
+                        }.buttonStyle(.borderless).accessibilityLabel("\(key) \(markerByDate[key] ?? " ")").accessibilityIdentifier("calendar-\(key)")
                     } else { Color.clear.frame(height: 42) }
                 }
             }
             HStack { Text("○ 已安排  ✓ 有实际记录  休 休息日").font(.caption2).foregroundStyle(.secondary); Spacer(); Button("今天") { store.calendarDate = Date() }.font(.caption).buttonStyle(.borderless) }
         }.padding(.vertical,4)
-    }
-    private func marker(_ date: String) -> String {
-        if kind == "training" ? !store.workouts(on: date).isEmpty : !store.meals(on: date).isEmpty { return "✓" }
-        if let (_,day) = store.scheduled(kind,date: date) { return day.rest ? "休" : "○" }; return " "
     }
     private func move(_ step: Int) { store.calendarDate = calendar.date(byAdding: expanded ? .month : .day,value: expanded ? step : step * 7,to: store.calendarDate) ?? store.calendarDate }
 }
@@ -47,30 +58,46 @@ struct TrainingCalendarView: View {
     @Bindable var store: AppStore
     @State private var cycleOptions = false
     @State private var editingDate: TrainingDateSelection?
+    @State private var ringWeeks: [String: [String: HKActivitySummary]] = [:]
+    @State private var ringRevisions: [String: TimeInterval] = [:]
+    @State private var loadingRingWeeks = Set<String>()
     private var selectedDate: String { store.calendarKey }
-    private var blocks: [TrainingBlock] { store.trainingBlocks(on: selectedDate) }
-    private var unmatchedWorkouts: [Workout] {
-        store.workouts(on: selectedDate).filter { workout in
-            store.associatedBlockID(for: workout, on: selectedDate) == nil
-        }
+    private var ringWeekKey: String {
+        let calendar = DayKey.calendar(store.settings.timezone)
+        let first = calendar.dateInterval(of: .weekOfYear, for: store.calendarDate)?.start ?? store.calendarDate
+        return store.scope + "/" + store.settings.timezone + "/" + DayKey.string(first, zone: store.settings.timezone)
     }
+    private var ringRevision: TimeInterval { store.localHealthReadAt?.timeIntervalSince1970 ?? 0 }
     private func detail(_ sessions: [Workout]) -> String {
         guard !sessions.isEmpty else { return "尚未开始 · 查看训练内容" }
         let active = sessions.contains { $0.status == "in_progress" }
         return "已练 \(sessions.count) 次\(active ? " · 进行中，可继续" : " · 查看详情可再练")"
     }
     var body: some View {
+        let dayWorkouts = store.workouts(on: selectedDate)
+        let dayBlocks = store.trainingBlocks(on: selectedDate)
+        let grouped = Dictionary(grouping: dayWorkouts) { store.associatedBlockID(for: $0, blocks: dayBlocks) ?? "" }
+        let unmatchedWorkouts = grouped[""] ?? []
+        let scheduledDay = store.scheduled("training", date: selectedDate)
         NavigationStack {
             List {
                 Section { PlanningCalendar(store: store,kind: "training") }
+                if selectedDate <= DayKey.string(Date(), zone: store.settings.timezone) {
+                    Section {
+                        DailyActivityRingsCard(date: store.calendarDate, timezone: store.settings.timezone,
+                                               summary: ringWeeks[ringWeekKey]?[selectedDate],
+                                               loading: loadingRingWeeks.contains(ringWeekKey) || ringRevisions[ringWeekKey] == nil,
+                                               refresh: { Task { await loadRings(force: true) } })
+                    }
+                }
                 if let active = store.activeWorkout,
-                   selectedDate != DayKey.string(Date(), zone: store.settings.timezone) || store.associatedBlockID(for: active, on: selectedDate) == nil {
+                   selectedDate != DayKey.string(Date(), zone: store.settings.timezone) || store.associatedBlockID(for: active, blocks: dayBlocks) == nil {
                     Section("正在训练") { NavigationLink("\(active.name) · 继续训练") { WorkoutView(store: store,workout: active) } }
                 }
                 Section(selectedDate) {
                     Button { editingDate = TrainingDateSelection(date: selectedDate) } label: { Label("安排训练", systemImage: "plus.circle.fill") }
                         .accessibilityIdentifier("schedule-training-day")
-                    if let (_,day) = store.scheduled("training",date: selectedDate) {
+                    if let (_,day) = scheduledDay {
                         if day.rest {
                             NavigationLink { ScheduledRestDayView(store: store, date: day.date) } label: {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -81,7 +108,7 @@ struct TrainingCalendarView: View {
                         }
                         else {
                             ForEach(Array(day.trainingBlocks.enumerated()), id: \.element.id) { index, block in
-                                let sessions = store.workouts(for: block, on: selectedDate)
+                                let sessions = grouped[block.id] ?? []
                                 if let plan = block.plan {
                                     NavigationLink { ScheduledTrainingView(store: store, plan: plan, date: day.date, blockID: block.id) } label: {
                                         VStack(alignment: .leading, spacing: 4) {
@@ -101,7 +128,7 @@ struct TrainingCalendarView: View {
                         }
                     } else if let legacy = store.plans.first(where: { $0.scheduledDate == selectedDate }), legacy.days.count == 1 {
                         NavigationLink { ScheduledTrainingView(store: store, plan: legacy, date: selectedDate) } label: { Text(legacy.days[0].name) }
-                    } else if store.workouts(on: selectedDate).isEmpty {
+                    } else if dayWorkouts.isEmpty {
                         Text("这一天尚未安排训练").foregroundStyle(.secondary)
                     }
                 }
@@ -120,11 +147,23 @@ struct TrainingCalendarView: View {
                 }
                 Section("周期") { Button("安排训练周期") { cycleOptions = true } }
             }.navigationTitle("训练")
+                .task(id: ringWeekKey + "/" + String(ringRevision)) { await loadRings() }
                 .sheet(item: $editingDate) { selection in
                     DailyTrainingScheduleView(store: store, date: selection.date)
                 }
                 .sheet(isPresented: $cycleOptions) { TrainingCycleOptionsView(store: store) }
         }
+    }
+    private func loadRings(force: Bool = false) async {
+        let week = ringWeekKey, revision = ringRevision, date = store.calendarDate, zone = store.settings.timezone, owner = store.scope
+        guard force || ringRevisions[week] != revision else { return }
+        guard !loadingRingWeeks.contains(week) else { return }
+        loadingRingWeeks.insert(week)
+        let summaries = (try? await ActivityRingsReader.loadWeek(containing: date, timezone: zone)) ?? [:]
+        loadingRingWeeks.remove(week)
+        guard store.scope == owner else { return }
+        ringWeeks[week] = summaries
+        ringRevisions[week] = revision
     }
 }
 private struct TrainingDateSelection: Identifiable {

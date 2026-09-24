@@ -65,12 +65,14 @@
 		C2C3E61F589277D506E86EA5 /* SessionRecoveryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB06FCA368D2B33E2A416DC3 /* SessionRecoveryUITests.swift */; };
 		C43C9A7146BEC87E3631A2DA /* SettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25271E82167028CD9B08B47 /* SettingsViews.swift */; };
 		C52E19A29AB399FD50BC9F28 /* WeightHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520831C061F317EF44595779 /* WeightHistory.swift */; };
+		C61218092C862BC67B08DF32 /* WatchActivityRings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57885689A384871129A47CFF /* WatchActivityRings.swift */; };
 		CC85AF3180687BBB8C30FA90 /* SleepRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15EA2FE52925D0A6C8A22B3C /* SleepRegressionTests.swift */; };
 		CE885F5BB92F000D76F80CBC /* CompanionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9BFE0CC6E58401B9DB78CB /* CompanionCore.swift */; };
 		CEA7EF53A5203551D6F24787 /* WatchWorkoutHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B5798D0570BFA1F64E3313C /* WatchWorkoutHealth.swift */; };
 		D738BE1685A2EA8E400235AC /* WorkoutShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01FCCC78797EAE04738EF669 /* WorkoutShareCard.swift */; };
 		DBF98A6A1A17B6EB0FDD5F21 /* WorkoutSport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */; };
 		DFA25A4A44AF0A58F4CE4C44 /* CloudAccountScopeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8FBB7E78C493A2100D82BC /* CloudAccountScopeTests.swift */; };
+		E357BB1DC04762E8DBABA8A7 /* ActivityRingsDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CC2EADA5E1B7EADACB90DA /* ActivityRingsDetailView.swift */; };
 		E4451F1BD19276A5751C123C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D5F3350DF5A906DE4EF153 /* Models.swift */; };
 		E500ADD3C4D0907E8E1686A5 /* DatabaseRecoveryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC10157B842DA6752AE5A413 /* DatabaseRecoveryUITests.swift */; };
 		EE354A7008E88A43DF481269 /* Network.swift in Sources */ = {isa = PBXBuildFile; fileRef = C624F46302C82B541804BF7A /* Network.swift */; };
@@ -147,6 +149,7 @@
 		4C49BF4F39BC7466EE052104 /* PlanningUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningUITests.swift; sourceTree = "<group>"; };
 		51505ECEC9315A197D1C58BE /* AiHealthWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AiHealthWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		520831C061F317EF44595779 /* WeightHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightHistory.swift; sourceTree = "<group>"; };
+		57885689A384871129A47CFF /* WatchActivityRings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchActivityRings.swift; sourceTree = "<group>"; };
 		5B9974C55046DA72DB6486C1 /* ExerciseLibraryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibraryUITests.swift; sourceTree = "<group>"; };
 		5E6A394C65D5696D29A99187 /* WatchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchStore.swift; sourceTree = "<group>"; };
 		6C03779D223E031C1E49D999 /* FoodLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodLibrary.swift; sourceTree = "<group>"; };
@@ -166,6 +169,7 @@
 		A10EBFE861210284C0618249 /* WaterNotificationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaterNotificationUITests.swift; sourceTree = "<group>"; };
 		A14AF61781D5D4117D6D6494 /* AiHealthWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiHealthWatchApp.swift; sourceTree = "<group>"; };
 		A6C239408EF8FAD9922F44CA /* VitalViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitalViews.swift; sourceTree = "<group>"; };
+		A6CC2EADA5E1B7EADACB90DA /* ActivityRingsDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityRingsDetailView.swift; sourceTree = "<group>"; };
 		AAF1252F16A15B2382C89110 /* PlanningViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningViews.swift; sourceTree = "<group>"; };
 		AB0EC116C4358F9D2001C4A3 /* AiHealthWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AiHealthWatch.entitlements; sourceTree = "<group>"; };
 		AF2AD30CA089D6595B9AF8A3 /* Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
@@ -232,6 +236,7 @@
 			isa = PBXGroup;
 			children = (
 				1E6A28E9E05C890D1C236C7A /* AccountSecureField.swift */,
+				A6CC2EADA5E1B7EADACB90DA /* ActivityRingsDetailView.swift */,
 				B17B5D22A287787C19FC64DB /* AiHealth.entitlements */,
 				7B5361C78C93164D03CFFB85 /* AiHealthApp.swift */,
 				73FA5CC3978A4CB93EA0D638 /* AppStore.swift */,
@@ -340,6 +345,7 @@
 				EE3F62C614F99CD53F68D8D1 /* Assets.xcassets */,
 				E523E415461619FE53650740 /* Info.plist */,
 				F225BF55BD6F4B1B62BEDDB7 /* PrivacyInfo.xcprivacy */,
+				57885689A384871129A47CFF /* WatchActivityRings.swift */,
 				1F7F3C40BB1B307D437DA2E5 /* WatchRestAlerts.swift */,
 				5E6A394C65D5696D29A99187 /* WatchStore.swift */,
 				8B5798D0570BFA1F64E3313C /* WatchWorkoutHealth.swift */,
@@ -547,6 +553,7 @@
 				4DF3E79D2C1A061B40B8CF43 /* CompanionCore.swift in Sources */,
 				8098D1355E8A56D316CF42EC /* CompanionTransport.swift in Sources */,
 				B4031A194B628B11BA9D2C61 /* Models.swift in Sources */,
+				C61218092C862BC67B08DF32 /* WatchActivityRings.swift in Sources */,
 				96A7207D8BC279CC428B8F68 /* WatchRestAlerts.swift in Sources */,
 				4B6625116E878A3FA51CFC77 /* WatchStore.swift in Sources */,
 				CEA7EF53A5203551D6F24787 /* WatchWorkoutHealth.swift in Sources */,
@@ -559,6 +566,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				83BF61B4B5EF604CBDC37613 /* AccountSecureField.swift in Sources */,
+				E357BB1DC04762E8DBABA8A7 /* ActivityRingsDetailView.swift in Sources */,
 				6B8B47B5AAFE0A12283D889A /* AiHealthApp.swift in Sources */,
 				68FE672D73BA32D25B81F8AA /* AppStore.swift in Sources */,
 				49D789D7954008C049999A27 /* Coach.swift in Sources */,
@@ -652,7 +660,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 68;
 				INFOPLIST_FILE = AiHealth/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -671,7 +679,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 68;
 				INFOPLIST_FILE = AiHealth/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -757,7 +765,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 68;
 				INFOPLIST_FILE = AiHealthWatch/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(RIYI_IOS_BUNDLE_ID).watchkitapp";
@@ -902,7 +910,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 68;
 				INFOPLIST_FILE = AiHealthWatch/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(RIYI_IOS_BUNDLE_ID).watchkitapp";

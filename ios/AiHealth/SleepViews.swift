@@ -100,7 +100,7 @@ struct SleepDetailView: View {
                 Button("授权 / 补充本机睡眠读取") { Task { await refresh(authorize: true); await checkSleepAuthorization() } }.disabled(busy)
                     .accessibilityIdentifier("authorize-local-sleep")
                 if let note { Text(note).font(.caption).foregroundStyle(.secondary) }
-                Text("显示当前健康读取范围内的记录。若苹果健康中已有数据，请确认已允许“日益”读取睡眠。\n当前版本展示时长和阶段，尚不读取苹果睡眠评分。").font(.caption).foregroundStyle(.secondary)
+                Text("显示当前健康读取范围内的记录。若苹果健康中已有数据，请确认已允许“日益”读取睡眠。\nApple 尚未向第三方开放睡眠评分读取；这里展示时长和阶段。").font(.caption).foregroundStyle(.secondary)
             }
         }
         .navigationTitle("睡眠").navigationBarTitleDisplayMode(.inline)
@@ -251,7 +251,7 @@ private struct SleepNightDetailView: View {
                     Text(current.cloud ? "云端已同步的 Apple 健康记录" : "本机已读取的 Apple 健康记录").font(.subheadline)
                     Text("记录截至 \(timestamp(current.observedAt)) · \(store.settings.timezone)").font(.caption).foregroundStyle(.secondary)
                     if current.cloud, let cutoff = current.cutoff { Text("云端摘要截至 \(timestamp(cutoff))").font(.caption).foregroundStyle(.secondary) }
-                    Text("按醒来日期归属，多来源选择单一来源，重叠时段不重复累计。阶段缺失不代表零。当前版本尚不读取苹果睡眠评分。").font(.caption).foregroundStyle(.secondary)
+                    Text("按醒来日期归属，多来源选择单一来源，重叠时段不重复累计。阶段缺失不代表零。Apple 尚未向第三方开放睡眠评分读取。").font(.caption).foregroundStyle(.secondary)
                 }
             }
             Section("这晚睡眠分析") {

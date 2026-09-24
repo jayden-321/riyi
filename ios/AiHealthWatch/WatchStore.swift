@@ -59,6 +59,15 @@ import Observation
             replica = CompanionReplica(snapshot: CompanionSnapshot(binding: "synthetic", revision: 1, workout: old, today: today))
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--watch-completed-rings-demo") {
+            demo = true
+            let plan = Plan.starter()
+            var finished = Workout(plan: plan, day: plan.days[0])
+            finished.startedAt = Date().addingTimeInterval(-600); finished.finishedAt = Date(); finished.status = "completed"
+            let today = CompanionDayStatus(date: CompanionCore.dayKey(Date(), zone: finished.timezone), timezone: finished.timezone, kind: "rest")
+            replica = CompanionReplica(snapshot: CompanionSnapshot(binding: "synthetic", revision: 1, workout: finished, today: today))
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--watch-demo") {
             demo = true
             let plan = Plan.starter(); var workout = Workout(plan: plan, day: plan.days[0])
