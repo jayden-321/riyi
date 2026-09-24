@@ -311,6 +311,7 @@ struct FoodShareView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var searchable = true
     @State private var code: String?
+    @State private var moderationState: String?
     @State private var busy = false
     @State private var error: String?
     var body: some View {
@@ -320,7 +321,10 @@ struct FoodShareView: View {
                     Text("品牌：\(product.brand.isEmpty ? "未填写" : product.brand)").font(.footnote).foregroundStyle(.secondary)
                     Text("保存后默认允许其他用户按名称或品牌搜索。只共享商品名称、品牌、规格与营养表，不包含个人饮食记录；你可关闭搜索或撤销分享。").font(.footnote)
                     Toggle("允许其他用户按名称或品牌搜索", isOn: $searchable)
-                    Button(busy ? "正在生成…" : code == nil ? "生成分享码" : "保存分享设置") { Task { await share() } }.disabled(busy)
+                    if moderationState == "pending" { Text("该商品已进入举报复核，暂不对其他用户显示。").font(.caption).foregroundStyle(.orange) }
+                    if moderationState == "removed" { Text("该商品已从公开搜索移除。如有疑问请联系日益支持。").font(.caption).foregroundStyle(.orange) }
+                    Button(busy ? "正在生成…" : code == nil ? "生成分享码" : "保存分享设置") { Task { await share() } }
+                        .disabled(busy || moderationState == "pending" || moderationState == "removed")
                     if let code {
                         Text(code).textSelection(.enabled).font(.body.monospaced())
                         ShareLink("发送分享码", item: code)
@@ -332,7 +336,7 @@ struct FoodShareView: View {
              .task {
                  do {
                      let state = try await store.foodShareStatus(product)
-                     if !state.code.isEmpty { code = state.code; searchable = state.searchable }
+                     if !state.code.isEmpty { code = state.code; searchable = state.searchable; moderationState = state.moderationState }
                      else if autoGenerate { await share() }
                  } catch {
                      if autoGenerate { await share() }
@@ -343,7 +347,7 @@ struct FoodShareView: View {
     }
     private func share() async {
         busy = true; error = nil; defer { busy = false }
-        do { code = try await store.shareFood(product, searchable: searchable) }
+        do { code = try await store.shareFood(product, searchable: searchable); moderationState = "visible" }
         catch { self.error = error.localizedDescription }
     }
     private func revoke(_ value: String) async {
@@ -364,6 +368,9 @@ struct FoodImportView: View {
     @State private var searchedQuery = ""
     @State private var hasMore = false
     @State private var nextOffset = 0
+    @State private var reporting: SharedFood?
+    @State private var blocking: SharedFood?
+    @State private var notice: String?
     var body: some View {
         NavigationStack {
             List {
@@ -381,13 +388,43 @@ struct FoodImportView: View {
                             Text("品牌：\(item.product.brand.isEmpty ? "未填写" : item.product.brand)").font(.caption).foregroundStyle(.secondary)
                             Text("整包 \(item.product.packageAmount.formatted()) \(item.product.packageUnit == "g" ? "克" : "毫升") · 每 100 \(item.product.basisUnit == "g" ? "克" : "毫升") \(item.product.energyPer100.formatted()) \(item.product.energyUnit == "kJ" ? "千焦" : "千卡")").font(.caption).foregroundStyle(.secondary)
                             Button("核对一致，导入常用") { Task { await importItem(item) } }
+                            HStack {
+                                Button("举报商品") { reporting = item }.buttonStyle(.borderless)
+                                Spacer()
+                                Button("屏蔽此来源", role: .destructive) { blocking = item }.buttonStyle(.borderless)
+                            }.font(.caption)
                         }
                     }
                     if hasMore { Button("加载更多") { Task { await loadMore() } }.disabled(busy) }
                 }
-                Section { Text("导入前请确认品牌、规格和营养表相同。朋友的饮食记录不会导入。").font(.caption).foregroundStyle(.secondary) }
+                Section {
+                    Text("导入前请确认品牌、规格和营养表相同。朋友的饮食记录不会导入。").font(.caption).foregroundStyle(.secondary)
+                    NavigationLink("管理已屏蔽来源") { BlockedFoodSourcesView(store: store) }
+                    Link("联系日益支持", destination: URL(string: "https://health.qyos.top/support")!)
+                }
+                if let notice { Section { Text(notice).foregroundStyle(Theme.green) } }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }.navigationTitle("导入商品").toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } } }
+            .sheet(item: $reporting) { item in
+                FoodReportView(store: store, item: item) {
+                    results.removeAll { $0.code == item.code }
+                    notice = "举报已提交；该商品已从搜索中隐藏，等待复核。"
+                }
+            }
+            .confirmationDialog("屏蔽这个商品的分享来源？", isPresented: Binding(get: { blocking != nil }, set: { if !$0 { blocking = nil } })) {
+                Button("屏蔽来源", role: .destructive) {
+                    if let item = blocking { Task { await blockSource(item) } }
+                    blocking = nil
+                }
+            } message: { Text("此来源分享的商品将不再出现在你的搜索结果中，可在下方管理页面解除。") }
+            .task {
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--food-moderation-ui-test") {
+                    results = [SharedFood(code: "RIYI-TEST-0000001", product: FoodProduct(name: "测试麦片", brand: "测试品牌", packageAmount: 100, energyPer100: 1400))]
+                    searched = true
+                }
+                #endif
+            }
         }
     }
     private func search() async {
@@ -415,6 +452,81 @@ struct FoodImportView: View {
     }
     private func importItem(_ item: SharedFood) async {
         do { _ = try await store.importSharedFood(item); dismiss() }
+        catch { self.error = error.localizedDescription }
+    }
+    private func blockSource(_ item: SharedFood) async {
+        do {
+            try await store.blockSharedFoodSource(item.code)
+            notice = "已屏蔽该分享来源。"
+            await search()
+        } catch { self.error = error.localizedDescription }
+    }
+}
+
+private struct FoodReportView: View {
+    @Bindable var store: AppStore
+    let item: SharedFood
+    let onSubmitted: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var reason = "inaccurate"
+    @State private var details = ""
+    @State private var busy = false
+    @State private var error: String?
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(item.product.brand.isEmpty ? item.product.name : "\(item.product.brand) · \(item.product.name)") {
+                    Picker("举报原因", selection: $reason) {
+                        Text("营养或商品资料不准确").tag("inaccurate")
+                        Text("冒犯性内容").tag("offensive")
+                        Text("垃圾或广告").tag("spam")
+                        Text("涉嫌侵权").tag("copyright")
+                        Text("其他").tag("other")
+                    }
+                    TextField("补充说明（选填，最多 500 字）", text: $details, axis: .vertical)
+                    Text("举报后该商品会先从搜索中隐藏，待人工复核。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let error { Section { Text(error).foregroundStyle(.red) } }
+            }.navigationTitle("举报商品")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) { Button(busy ? "提交中…" : "提交") { Task { await submit() } }.disabled(busy || details.count > 500) }
+                }
+        }
+    }
+    private func submit() async {
+        busy = true; error = nil; defer { busy = false }
+        do {
+            try await store.reportSharedFood(item.code, reason: reason, details: details)
+            onSubmitted(); dismiss()
+        } catch { self.error = error.localizedDescription }
+    }
+}
+
+private struct BlockedFoodSourcesView: View {
+    @Bindable var store: AppStore
+    @State private var items: [BlockedFoodSource] = []
+    @State private var error: String?
+    var body: some View {
+        List {
+            if items.isEmpty { Text("没有已屏蔽的来源").foregroundStyle(.secondary) }
+            ForEach(items) { item in
+                HStack {
+                    Text(item.label)
+                    Spacer()
+                    Button("解除屏蔽") { Task { await unblock(item) } }.buttonStyle(.borderless)
+                }
+            }
+            if let error { Text(error).foregroundStyle(.red) }
+        }.navigationTitle("已屏蔽来源").task { await load() }
+    }
+    private func load() async {
+        do { items = try await store.blockedFoodSources(); error = nil }
+        catch { self.error = error.localizedDescription }
+    }
+    private func unblock(_ item: BlockedFoodSource) async {
+        do { try await store.unblockFoodSource(item.id); await load() }
         catch { self.error = error.localizedDescription }
     }
 }

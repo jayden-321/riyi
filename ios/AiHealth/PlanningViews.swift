@@ -458,7 +458,6 @@ struct DietView: View {
     @Bindable var store: AppStore
     @State private var editing: MealLog?; @State private var planning = false
     @State private var common = false; @State private var textEntry = false; @State private var photoEntry = false
-    @State private var camera = false; @State private var capturedImage: UIImage?
     private var logs: [MealLog] { store.meals(on: store.calendarKey) }
     private var energy: MealEnergySummary { MealEnergySummary(logs) }
     private var future: Bool { store.calendarKey > DayKey.string(Date(),zone: store.settings.timezone) }
@@ -477,10 +476,7 @@ struct DietView: View {
                         Spacer()
                         Button { textEntry = true } label: { Label("文字", systemImage: "text.cursor") }.disabled(future).accessibilityIdentifier("add-meal-log")
                         Spacer()
-                        Button {
-                            if UIImagePickerController.isSourceTypeAvailable(.camera) { camera = true }
-                            else { photoEntry = true }
-                        } label: { Label("拍照", systemImage: "camera") }.disabled(future)
+                        Button { photoEntry = true } label: { Label("拍照", systemImage: "camera") }.disabled(future)
                     }.buttonStyle(.bordered)
                     Button("和 AI 安排饮食周期") { planning = true }
                 }
@@ -502,8 +498,7 @@ struct DietView: View {
                 .sheet(isPresented: $store.showWaterEntryFromReminder) { WaterView(store: store) }
                 .sheet(isPresented: $common) { FoodCommonView(store: store, date: store.calendarDate) }
                 .sheet(isPresented: $textEntry) { FoodTextEntryView(store: store, date: store.calendarDate) }
-                .sheet(isPresented: $photoEntry, onDismiss: { capturedImage = nil }) { FoodOutsidePhotoView(store: store, date: store.calendarDate, initialImage: capturedImage) }
-                .fullScreenCover(isPresented: $camera, onDismiss: { if capturedImage != nil { photoEntry = true } }) { FoodCameraPicker { capturedImage = $0 }.ignoresSafeArea() }
+                .sheet(isPresented: $photoEntry) { FoodOutsidePhotoView(store: store, date: store.calendarDate) }
         }
     }
     private func makeLog() -> MealLog { MealLog(description: "",eatenAt: mealEntryTime(for: store.calendarDate, zone: store.settings.timezone),timezone: store.settings.timezone) }

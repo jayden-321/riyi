@@ -13,7 +13,12 @@ struct CoachSettings: Codable {
 }
 struct CoachMeal: Codable { var name: String; var foods: [String]; var preparation: String; var alternatives: [String] }
 struct CoachMeals: Codable { var meals: [CoachMeal]; var notes: [String] }
+struct CoachCompareAnswer: Codable {
+    var message: String; var questions: [String]; var error: String?
+}
 struct CoachResult: Codable {
+    var variantB: CoachCompareAnswer?
+    var variantAError: String?
     var cycle: PlanningCycle?
     var frameworks: [String]?
     var message: String; var questions: [String]; var rationale: [String]; var dataQuality: [String]

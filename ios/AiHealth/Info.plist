@@ -28,7 +28,7 @@
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>将你在日益实际完成的训练及运动距离写入 Apple 健康；计划安排不会写成已完成运动。</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>连接你配置的本地开发服务器。</string>
+	<string>连接你在同一局域网中选择的日益服务器。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>拍摄食物或包装营养表，确认后记录饮食；使用 AI 识别时照片会上传到你配置的服务。</string>
 	<key>UILaunchScreen</key>

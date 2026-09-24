@@ -154,7 +154,10 @@ struct CoachRunCard: View {
                     Label(run.kind == "fitness" ? "次日训练 · \(run.targetDate)" : run.kind == "sleep" ? "今晚睡眠 · \(run.targetDate)" : "教练对话", systemImage: run.kind == "sleep" ? "moon.stars" : "sparkles").font(.headline)
                     Spacer()
                 }
-                                if let result = run.result {
+                if let result = run.result {
+                    if run.kind == "chat", result.variantB != nil {
+                        Text("A · 日益当前方案").font(.subheadline.bold()).foregroundStyle(Theme.green)
+                    }
                     Text(result.message).lineSpacing(4)
                     ForEach(Array(result.questions.enumerated()), id: \.offset) { _, question in Text("· \(question)").fontWeight(.medium) }
                     if let cycle = result.cycle {
@@ -195,6 +198,16 @@ struct CoachRunCard: View {
                         }
                         ForEach(Array(menu.notes.enumerated()), id: \.offset) { _, note in Text(note).font(.caption).foregroundStyle(.secondary) }
                         Button("采用到饮食日历") { preview = run.legacyCycle(kind: "diet") }.buttonStyle(.borderedProminent)
+                    }
+                    if run.kind == "chat", let answer = result.variantB {
+                        Divider()
+                        Text("B · 完整 Skill 参考").font(.subheadline.bold()).foregroundStyle(Theme.green)
+                        if let error = answer.error, !error.isEmpty {
+                            Text(error).foregroundStyle(.secondary)
+                        } else {
+                            Text(answer.message).lineSpacing(4)
+                            ForEach(Array(answer.questions.enumerated()), id: \.offset) { _, question in Text("· \(question)").fontWeight(.medium) }
+                        }
                     }
                 } else { Text(run.status == "running" ? "AI 教练正在安排，完成后会自动显示。" : "本次分析未完成，可重新发送。") }
                 Text("\(run.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(run.timezone)").font(.caption2).foregroundStyle(.secondary)
