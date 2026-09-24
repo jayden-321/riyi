@@ -143,6 +143,9 @@ let sportOptions: [(code: String, title: String, icon: String)] = [
 func sportTitle(_ code: String) -> String { sportOptions.first { $0.code == code }?.title ?? "其他运动" }
 struct Workout: Codable, Identifiable {
     var synthetic: Bool?
+    var sourceHealthkitUuid: String?
+    var sourceName: String?
+    var importedActiveEnergyKcal: Double?
     var activity: TimedActivity?
     var actualDistanceMeters: Double?
     var scheduledBlockId: String?

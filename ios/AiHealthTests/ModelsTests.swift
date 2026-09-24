@@ -3,6 +3,51 @@ import SwiftData
 @testable import AiHealth
 
 final class ModelsTests: XCTestCase {
+    @MainActor func testAppleFitnessHIITBecomesOneCompletedWorkoutAndFollowsDeletion() throws {
+        let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: container)
+        store.startDemo(); store.setHealthReading(true)
+        let end = Date().addingTimeInterval(-60)
+        let start = end.addingTimeInterval(-660)
+        let uuid = newID()
+        var sample = HealthSample(healthkitUuid: uuid, type: "workout", unit: "workout", startAt: start, endAt: end, sourceName: "Apple Watch", sourceBundleId: "com.apple.health.watch")
+        sample.workoutJson = ["activity_type": .number(63), "duration_seconds": .number(640), "active_energy_kcal": .number(78)]
+        XCTAssertTrue(store.reconcileImportedWorkouts([sample]))
+        XCTAssertFalse(store.reconcileImportedWorkouts([sample]))
+        XCTAssertEqual(store.workouts.count, 1)
+        XCTAssertEqual(store.workouts[0].status, "completed")
+        XCTAssertEqual(store.workouts[0].activity?.sport, "hiit")
+        XCTAssertEqual(store.workouts[0].elapsedSeconds(at: Date()), 640, accuracy: 0.01)
+        XCTAssertEqual(store.workouts[0].importedActiveEnergyKcal, 78)
+        XCTAssertEqual(store.workouts[0].sourceHealthkitUuid, uuid.lowercased())
+        XCTAssertEqual(store.records.first(where: { $0.kind == "workout" })?.recordId, HealthWorkoutImport.id(for: uuid))
+        var removed = HealthSample(healthkitUuid: uuid, type: "workout", unit: "workout", deleted: true)
+        XCTAssertTrue(removed.deleted)
+        XCTAssertTrue(store.reconcileImportedWorkouts([removed]))
+        XCTAssertTrue(store.workouts.isEmpty)
+        XCTAssertFalse(store.reconcileImportedWorkouts([sample]))
+        removed.metadataJson["riyi_session_id"] = .string(newID())
+        XCTAssertNil(HealthWorkoutImport.make(removed, zone: store.settings.timezone, ownBundleID: "com.riyi.ios"))
+        var owned = sample; owned.healthkitUuid = newID(); owned.metadataJson["riyi_session_id"] = .string(newID())
+        XCTAssertNil(HealthWorkoutImport.make(owned, zone: store.settings.timezone, ownBundleID: "com.riyi.ios"))
+        owned.metadataJson = [:]; owned.sourceName = "日益 Watch 测试"; owned.sourceBundleId = "com.aijiankang.watchtrial.hong.ios"
+        XCTAssertNil(HealthWorkoutImport.make(owned, zone: store.settings.timezone, ownBundleID: "com.riyi.ios"))
+    }
+    @MainActor func testAlreadyCachedAppleWorkoutAppearsWhenHealthOverviewRefreshes() async throws {
+        let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: container)
+        store.scope = "local-demo"; store.reload(); store.setHealthReading(true)
+        let end = Date().addingTimeInterval(-30), start = end.addingTimeInterval(-600)
+        var sample = HealthSample(healthkitUuid: newID(), type: "workout", unit: "workout", startAt: start, endAt: end, sourceName: "Apple Watch", sourceBundleId: "com.apple.health.watch")
+        sample.workoutJson = ["activity_type": .number(63), "duration_seconds": .number(600)]
+        let worker = await store.healthStorage.value
+        try await worker.persist(samples: [sample], anchor: nil, cursorKey: store.scope + "/workout", scope: store.scope, upload: false)
+        await store.refreshLocalHealth()
+        XCTAssertEqual(store.workouts.count, 1)
+        XCTAssertEqual(store.workouts[0].status, "completed")
+        await store.refreshLocalHealth()
+        XCTAssertEqual(store.workouts.count, 1)
+    }
     @MainActor func testWaterHistoryAndTotalFollowSelectedCalendarDay() throws {
         let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: container)

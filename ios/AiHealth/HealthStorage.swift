@@ -363,4 +363,14 @@ actor HealthStorage {
         try modelContext.save()
         return result
     }
+
+    /// A bounded local read for app-visible imported workouts. The raw archive may contain
+    /// hundreds of thousands of other samples, so never scan it in memory.
+    func recentWorkoutRecords(scope: String, since: Date) throws -> [HealthSample] {
+        var query = FetchDescriptor<LocalHealthRecord>(predicate: #Predicate {
+            $0.scope == scope && $0.type == "workout" && $0.endAt != nil && $0.endAt! >= since
+        }, sortBy: [SortDescriptor(\.endAt, order: .reverse)])
+        query.fetchLimit = 1000
+        return try modelContext.fetch(query).compactMap { try? Wire.read($0.payload, as: HealthSample.self) }
+    }
 }

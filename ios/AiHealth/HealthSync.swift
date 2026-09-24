@@ -61,6 +61,25 @@ import SwiftData
         guard HKHealthStore.isHealthDataAvailable(), let sleep = specs.first(where: { $0.name == "sleep_analysis" }) else { return false }
         return (try? await authorizationRequestStatus(for: sleep.type)) == .shouldRequest
     }
+    /// Workout-only incremental refresh runs on foreground and when opening the training tab.
+    /// It avoids waiting for the six-hour all-type sweep.
+    func refreshWorkouts(automatic: Bool = true) async {
+        guard let store, store.signedIn, store.healthReadingEnabled, HKHealthStore.isHealthDataAvailable(),
+              let spec = specs.first(where: { $0.name == "workout" }) else { return }
+        let owner = store.scope
+        let checkKey = "workoutCheck.\(owner).\(store.healthHistoryWindow.rawValue)"
+        if automatic, let last = UserDefaults.standard.object(forKey: checkKey) as? Date,
+           Date() >= last, Date().timeIntervalSince(last) < 60 { return }
+        do {
+            guard try await authorizationRequestStatus(for: spec.type) == .unnecessary else { return }
+            try await pull(spec)
+            guard store.scope == owner else { return }
+            UserDefaults.standard.set(Date(), forKey: checkKey)
+            await store.refreshLocalHealth(markRead: true)
+        } catch {
+            if !automatic, store.scope == owner { store.healthStatus = "训练读取待重试：\(error.localizedDescription)" }
+        }
+    }
     func weightAuthorizationNeedsRequest() async -> Bool {
         guard HKHealthStore.isHealthDataAvailable(), let weight = specs.first(where: { $0.name == "body_mass" }) else { return false }
         return (try? await authorizationRequestStatus(for: weight.type)) == .shouldRequest
@@ -363,6 +382,9 @@ import SwiftData
                 store?.markHealthWorkoutSaved(sessionID)
             }
             result.workoutJson = ["activity_type": .number(Double(w.workoutActivityType.rawValue)), "duration_seconds": .number(w.duration)]
+            if let id = w.metadata?[HKMetadataKeyExternalUUID] as? String { result.metadataJson["external_uuid"] = .string(id) }
+            if let id = w.metadata?["riyi_session_id"] as? String { result.metadataJson["riyi_session_id"] = .string(id) }
+            if let id = w.metadata?["watch_session_id"] as? String { result.metadataJson["watch_session_id"] = .string(id) }
             let distanceType: HKQuantityType? = switch w.workoutActivityType {
             case .swimming: HKQuantityType(.distanceSwimming)
             case .cycling: HKQuantityType(.distanceCycling)
@@ -373,10 +395,71 @@ import SwiftData
                 result.workoutJson?["distance_meters"] = .number(distance.doubleValue(for: .meter()))
             }
             if let energy = w.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity() { result.workoutJson?["active_energy_kcal"] = .number(energy.doubleValue(for: .kilocalorie())) }
+            if let raw = w.metadata?[HKMetadataKeySwimmingLocationType] as? NSNumber,
+               let location = HKWorkoutSwimmingLocationType(rawValue: raw.intValue) {
+                result.workoutJson?["swim_location"] = .string(location == .pool ? "pool" : "open_water")
+            }
+            if let length = w.metadata?[HKMetadataKeyLapLength] as? HKQuantity {
+                result.workoutJson?["pool_length_meters"] = .number(length.doubleValue(for: .meter()))
+            }
             // Workout energy is preserved but never added again to daily active energy.
         }
         if let v = sample.metadata?[HKMetadataKeyWasUserEntered] as? Bool { result.metadataJson["was_user_entered"] = .bool(v) }
         if let v = sample.metadata?[HKMetadataKeyTimeZone] as? String { result.metadataJson["timezone"] = .string(v) }
+        return result
+    }
+}
+
+enum HealthWorkoutImport {
+    static func id(for healthkitUUID: String) -> String { stableID("healthkit-workout/" + healthkitUUID.lowercased()) }
+
+    static func make(_ sample: HealthSample, zone: String, ownBundleID: String?, now: Date = Date()) -> Workout? {
+        guard sample.type == "workout", !sample.deleted, UUID(uuidString: sample.healthkitUuid) != nil,
+              let start = sample.startAt, let end = sample.endAt, end > start, end <= now,
+              end >= now.addingTimeInterval(-7 * 86400),
+              let detail = sample.workoutJson,
+              case .number(let raw)? = detail["activity_type"], raw.isFinite, raw >= 0, raw < 10_000, raw.rounded() == raw,
+              let kind = HKWorkoutActivityType(rawValue: UInt(raw)) else { return nil }
+        if sample.metadataJson["riyi_session_id"] != nil || sample.metadataJson["watch_session_id"] != nil { return nil }
+        if let ownBundleID, sample.sourceBundleId == ownBundleID || sample.sourceBundleId == ownBundleID + ".watchkitapp" { return nil }
+        if sample.sourceName.hasPrefix("日益") || sample.sourceName.hasPrefix("爱健康") || sample.sourceBundleId.hasPrefix("com.aijiankang.") { return nil }
+
+        let sport: String
+        let name: String
+        switch kind {
+        case .highIntensityIntervalTraining: sport = "hiit"; name = "HIIT 高强度间歇"
+        case .walking: sport = "walking"; name = "步行"
+        case .running: sport = "running"; name = "跑步"
+        case .cycling: sport = "cycling"; name = "骑行"
+        case .pilates: sport = "pilates"; name = "普拉提"
+        case .yoga: sport = "yoga"; name = "瑜伽"
+        case .hiking: sport = "hiking"; name = "徒步"
+        case .rowing: sport = "rowing"; name = "划船"
+        case .elliptical: sport = "elliptical"; name = "椭圆机"
+        case .swimming: sport = detail["swim_location"] == nil ? "other" : "swimming"; name = "游泳"
+        case .traditionalStrengthTraining, .functionalStrengthTraining: sport = "other"; name = "力量训练"
+        default: sport = "other"; name = "其他运动"
+        }
+        var activity = TimedActivity(name: name, sport: sport)
+        if sport == "swimming", case .string(let location)? = detail["swim_location"] {
+            activity.swimLocation = location
+            if case .number(let length)? = detail["pool_length_meters"] { activity.poolLengthMeters = length }
+            if !activity.validConfiguration { activity.sport = "other"; activity.swimLocation = nil; activity.poolLengthMeters = nil }
+        }
+        var result = Workout(activity: activity)
+        result.id = id(for: sample.healthkitUuid)
+        result.name = name
+        result.status = "completed"
+        result.startedAt = start
+        result.finishedAt = end
+        result.timezone = zone
+        result.sourceHealthkitUuid = sample.healthkitUuid.lowercased()
+        result.sourceName = sample.sourceName
+        if case .number(let duration)? = detail["duration_seconds"], duration.isFinite, duration > 0 {
+            result.pausedDurationSeconds = max(0, end.timeIntervalSince(start) - duration)
+        }
+        if case .number(let distance)? = detail["distance_meters"], distance.isFinite, (0...1_000_000).contains(distance) { result.actualDistanceMeters = distance }
+        if case .number(let energy)? = detail["active_energy_kcal"], energy.isFinite, (0...10_000).contains(energy) { result.importedActiveEnergyKcal = energy }
         return result
     }
 }

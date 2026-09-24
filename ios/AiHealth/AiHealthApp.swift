@@ -42,6 +42,14 @@ import SwiftData
                 let cycle = PlanningCycle(name: "界面验证食谱",kind: "diet",startDate: date,endDate: date,timezone: state.settings.timezone,days: [CycleDay(date: date,meals: [meal])])
                 state.save(cycle,kind: "cycle",id: cycle.id)
             }
+            if ProcessInfo.processInfo.arguments.contains("--external-workout-ui-test") {
+                state.startDemo(); state.setHealthReading(true); state.selectedTab = "training"
+                let end = Date().addingTimeInterval(-30)
+                var workout = HealthSample(healthkitUuid: newID(), type: "workout", unit: "workout", startAt: end.addingTimeInterval(-660), endAt: end,
+                                           sourceName: "Apple Watch", sourceBundleId: "com.apple.health.watch")
+                workout.workoutJson = ["activity_type": .number(63), "duration_seconds": .number(640), "active_energy_kcal": .number(78)]
+                state.reconcileImportedWorkouts([workout])
+            }
             if ProcessInfo.processInfo.arguments.contains("--water-notification-ui-test") {
                 state.startDemo()
                 state.openWaterEntryFromReminder()
@@ -183,6 +191,7 @@ struct RootView: View {
         .sheet(isPresented: $store.showReauthentication) { ReauthenticationView(store: store) }
         .task(id: store.scope) { await refresh() }
         .onChange(of: phase) { _, value in if value == .active { Task { await refresh() } } }
+        .onChange(of: store.selectedTab) { _, tab in if tab == "training" { Task { await health.refreshWorkouts(automatic: false) } } }
     }
     private func refresh() async {
         let owner = store.scope
@@ -193,6 +202,7 @@ struct RootView: View {
         store.companionRefreshRequested?()
         async let coach: () = store.loadCoach()
         await health.syncAll()
+        await health.refreshWorkouts()
         await health.activate()
         guard store.scope == owner else { return }
         await store.synchronize(showErrors: false)
@@ -268,6 +278,10 @@ struct TodayView: View {
     @State private var training: Workout?
     @State private var teamRefreshRevision = 0
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    private var extraImportedToday: [Workout] {
+        let date = DayKey.string(Date(), zone: store.settings.timezone)
+        return store.workouts(on: date).filter { $0.sourceHealthkitUuid != nil && store.associatedBlockID(for: $0, on: date) == nil }
+    }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -334,6 +348,14 @@ struct TodayView: View {
                                 Text("已有 \(store.plans.count) 份计划模板，可在训练日历里选择训练日和日期。").foregroundStyle(.secondary)
                                 Button("安排今天的训练") { store.calendarDate = Date(); store.selectedTab = "training" }.buttonStyle(.borderedProminent)
                             } else { Text("从一份训练计划开始").font(.title3.bold()); Text("在「训练」中登记动作和计划组。").foregroundStyle(.secondary) }
+                            if !extraImportedToday.isEmpty && (store.activeWorkout != nil || store.scheduled("training", date: DayKey.string(Date(), zone: store.settings.timezone)) != nil || store.todayPlan != nil) {
+                                Divider()
+                                Text("Apple 健康导入 · 已完成").font(.subheadline).foregroundStyle(.secondary)
+                                ForEach(extraImportedToday) { workout in
+                                    NavigationLink("\(workout.name) · \(Int(workout.elapsedSeconds(at: Date()) / 60)) 分钟") { WorkoutView(store: store, workout: workout) }
+                                        .buttonStyle(.bordered)
+                                }
+                            }
                         }
                     }
                     TodayTeamCard(store: store, refreshRevision: teamRefreshRevision)
