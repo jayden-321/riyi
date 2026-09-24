@@ -325,6 +325,10 @@ struct WorkoutView: View {
                         HStack { Text("实际距离"); Spacer(); TextField("可留空", value: $workout.actualDistanceMeters, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("米") }
                     } else if let distance = workout.actualDistanceMeters { Text("实际距离 \(distance.formatted()) 米") }
                 }
+                if workout.sourceHealthkitUuid != nil {
+                    Text("从 Apple 健康导入 · \(workout.sourceName ?? "未知来源")").font(.caption).foregroundStyle(.secondary)
+                    if let energy = workout.importedActiveEnergyKcal { Text("活动能量约 \(energy.formatted(.number.precision(.fractionLength(0)))) 千卡").font(.caption).foregroundStyle(.secondary) }
+                }
                 if active, workout.restUntil != nil {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         let remaining = CompanionCore.remaining(workout, now: context.date)
@@ -387,7 +391,7 @@ struct WorkoutView: View {
                 RatingPicker(title: "疲劳程度", value: $workout.feedback.fatigue)
                 LabeledContent("训练备注") { TextField("可留空", text: $workout.feedback.note, axis: .vertical).multilineTextAlignment(.trailing) }
             }.disabled(!active)
-            if workout.status == "completed" {
+            if workout.status == "completed" && workout.sourceHealthkitUuid == nil {
                 Section("Apple 健康") {
                     if store.healthWorkoutSaved(workout.id) { Text("已写入 Apple 健康").foregroundStyle(Theme.green) }
                     else if store.workoutHealth.hasPairedWatch {

@@ -415,6 +415,27 @@ import Observation
         let worker = await healthStorage.value
         return try await worker.persist(samples: samples, anchor: anchor, cursorKey: cursorKey, scope: expectedScope, upload: settings.healthConsent && !isDemo)
     }
+    @discardableResult func reconcileImportedWorkouts(_ samples: [HealthSample], now: Date = Date()) -> Bool {
+        guard signedIn && healthReadingEnabled else { return false }
+        var changed = false
+        for sample in samples where sample.type == "workout" {
+            let id = HealthWorkoutImport.id(for: sample.healthkitUuid)
+            if sample.deleted {
+                if let record = records.first(where: { $0.kind == "workout" && $0.recordId == id && !$0.tombstoned }),
+                   let workout: Workout = try? Wire.read(record.payload), workout.sourceHealthkitUuid == sample.healthkitUuid.lowercased() {
+                    remove(kind: "workout", id: id)
+                    changed = true
+                }
+                continue
+            }
+            // A tombstone also represents an explicit user deletion: never silently recreate it.
+            if records.contains(where: { $0.kind == "workout" && $0.recordId == id }) { continue }
+            if case .string(let linkedID)? = sample.metadataJson["external_uuid"], workouts.contains(where: { $0.id == linkedID }) { continue }
+            guard let workout = HealthWorkoutImport.make(sample, zone: settings.timezone, ownBundleID: Bundle.main.bundleIdentifier, now: now) else { continue }
+            if save(workout, kind: "workout", id: workout.id) { changed = true }
+        }
+        return changed
+    }
     func setHealthReading(_ enabled: Bool) {
         healthReadingEnabled = enabled; UserDefaults.standard.set(enabled, forKey: "healthReading.\(scope)")
         if !enabled { healthStatus = "已停止本机健康读取；已有记录仍保留" }
@@ -452,6 +473,11 @@ import Observation
                     self.localHealthSampleCount = result.count; self.recentHealthSamples = result.latest
                     self.energyBaselineKcal = result.energyBaselineKcal; self.energyBaselineDays = result.energyBaselineDays ?? 0
                     self.localSummary = result.count > 0 || self.healthReadingEnabled ? result.summary : nil
+                    if self.healthReadingEnabled {
+                        let imported = try await worker.recentWorkoutRecords(scope: owner, since: Date().addingTimeInterval(-7 * 86400))
+                        guard self.scope == owner else { continue }
+                        if self.reconcileImportedWorkouts(imported), !self.isDemo { await self.synchronize(showErrors: false, recordsOnly: true) }
+                    }
                     if self.localHealthReadAt != nil && self.healthStatus == "尚未读取健康数据" { self.healthStatus = result.count > 0 ? "所选范围内已保存 \(result.count) 条健康记录" : "上次未读到可访问记录，请检查系统健康授权" }
                     self.reload()
                 } catch { self.error = "本机健康概览读取失败：\(error.localizedDescription)" }

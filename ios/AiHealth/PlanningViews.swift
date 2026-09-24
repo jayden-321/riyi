@@ -111,12 +111,12 @@ struct TrainingCalendarView: View {
                             NavigationLink { WorkoutView(store: store, workout: w) } label: {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(w.name)
-                                    Text("\(w.startedAt.formatted(date: .omitted, time: .shortened)) · \(w.status == "in_progress" ? "进行中" : "已练记录")")
+                                    Text("\(w.startedAt.formatted(date: .omitted, time: .shortened)) · \(w.sourceHealthkitUuid != nil ? "Apple 健康导入 · 已完成" : w.status == "in_progress" ? "进行中" : "已练记录")")
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                             }
                         }
-                    } header: { Text("未关联安排的已练记录") } footer: { Text("原安排删除或无法可靠对应时，实际训练仍保留在这里。") }
+                    } header: { Text("当天已练记录") } footer: { Text("Apple 健康导入或未关联计划的训练会列在这里。") }
                 }
                 Section("周期") { Button("安排训练周期") { cycleOptions = true } }
             }.navigationTitle("训练")

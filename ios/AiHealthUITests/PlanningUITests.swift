@@ -1,6 +1,20 @@
 import XCTest
 
 final class PlanningUITests: XCTestCase {
+    func testAppleFitnessHIITAppearsAsCompletedTraining() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--external-workout-ui-test"]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["训练"].waitForExistence(timeout: 10))
+        let workout = app.staticTexts["HIIT 高强度间歇"]
+        XCTAssertTrue(workout.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Apple 健康导入 · 已完成")).firstMatch.exists)
+        workout.tap()
+        XCTAssertTrue(app.staticTexts["从 Apple 健康导入 · Apple Watch"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["写入 Apple 健康"].exists)
+    }
     func testSelectedDateCanCreateSportTrainingDirectly() {
         continueAfterFailure = false
         let app = XCUIApplication()
