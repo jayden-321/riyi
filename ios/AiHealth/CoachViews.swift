@@ -155,9 +155,11 @@ struct CoachRunCard: View {
                     Spacer()
                 }
                 if let result = run.result {
+                    #if DEBUG
                     if run.kind == "chat", result.variantB != nil {
                         Text("A · 日益当前方案").font(.subheadline.bold()).foregroundStyle(Theme.green)
                     }
+                    #endif
                     Text(result.message).lineSpacing(4)
                     ForEach(Array(result.questions.enumerated()), id: \.offset) { _, question in Text("· \(question)").fontWeight(.medium) }
                     if let cycle = result.cycle {
@@ -199,6 +201,7 @@ struct CoachRunCard: View {
                         ForEach(Array(menu.notes.enumerated()), id: \.offset) { _, note in Text(note).font(.caption).foregroundStyle(.secondary) }
                         Button("采用到饮食日历") { preview = run.legacyCycle(kind: "diet") }.buttonStyle(.borderedProminent)
                     }
+                    #if DEBUG
                     if run.kind == "chat", let answer = result.variantB {
                         Divider()
                         Text("B · 完整 Skill 参考").font(.subheadline.bold()).foregroundStyle(Theme.green)
@@ -209,6 +212,7 @@ struct CoachRunCard: View {
                             ForEach(Array(answer.questions.enumerated()), id: \.offset) { _, question in Text("· \(question)").fontWeight(.medium) }
                         }
                     }
+                    #endif
                 } else { Text(run.status == "running" ? "AI 教练正在安排，完成后会自动显示。" : "本次分析未完成，可重新发送。") }
                 Text("\(run.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(run.timezone)").font(.caption2).foregroundStyle(.secondary)
             }

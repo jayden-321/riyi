@@ -245,6 +245,7 @@ struct WelcomeView: View {
                         HStack { Spacer(); if store.syncing { ProgressView().tint(.white) }; Text(register ? "创建账号，开始记录" : "登录").bold(); Spacer() }.padding(.vertical, 10)
                     }.buttonStyle(.borderedProminent).disabled(store.syncing || email.isEmpty || password.isEmpty)
                     Button(register ? "已有账号？登录" : "没有账号？注册") { register.toggle() }
+                    if !register { Link("忘记密码？联系支持", destination: URL(string: "https://health.qyos.top/support")!) }
                     Divider()
                     Button("先体验本地记录") { store.startDemo() }
                     Text("本地体验的数据只保存在这台设备，不上传、不调用 AI；与云端账号的数据分开保存。").font(.footnote).foregroundStyle(.secondary)
