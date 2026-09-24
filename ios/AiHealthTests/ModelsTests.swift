@@ -3,6 +3,22 @@ import SwiftData
 @testable import AiHealth
 
 final class ModelsTests: XCTestCase {
+    @MainActor func testWaterHistoryAndTotalFollowSelectedCalendarDay() throws {
+        let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: container)
+        store.startDemo()
+        let zone = store.settings.timezone
+        let today = Date()
+        let yesterday = DayKey.calendar(zone).date(byAdding: .day, value: -1, to: today)!
+        store.addWater(250, date: yesterday)
+        store.addWater(500, date: today)
+        store.calendarDate = yesterday
+        XCTAssertEqual(store.water(on: store.calendarKey), 250)
+        XCTAssertEqual(store.waters(on: store.calendarKey).map(\.amountMl), [250])
+        store.calendarDate = today
+        XCTAssertEqual(store.water(on: store.calendarKey), 500)
+        XCTAssertEqual(store.waters(on: store.calendarKey).map(\.amountMl), [500])
+    }
     @MainActor func testWaterReminderRouteSelectsTodayWithoutInventingIntake() throws {
         let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: container)

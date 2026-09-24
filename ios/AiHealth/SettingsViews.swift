@@ -5,28 +5,33 @@ struct WaterView: View {
     @State private var custom = 300; @State private var date = Date(); @State private var reminders = false
     @State private var start = 8; @State private var end = 22; @State private var interval = 2
     @State private var reminderStatus = ""
+    private var selectedDay: String { store.calendarKey }
+    private var selectedWaters: [WaterLog] { store.waters(on: selectedDay) }
+    private var future: Bool { selectedDay > DayKey.string(Date(), zone: store.settings.timezone) }
+    private var selectedEntryTime: Date { mealEntryTime(for: store.calendarDate, zone: store.settings.timezone) }
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 18) {
-                        Label("今天已记录", systemImage: "drop.fill").foregroundStyle(Theme.green)
-                        HStack(alignment: .firstTextBaseline) { Text("\(store.waterToday)").font(.system(size: 48, weight: .bold, design: .rounded)); Text("/ \(store.profile.waterGoalMl) ml").foregroundStyle(.secondary) }
-                        ProgressView(value: min(Double(store.waterToday) / Double(store.profile.waterGoalMl), 1))
-                        HStack { Button("+ 250 ml") { store.addWater(250) }; Spacer(); Button("+ 500 ml") { store.addWater(500) } }.buttonStyle(.bordered)
+                        Label("\(selectedDay) 已记录", systemImage: "drop.fill").foregroundStyle(Theme.green)
+                        HStack(alignment: .firstTextBaseline) { Text("\(store.water(on: selectedDay))").font(.system(size: 48, weight: .bold, design: .rounded)); Text("/ \(store.profile.waterGoalMl) ml").foregroundStyle(.secondary) }
+                        ProgressView(value: min(Double(store.water(on: selectedDay)) / Double(store.profile.waterGoalMl), 1))
+                        HStack { Button("+ 250 ml") { store.addWater(250, date: selectedEntryTime) }; Spacer(); Button("+ 500 ml") { store.addWater(500, date: selectedEntryTime) } }.buttonStyle(.bordered).disabled(future)
                         Text("未登记不代表未喝水；目标可在个人档案中调整。").font(.caption).foregroundStyle(.secondary)
                     }.padding(.vertical, 12)
                 }
-                Section("最近记录 · 左滑可删除") {
-                    ForEach(Array(store.waters.prefix(50))) { w in
+                Section("当天记录 · 左滑可删除") {
+                    if selectedWaters.isEmpty { Text("这一天还没有饮水记录").foregroundStyle(.secondary) }
+                    ForEach(selectedWaters) { w in
                         HStack { Label("\(w.amountMl) ml", systemImage: "drop"); Spacer(); Text(w.drankAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.secondary) }
                             .swipeActions { Button("删除", role: .destructive) { store.remove(kind: "water", id: w.id) } }
                     }
                 }
                 Section("自定义 / 补记") {
                     HStack { Text("饮水量"); TextField("ml", value: $custom, format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing); Text("ml") }
-                    DatePicker("饮水时间", selection: $date, in: ...Date())
-                    Button("记录这次饮水") { store.addWater(custom, date: date); date = Date() }.disabled(custom < 1 || custom > 5000)
+                    DatePicker("饮水时间", selection: $date, in: ...Date(), displayedComponents: .hourAndMinute)
+                    Button("记录这次饮水") { store.addWater(custom, date: date); date = selectedEntryTime }.disabled(custom < 1 || custom > 5000 || future)
                 }
                 Section("提醒") {
                     Stepper("开始：\(start):00", value: $start, in: 0...22)
@@ -37,9 +42,10 @@ struct WaterView: View {
                     if !reminderStatus.isEmpty { Text(reminderStatus).font(.caption).foregroundStyle(.secondary) }
                 }
             }.navigationTitle("饮水").onAppear {
+                date = selectedEntryTime
                 let settings = Notifications.shared.savedSettings(); start = settings.start; end = settings.end; interval = settings.interval
                 reminderStatus = settings.enabled ? "已安排 \(start):00–\(end):00 的每日提醒" : "提醒尚未开启"
-            }
+            }.onChange(of: store.calendarDate) { _, _ in date = selectedEntryTime }
         }
     }
 }

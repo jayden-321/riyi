@@ -41,7 +41,7 @@ HIIT 已单列为运动大类；教练设置可保存每次动作数与每动作
 
 ## 给 Codex 的任务
 
-> 请先 `git pull --ff-only origin main` 更新日益客户端源码，并保护我本机未提交的修改。阅读 README 与 `ios/project.yml`，用我自己的 Apple 账号 Personal Team 给 iPhone 和已配对的 Apple Watch 安装构建 **62** 的「日益」：两端必须使用同一个 Team、同一张 Apple Development 证书，各自的描述文件覆盖对应 Bundle ID 与设备。在本地填写独有的 `RIYI_IOS_BUNDLE_ID` 和共用 `DEVELOPMENT_TEAM`，重新运行 `xcodegen generate`，再用 Xcode 构建、安装并启动两端。手机欢迎页选择「已有账号？登录」，使用我自己的云端账号，默认固定服务器 `https://health.gzqy.xyz`，也不要使用仓库作者账号。请让我在设备上亲自输入密码并授予 Apple 健康、云端上传、AI 分析和训练写入权限。登录后核对云端数据、同日力量加游泳是否各显示一次且分别可开始、已完成训练的日期能否补排计划、手动／AI 周期入口、手表状态及饮食。只凭 BUILD SUCCEEDED 或已安装不能算完成；分别报告两端签名、安装、启动、同步与实际限制。不要部署或修改服务器，不索取 Apple 密码，不把个人签名配置、密钥或健康记录推回 GitHub。
+> 请先 `git pull --ff-only origin main` 更新日益客户端源码，并保护我本机未提交的修改。阅读 README 与 `ios/project.yml`，用我自己的 Apple 账号 Personal Team 给 iPhone 和已配对的 Apple Watch 安装构建 **63** 的「日益」：两端必须使用同一个 Team、同一张 Apple Development 证书，各自的描述文件覆盖对应 Bundle ID 与设备。在本地填写独有的 `RIYI_IOS_BUNDLE_ID` 和共用 `DEVELOPMENT_TEAM`，重新运行 `xcodegen generate`，再用 Xcode 构建、安装并启动两端。手机欢迎页选择「已有账号？登录」，使用我自己的云端账号，默认固定服务器 `https://health.gzqy.xyz`，也不要使用仓库作者账号。请让我在设备上亲自输入密码并授予 Apple 健康、云端上传、AI 分析和训练写入权限。登录后核对云端数据、同日力量加游泳是否各显示一次且分别可开始、已完成训练的日期能否补排计划、手动／AI 周期入口、手表状态及饮食。只凭 BUILD SUCCEEDED 或已安装不能算完成；分别报告两端签名、安装、启动、同步与实际限制。不要部署或修改服务器，不索取 Apple 密码，不把个人签名配置、密钥或健康记录推回 GitHub。
 
 ## 第三方资料
 

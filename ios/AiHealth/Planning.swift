@@ -479,7 +479,8 @@ extension AppStore {
     }
     func meals(on date: String) -> [MealLog] { mealLogs.filter { DayKey.string($0.eatenAt, zone: settings.timezone) == date }.sorted { $0.eatenAt < $1.eatenAt } }
     func workouts(on date: String) -> [Workout] { workouts.filter { DayKey.string($0.startedAt, zone: settings.timezone) == date } }
-    func water(on date: String) -> Int { waters.filter { DayKey.string($0.drankAt, zone: settings.timezone) == date }.reduce(0) { $0 + $1.amountMl } }
+    func waters(on date: String) -> [WaterLog] { waters.filter { DayKey.string($0.drankAt, zone: settings.timezone) == date } }
+    func water(on date: String) -> Int { waters(on: date).reduce(0) { $0 + $1.amountMl } }
     func openPlanningChat(kind: String, start: Date, end: Date) {
         let from = DayKey.string(start, zone: settings.timezone), until = DayKey.string(end, zone: settings.timezone)
         var text = "请为我制定 \(from) 到 \(until)（含首尾日期）的\(kind == "diet" ? "饮食" : "训练")周期计划，按每天分别安排。"
