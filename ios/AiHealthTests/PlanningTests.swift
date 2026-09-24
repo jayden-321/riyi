@@ -3,6 +3,18 @@ import SwiftData
 @testable import AiHealth
 
 final class PlanningTests: XCTestCase {
+    func testManualRestDayCanBecomeEditableTrainingDay() {
+        var day = CycleDay(date: "2026-09-24", rest: true)
+        day.setTrainingEnabled(true)
+        XCTAssertFalse(day.rest)
+        XCTAssertEqual(day.trainingBlocks.count, 0)
+        let block = TrainingBlock(activity: TimedActivity(name: "散步", sport: "walking"))
+        day.setTrainingBlocks([block])
+        XCTAssertEqual(day.trainingBlocks.first?.activity?.name, "散步")
+        day.setTrainingEnabled(false)
+        XCTAssertTrue(day.rest)
+        XCTAssertTrue(day.trainingBlocks.isEmpty)
+    }
     func testSingleDayTrainingCycleUsesSelectedDateAndSnapshot() throws {
         let original = Plan.starter()
         let day = original.days[0]

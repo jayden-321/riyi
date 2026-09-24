@@ -3,6 +3,17 @@ import SwiftData
 @testable import AiHealth
 
 final class ModelsTests: XCTestCase {
+    @MainActor func testWaterReminderRouteSelectsTodayWithoutInventingIntake() throws {
+        let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = AppStore(container: container)
+        store.startDemo()
+        store.calendarDate = Date().addingTimeInterval(-86400)
+        store.openWaterEntryFromReminder()
+        XCTAssertEqual(store.selectedTab, "diet")
+        XCTAssertTrue(store.showWaterEntryFromReminder)
+        XCTAssertEqual(store.waterToday, 0)
+        XCTAssertTrue(DayKey.calendar(store.settings.timezone).isDateInToday(store.calendarDate))
+    }
     func testSportPlanCreatesTimeBasedWorkoutAndKeepsLegacyStrengthPlan() throws {
         var sport = Plan.draft(); sport.category = "swimming"; sport.trainingGoal = "custom"
         sport.days = [PlanDay(name: "周末游泳", exercises: [], activity: TimedActivity(name: "自由泳", targetMinutes: 30, sport: "swimming", targetDistanceMeters: 800, swimLocation: "pool", poolLengthMeters: 25))]

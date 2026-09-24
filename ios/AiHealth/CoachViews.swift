@@ -68,7 +68,6 @@ struct CoachView: View {
                             Button("制定训练计划") { message = "请根据我的记录帮我制定训练计划。缺少的信息先问我。"; inputFocused = true }
                             Button("今日食谱") { sendMessage(recipePrompt) }.disabled(store.coachBusy)
                             Button("分析次日训练") { Task { await store.analyzeCoach("fitness") } }.disabled(store.coachBusy)
-                            NavigationLink("教练思路与资料来源") { CoachSourcesView() }
                             NavigationLink("分析记录") { CoachAnalysisHistoryView(store: store) }
                             Divider()
                             Button("清空对话", role: .destructive) { confirmClear = true }.disabled(store.coachBusy || !runs.contains(where: { $0.kind == "chat" }))
@@ -155,7 +154,10 @@ struct CoachRunCard: View {
                     Label(run.kind == "fitness" ? "次日训练 · \(run.targetDate)" : run.kind == "sleep" ? "今晚睡眠 · \(run.targetDate)" : "教练对话", systemImage: run.kind == "sleep" ? "moon.stars" : "sparkles").font(.headline)
                     Spacer()
                 }
-                                if let result = run.result {
+                if let result = run.result {
+                    if run.kind == "chat", result.variantB != nil {
+                        Text("A · 日益当前方案").font(.subheadline.bold()).foregroundStyle(Theme.green)
+                    }
                     Text(result.message).lineSpacing(4)
                     ForEach(Array(result.questions.enumerated()), id: \.offset) { _, question in Text("· \(question)").fontWeight(.medium) }
                     if let cycle = result.cycle {
@@ -197,13 +199,15 @@ struct CoachRunCard: View {
                         ForEach(Array(menu.notes.enumerated()), id: \.offset) { _, note in Text(note).font(.caption).foregroundStyle(.secondary) }
                         Button("采用到饮食日历") { preview = run.legacyCycle(kind: "diet") }.buttonStyle(.borderedProminent)
                     }
-                    DisclosureGroup("分析依据与数据情况") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(result.frameworks ?? [], id: \.self) { Text($0).font(.caption) }
-                            ForEach(Array((result.rationale + result.dataQuality).enumerated()), id: \.offset) { _, text in Text(text).font(.caption) }
-                            Text("数据截至：\(result.dataCutoffAt?.formatted() ?? "暂无可用时间")")
-                            Text("最近健康上传：\(result.lastHealthSyncAt?.formatted() ?? "尚无完整同步")")
-                        }.font(.caption).foregroundStyle(.secondary)
+                    if run.kind == "chat", let answer = result.variantB {
+                        Divider()
+                        Text("B · 完整 Skill 参考").font(.subheadline.bold()).foregroundStyle(Theme.green)
+                        if let error = answer.error, !error.isEmpty {
+                            Text(error).foregroundStyle(.secondary)
+                        } else {
+                            Text(answer.message).lineSpacing(4)
+                            ForEach(Array(answer.questions.enumerated()), id: \.offset) { _, question in Text("· \(question)").fontWeight(.medium) }
+                        }
                     }
                 } else { Text(run.status == "running" ? "AI 教练正在安排，完成后会自动显示。" : "本次分析未完成，可重新发送。") }
                 Text("\(run.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(run.timezone)").font(.caption2).foregroundStyle(.secondary)
@@ -222,7 +226,6 @@ struct CoachSettingsView: View {
     var body: some View {
         Form {
             Section("教练重点") {
-                Text("训练：谭成义框架\n食谱与营养：陈石营养框架\n均为非官方资料改编。").font(.footnote).foregroundStyle(.secondary)
                 Picker("侧重点", selection: $settings.style) { Text("综合训练与恢复").tag("balanced"); Text("动作质量").tag("technique"); Text("量化进步").tag("measured"); Text("饮食与恢复").tag("nutrition") }
             }
             Section("你的训练条件") {
@@ -273,22 +276,5 @@ struct CoachSettingsView: View {
                     }
                 }.disabled(saving || settings.sleepReminderMinute <= settings.sleepAnalysisMinute)
             } }
-    }
-}
-
-struct CoachSourcesView: View {
-    var body: some View {
-        List {
-            Section("日益 AI 教练") { Text("根据你的实际记录和问答提供建议。侧重点只改变解释和提问方式，不代表真实教练本人或其代言。") }
-            Section("营养问答参考") {
-                Link("chenshi-nutrition-skill · MIT", destination: URL(string: "https://github.com/helmet88mo/chenshi-nutrition-skill")!)
-                Text("参考其先了解睡眠、压力、饮食和运动，再给可执行步骤的框架；未直接载入人物扮演、激素推断或固定减重协议。食谱为建议份量，不提供未经食物数据库核算的精确营养值。").font(.footnote)
-            }
-            Section("训练视角调研") {
-                Link("Fitness Coach Personas 合集", destination: URL(string: "https://github.com/superj0107/fitness-coach-personas")!)
-                Link("Tanchengyi Perspective", destination: URL(string: "https://github.com/superj0107/tanchengyi-perspective")!)
-                Text("训练计划已接入该资料改编的训练框架：动作质量、频率安排、保留余力与渐进调整。当前用于非商业测试原型，不冒充真人或声称代言；正式产品化前会澄清原仓库 README 与 MIT 文件的授权表述差异。").font(.footnote)
-            }
-        }.navigationTitle("教练资料来源")
     }
 }

@@ -30,6 +30,13 @@ struct CycleDay: Codable, Identifiable {
         plan = nil; activity = nil; recoveryActivity = nil
         rest = blocks.isEmpty
     }
+    mutating func setTrainingEnabled(_ enabled: Bool) {
+        let existing = trainingBlocks
+        rest = !enabled
+        sessions = enabled ? existing : nil
+        plan = nil; activity = nil
+        if enabled { recoveryActivity = nil }
+    }
 }
 struct TrainingBlock: Codable, Identifiable {
     var id = newID()

@@ -1,6 +1,22 @@
 import XCTest
 
 final class FoodEntryUITests: XCTestCase {
+    func testSharedFoodCanBeReportedOrBlockedFromImportScreen() {
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--food-moderation-ui-test"]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["饮食"].waitForExistence(timeout: 10))
+        app.buttons["常用"].tap()
+        app.buttons["导入"].tap()
+        XCTAssertTrue(app.staticTexts["测试品牌 · 测试麦片"].waitForExistence(timeout: 8))
+        app.buttons["举报商品"].tap()
+        XCTAssertTrue(app.navigationBars["举报商品"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["举报原因"].exists)
+        app.buttons["取消"].tap()
+        app.buttons["屏蔽此来源"].tap()
+        XCTAssertTrue(app.buttons["屏蔽来源"].waitForExistence(timeout: 5))
+    }
     func testImportCanSearchWithEmptyText() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -54,6 +70,7 @@ final class FoodEntryUITests: XCTestCase {
         photo.tap()
         XCTAssertTrue(app.navigationBars["拍照记录外食"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["无需包装或营养表"].exists)
+        XCTAssertTrue(app.buttons["从相册选"].exists)
         app.buttons["关闭"].tap()
         common.tap()
         XCTAssertTrue(app.navigationBars["常用"].waitForExistence(timeout: 5))

@@ -164,10 +164,11 @@ struct AccountView: View {
                     Button("导出结构化数据") { Task { exportURL = await store.export() } }
                     if let exportURL { ShareLink("保存 / 分享导出文件", item: exportURL) }
                     NavigationLink("隐私与数据说明") { PrivacyView() }
+                    Link("帮助与支持", destination: URL(string: "https://health.qyos.top/support")!)
                     Button(store.isDemo ? "退出本地体验" : "退出登录") { logoutConfirm = true }
                     if !store.isDemo { Button("删除账号与数据", role: .destructive) { deleteSheet = true } }
                 }
-            Section { Text("日益 0.1 · 开发版").foregroundStyle(.secondary); Text("训练、饮食与饮水可离线保存。健康后台更新由系统调度，无法保证准点完成。").font(.caption).foregroundStyle(.secondary) }
+            Section { Text("训练、饮食与饮水可离线保存。健康后台更新由系统调度，无法保证准点完成。").font(.caption).foregroundStyle(.secondary) }
         }.navigationTitle("数据")
     }
 }
@@ -338,7 +339,7 @@ struct PrivacyView: View {
             Section("记录的保存位置") { Text("训练、饮水和身体反馈先保存到本机；登录云端账号后同步到所配置的服务器。本地体验的数据不会上传。SwiftData 未启用 CloudKit。") }
             Section("健康数据") { Text("只读取白名单类型。云端上传和 AI 处理分别征得同意。没有查询到数据不能判断你是否授权或是否存在记录。关闭同步会停止后续上传，不自动删除既有副本。") }
             Section("AI 数据处理") { Text("仅在开启 AI 分析后发送相关汇总、训练和反馈。不发送邮箱、令牌及全部原始健康样本。目标为你配置的 AI 接口；第三方兼容服务也会接收数据，其规则可能与 OpenAI 不同。服务器设置 store=false，但这不等于零留存。测试连接只发送合成数据。") }
-            Section("导出与删除") { Text("可导出结构化 JSON。删除账号清除当前服务器中的账号关联数据及本机账号空间；已导出文件、其他设备的离线副本和服务商留存需分别处理。开发版尚未配置服务器备份。") }
+            Section("导出与删除") { Text("可导出结构化 JSON。删除账号会清除服务器主数据库中的账号关联数据及本机账号空间；发布前备份、已导出文件、其他设备的离线副本和服务商留存需分别处理。备份留存规则会在公开隐私政策中说明。") }
             Section("分析边界") { Text("仅解释已记录数据，不进行疾病诊断、不自动增加训练重量、不计算缺少饮食依据的热量缺口。") }
         }.navigationTitle("数据说明")
     }

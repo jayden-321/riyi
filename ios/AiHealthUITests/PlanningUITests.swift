@@ -11,9 +11,12 @@ final class PlanningUITests: XCTestCase {
         XCTAssertFalse(app.buttons["我的计划与历史记录"].exists)
         app.buttons["schedule-training-day"].tap()
         app.buttons["plan-sport-category"].tap()
-        app.buttons["普拉提"].tap()
+        let pilates = app.buttons["普拉提"]
+        if !pilates.exists { app.buttons["plan-sport-category"].tap() }
+        XCTAssertTrue(pilates.waitForExistence(timeout: 5))
+        pilates.tap()
         app.buttons["保存"].tap()
-        XCTAssertTrue(app.staticTexts["普拉提"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.staticTexts["1. 普拉提"].waitForExistence(timeout: 6))
     }
     func testPlanEditorChoosesSportBeforeExerciseLibrary() {
         continueAfterFailure = false
@@ -45,12 +48,13 @@ final class PlanningUITests: XCTestCase {
         XCTAssertTrue(activity.waitForExistence(timeout: 5))
         XCTAssertEqual(activity.value as? String, "饭后散步")
         app.buttons["安排为训练"].tap()
-        XCTAssertTrue(app.staticTexts["饭后散步"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["1. 饭后散步"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["今天是休息日"].exists)
         app.tabBars.buttons["训练"].tap()
         app.buttons["scheduled-activity"].tap()
-        app.buttons["删除今天的安排"].tap()
-        app.buttons["删除当天安排"].tap()
+        let deleteButtons = app.buttons.matching(NSPredicate(format: "label == %@", "删除当前训练"))
+        deleteButtons.element(boundBy: 0).tap()
+        deleteButtons.element(boundBy: 0).tap()
         XCTAssertTrue(app.staticTexts["这一天尚未安排训练"].waitForExistence(timeout: 5))
     }
 
@@ -89,16 +93,18 @@ final class PlanningUITests: XCTestCase {
         let trainingDay = app.switches.matching(NSPredicate(format: "identifier BEGINSWITH %@", "manual-day-toggle-")).firstMatch
         XCTAssertTrue(trainingDay.waitForExistence(timeout: 5))
         XCTAssertTrue(trainingDay.isHittable)
-        trainingDay.tap()
+        // SwiftUI exposes the whole Form row as a Switch; tap the visible
+        // trailing control rather than its label/row midpoint.
+        trainingDay.coordinate(withNormalizedOffset: CGVector(dx: 0.90, dy: 0.50)).tap()
         XCTAssertEqual(trainingDay.value as? String, "1")
         XCTAssertTrue(app.navigationBars["手动编辑周期"].exists)
         let edit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "edit-cycle-day-")).firstMatch
         XCTAssertTrue(edit.waitForExistence(timeout: 5)); edit.tap()
         app.buttons["plan-sport-category"].tap()
         app.buttons["普拉提"].tap()
-        app.buttons["保存"].tap()
+        app.navigationBars["编辑训练项目"].buttons["保存"].tap()
         app.buttons["save-manual-training-cycle"].tap()
-        XCTAssertTrue(app.staticTexts["普拉提"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "普拉提")).firstMatch.waitForExistence(timeout: 6))
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "手动周期安排到日历"; attachment.lifetime = .keepAlways; add(attachment)
     }
     func testAccountEntrancesAndProfileMetricsAreInside() {
@@ -129,7 +135,11 @@ final class PlanningUITests: XCTestCase {
         let input = app.textFields["meal-description"].exists ? app.textFields["meal-description"] : app.textViews["meal-description"]
         XCTAssertTrue(input.waitForExistence(timeout: 5)); input.tap(); input.typeText("蛋糕一小块")
         app.buttons["save-meal-log"].tap()
-        XCTAssertTrue(app.staticTexts["蛋糕一小块"].waitForExistence(timeout: 5));XCTAssertTrue(app.staticTexts["热量待估算"].exists)
+        XCTAssertTrue(app.staticTexts["另有 1 笔热量未估算"].waitForExistence(timeout: 5))
+        let savedMeal = app.staticTexts["蛋糕一小块"]
+        for _ in 0..<4 where !savedMeal.exists { app.swipeUp() }
+        XCTAssertTrue(savedMeal.exists)
+        XCTAssertTrue(app.staticTexts["热量待估算"].exists)
         let shot = XCTAttachment(screenshot: app.screenshot());shot.name = "饮食日历与临时加餐";shot.lifetime = .keepAlways;add(shot)
         app.buttons["和 AI 安排饮食周期"].tap()
         XCTAssertTrue(app.navigationBars["饮食周期"].waitForExistence(timeout: 5));XCTAssertTrue(app.buttons["一周"].exists)

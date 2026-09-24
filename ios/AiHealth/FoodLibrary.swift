@@ -70,7 +70,8 @@ struct SharedFood: Decodable, Identifiable {
 
 struct SharedFoodPage: Decodable { var items: [SharedFood]; var hasMore: Bool }
 
-struct FoodShareStatus: Decodable { var code: String; var searchable: Bool }
+struct FoodShareStatus: Decodable { var code: String; var searchable: Bool; var moderationState: String? }
+struct BlockedFoodSource: Decodable, Identifiable { var id: String; var label: String }
 
 extension AppStore {
     var foodProducts: [FoodProduct] { (values("food") as [FoodProduct]).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending } }
@@ -153,6 +154,27 @@ extension AppStore {
         guard !isDemo else { throw AppError.message("撤销分享需要登录账号") }
         guard let encoded = code.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) else { throw AppError.message("分享码无效") }
         _ = try await network.request("/v1/foods/share/\(encoded)", method: "DELETE")
+    }
+
+    func reportSharedFood(_ code: String, reason: String, details: String) async throws {
+        guard !isDemo else { throw AppError.message("举报需要登录账号") }
+        struct Request: Encodable { var code: String; var reason: String; var details: String }
+        _ = try await network.request("/v1/foods/report", method: "POST", body: Wire.data(Request(code: code, reason: reason, details: details)))
+    }
+    func blockSharedFoodSource(_ code: String) async throws {
+        guard !isDemo else { throw AppError.message("屏蔽需要登录账号") }
+        struct Request: Encodable { var code: String }
+        _ = try await network.request("/v1/foods/block", method: "POST", body: Wire.data(Request(code: code)))
+    }
+    func blockedFoodSources() async throws -> [BlockedFoodSource] {
+        guard !isDemo else { return [] }
+        struct Reply: Decodable { var items: [BlockedFoodSource] }
+        let value: Reply = try Wire.read(await network.request("/v1/foods/blocks"))
+        return value.items
+    }
+    func unblockFoodSource(_ id: String) async throws {
+        guard !isDemo else { throw AppError.message("解除屏蔽需要登录账号") }
+        _ = try await network.request("/v1/foods/blocks/\(id)", method: "DELETE")
     }
 
     func importSharedFood(_ shared: SharedFood) async throws -> FoodProduct {

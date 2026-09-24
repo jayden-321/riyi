@@ -2,9 +2,10 @@ import SwiftUI
 import SwiftData
 
 @main struct AiHealthApp: App {
-    @State private var store: AppStore
-    private let health: HealthSync
-    private let companion: CompanionPhone
+    @State private var store: AppStore?
+    private let health: HealthSync?
+    private let companion: CompanionPhone?
+    private let startupFailure: String?
     init() {
         let bar = UITabBarAppearance(); bar.configureWithOpaqueBackground(); bar.backgroundColor = UIColor(Theme.cream)
         for item in [bar.stackedLayoutAppearance, bar.inlineLayoutAppearance, bar.compactInlineLayoutAppearance] {
@@ -16,6 +17,11 @@ import SwiftData
         UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: UIColor(Theme.ink)]
         UINavigationBar.appearance().largeTitleTextAttributes = [.foregroundColor: UIColor(Theme.ink)]
         do {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--database-unavailable-ui-test") {
+                throw AppError.message("合成数据库打开失败")
+            }
+            #endif
             var configuration = ModelConfiguration(cloudKitDatabase: .none)
             #if DEBUG
             if let run = ProcessInfo.processInfo.environment["AIHEALTH_UI_TEST_STORE"], UUID(uuidString: run) != nil {
@@ -25,7 +31,9 @@ import SwiftData
             let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: configuration)
             let state = AppStore(container: container); _store = State(initialValue: state)
             companion = CompanionPhone(store: state)
-            health = HealthSync(); health.store = state; Notifications.shared.configure(store: state)
+            let healthSync = HealthSync(); healthSync.store = state; health = healthSync
+            Notifications.shared.configure(store: state)
+            startupFailure = nil
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--planning-ui-test") {
                 state.startDemo(); state.selectedTab = "diet"
@@ -33,6 +41,10 @@ import SwiftData
                 let meal = NutritionMeal(slot: "lunch",name: "午餐",foods: ["鸡肉、米饭、时蔬"],preparation: "做熟后食用",alternatives: ["可替换同类食材"])
                 let cycle = PlanningCycle(name: "界面验证食谱",kind: "diet",startDate: date,endDate: date,timezone: state.settings.timezone,days: [CycleDay(date: date,meals: [meal])])
                 state.save(cycle,kind: "cycle",id: cycle.id)
+            }
+            if ProcessInfo.processInfo.arguments.contains("--water-notification-ui-test") {
+                state.startDemo()
+                state.openWaterEntryFromReminder()
             }
             if ProcessInfo.processInfo.arguments.contains("--session-expired-ui-test") {
                 state.scope = state.network.baseURL.absoluteString + "/ui-test-user"
@@ -49,6 +61,10 @@ import SwiftData
                 state.save(lunch, kind: "meal", id: lunch.id)
             }
             if ProcessInfo.processInfo.arguments.contains("--food-share-ui-test") {
+                state.scope = state.network.baseURL.absoluteString + "/ui-test-user"
+                state.reload(); state.selectedTab = "diet"
+            }
+            if ProcessInfo.processInfo.arguments.contains("--food-moderation-ui-test") {
                 state.scope = state.network.baseURL.absoluteString + "/ui-test-user"
                 state.reload(); state.selectedTab = "diet"
             }
@@ -109,9 +125,36 @@ import SwiftData
                 if state.activeWorkout == nil { let plan = Plan.starter(); state.start(plan: plan, day: plan.days[0], synthetic: true) }
             }
             #endif
-        } catch { fatalError("无法打开本地数据库，请保留 App 数据并联系支持：\(error)") }
+        } catch {
+            _store = State(initialValue: nil)
+            health = nil
+            companion = nil
+            startupFailure = error.localizedDescription
+        }
     }
-    var body: some Scene { WindowGroup { RootView(store: store, health: health).tint(Theme.green).foregroundStyle(Theme.ink).preferredColorScheme(.light) } }
+    var body: some Scene {
+        WindowGroup {
+            if let store, let health {
+                RootView(store: store, health: health).tint(Theme.green).foregroundStyle(Theme.ink).preferredColorScheme(.light)
+            } else {
+                DatabaseUnavailableView(detail: startupFailure ?? "未知错误").preferredColorScheme(.light)
+            }
+        }
+    }
+}
+
+private struct DatabaseUnavailableView: View {
+    let detail: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Image(systemName: "externaldrive.badge.exclamationmark").font(.system(size: 44)).foregroundStyle(Theme.green)
+            Text("暂时无法打开本机记录").font(.title.bold()).accessibilityIdentifier("database-unavailable")
+            Text("请退出日益后重试。若仍无法打开，请保留 App 和本机数据，不要卸载；联系支持时可提供下方错误信息。")
+            Text(detail).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
+        }
+        .padding(28).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .background(Theme.cream).foregroundStyle(Theme.ink)
+    }
 }
 
 enum Theme {
