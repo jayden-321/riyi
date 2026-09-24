@@ -188,7 +188,7 @@ struct ManualTrainingCycleView: View {
     var body: some View {
         Form {
             Section("周期") {
-                TextField("周期名称", text: $name)
+                HStack { Text("周期名称"); Spacer(); TextField("输入名称", text: $name).multilineTextAlignment(.trailing) }
                 DatePicker("开始日期", selection: $start, displayedComponents: .date)
                 DatePicker("结束日期", selection: $end, in: start..., displayedComponents: .date)
                 Text("\(count) 天 · 每一天可分别安排训练或休息").font(.caption).foregroundStyle(.secondary)

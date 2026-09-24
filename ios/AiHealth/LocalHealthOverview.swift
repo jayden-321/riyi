@@ -4,6 +4,33 @@ import Foundation
 enum LocalHealthOverview {
     static let names = ["height_cm": "身高", "waist_cm": "腰围", "body_mass": "体重", "body_fat_percentage": "体脂率", "bmi": "BMI", "lean_body_mass": "去脂体重", "sleep_analysis": "睡眠", "heart_rate": "心率", "resting_heart_rate": "静息心率", "hrv_sdnn": "HRV", "respiratory_rate": "呼吸频率", "oxygen_saturation": "血氧", "vo2_max": "最大摄氧量", "step_count": "步数", "walking_running_distance": "步行/跑步距离", "active_energy": "活动能量", "basal_energy": "静息能量", "exercise_time": "锻炼时间", "flights_climbed": "爬楼层数", "workout": "训练"]
 
+    /// Recent complete days with both energy sources. Missing data is never treated as zero.
+    static func energyBaseline(samples: [HealthSample], zone: String, now: Date) -> (kcal: Double, days: Int)? {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: zone) ?? .current
+        let today = calendar.startOfDay(for: now)
+        var totals: [Double] = []
+        for offset in 1...7 {
+            guard let start = calendar.date(byAdding: .day, value: -offset, to: today), let end = calendar.date(byAdding: .day, value: 1, to: start) else { continue }
+            var parts: [Double] = []
+            for type in ["basal_energy", "active_energy"] {
+                let day = samples.filter { !$0.deleted && $0.type == type && $0.value != nil && $0.startAt != nil && $0.endAt != nil && $0.endAt! > start && $0.startAt! < end }
+                let chosen = primary(day)
+                guard !chosen.isEmpty else { break }
+                if type == "basal_energy" {
+                    let covered = chosen.reduce(0.0) { $0 + max(0, min(end, $1.endAt!).timeIntervalSince(max(start, $1.startAt!))) }
+                    guard covered >= 18 * 3600 else { break }
+                }
+                parts.append(intervalSum(chosen, from: start, to: end))
+            }
+            if parts.count == 2, parts[0] > 0, parts[1] >= 0 { totals.append(parts[0] + parts[1]) }
+        }
+        guard totals.count >= 3 else { return nil }
+        let sortedTotals = totals.sorted()
+        let median = sortedTotals.count % 2 == 0 ? (sortedTotals[sortedTotals.count / 2 - 1] + sortedTotals[sortedTotals.count / 2]) / 2 : sortedTotals[sortedTotals.count / 2]
+        guard (800...6000).contains(median) else { return nil }
+        return (median, totals.count)
+    }
+
     static func make(samples: [HealthSample], zone: String, now: Date = Date(), water: Int = 0) -> DailySummary {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: zone) ?? .current
         let today = calendar.startOfDay(for: now), yesterday = calendar.date(byAdding: .day, value: -1, to: today)!

@@ -213,8 +213,8 @@ struct ReauthenticationView: View {
                 Section("重新登录云端账号") {
                     Text("登录已过期。用原账号重新登录后，继续同步这台设备上的记录。")
                     Text("服务器：\(store.network.baseURL.absoluteString)").font(.caption).foregroundStyle(.secondary)
-                    TextField("原账号邮箱", text: $email).textContentType(.username).keyboardType(.emailAddress).textInputAutocapitalization(.never).accessibilityIdentifier("reauth-email")
-                    AccountSecureField(placeholder: "密码", text: $password, contentType: .password).frame(height: 36)
+                    LabeledContent("邮箱") { TextField("原账号邮箱", text: $email).textContentType(.username).keyboardType(.emailAddress).textInputAutocapitalization(.never).multilineTextAlignment(.trailing).accessibilityIdentifier("reauth-email") }
+                    LabeledContent("密码") { AccountSecureField(placeholder: "输入密码", text: $password, contentType: .password).frame(height: 36) }
                     Button("重新登录") {
                         dismissInputKeyboard()
                         Task { if await store.reauthenticate(email: email, password: password) { dismiss() } }
@@ -237,8 +237,8 @@ struct WelcomeView: View {
                     Image(systemName: "leaf.circle.fill").font(.system(size: 64)).foregroundStyle(Theme.green)
                     VStack(alignment: .leading, spacing: 10) { Text("日益").font(.largeTitle.bold()); Text("让每一次训练，\n成为看得见的积累。").font(.title2).foregroundStyle(Theme.muted) }
                     VStack(spacing: 14) {
-                        TextField("邮箱", text: $email).textContentType(.username).keyboardType(.emailAddress).textInputAutocapitalization(.never)
-                        AccountSecureField(placeholder: "密码（12–72 字节）", text: $password, contentType: register ? nil : .password).frame(height: 36)
+                        HStack { Text("邮箱"); Spacer(); TextField("输入邮箱", text: $email).textContentType(.username).keyboardType(.emailAddress).textInputAutocapitalization(.never).multilineTextAlignment(.trailing) }
+                        HStack { Text("密码"); Spacer(); AccountSecureField(placeholder: "12–72 字节", text: $password, contentType: register ? nil : .password).frame(height: 36) }
                     }.textFieldStyle(.roundedBorder)
                     Button { dismissInputKeyboard(); Task { await store.authenticate(url: store.network.baseURL.absoluteString, email: email, password: password, register: register) } } label: {
                         HStack { Spacer(); if store.syncing { ProgressView().tint(.white) }; Text(register ? "创建账号，开始记录" : "登录").bold(); Spacer() }.padding(.vertical, 10)

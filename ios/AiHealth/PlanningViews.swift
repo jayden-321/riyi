@@ -150,15 +150,15 @@ struct ScheduledActivityView: View {
         List {
             Section("\(date) · 训练安排") {
                 Picker("运动大类", selection: $sport) { ForEach(sportOptions.filter { $0.code != "strength" }, id: \.code) { option in Text(option.title).tag(option.code) } }
-                TextField("活动名称", text: $name)
-                TextField("目标分钟数（可选）", value: $targetMinutes, format: .number).keyboardType(.numberPad)
+                HStack { Text("活动名称"); Spacer(); TextField("输入名称", text: $name).multilineTextAlignment(.trailing) }
+                HStack { Text("目标时长"); Spacer(); TextField("可留空", value: $targetMinutes, format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing); Text("分钟") }
                 if ["swimming", "running", "cycling", "walking", "hiking", "rowing"].contains(sport) {
-                    TextField("目标距离（米，可选）", value: $targetDistanceMeters, format: .number).keyboardType(.decimalPad)
+                    HStack { Text("目标距离"); Spacer(); TextField("可留空", value: $targetDistanceMeters, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("米") }
                 }
-                TextField("目标消耗（千卡，可选）", value: $targetEnergyKcal, format: .number).keyboardType(.decimalPad)
+                HStack { Text("目标消耗"); Spacer(); TextField("可留空", value: $targetEnergyKcal, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("千卡") }
                 if sport == "swimming" {
                     Picker("游泳地点", selection: $swimLocation) { Text("请选择").tag(""); Text("泳池游泳").tag("pool"); Text("开放水域游泳").tag("open_water") }
-                    if swimLocation == "pool" { TextField("泳池长度（米）", value: $poolLengthMeters, format: .number).keyboardType(.decimalPad) }
+                    if swimLocation == "pool" { HStack { Text("泳池长度"); Spacer(); TextField("数值", value: $poolLengthMeters, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("米") } }
                 }
                 Button("保存调整") {
                     let activity = TimedActivity(name: name, targetMinutes: targetMinutes, sport: sport, targetDistanceMeters: targetDistanceMeters,
@@ -250,8 +250,8 @@ struct ScheduledRestDayView: View {
                 Text("今天未安排训练。")
             }
             Section("改为按时长训练") {
-                TextField("活动名称", text: $activity).accessibilityIdentifier("activity-name")
-                TextField("目标分钟数（可选）", value: $targetMinutes, format: .number).keyboardType(.numberPad)
+                HStack { Text("活动名称"); Spacer(); TextField("输入名称", text: $activity).multilineTextAlignment(.trailing).accessibilityIdentifier("activity-name") }
+                HStack { Text("目标时长"); Spacer(); TextField("可留空", value: $targetMinutes, format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing); Text("分钟") }
                 Button("安排为训练") { if store.convertRestToActivity(on: date, name: activity, targetMinutes: targetMinutes) { dismiss() } }
             }
             Section("改为力量训练") {
@@ -460,16 +460,24 @@ struct DietView: View {
     @State private var common = false; @State private var textEntry = false; @State private var photoEntry = false
     private var logs: [MealLog] { store.meals(on: store.calendarKey) }
     private var energy: MealEnergySummary { MealEnergySummary(logs) }
+    private var protein: MealMacroTotal { MealMacroTotal(logs, exact: \.proteinG, low: \.proteinMinG, high: \.proteinMaxG) }
+    private var fat: MealMacroTotal { MealMacroTotal(logs, exact: \.fatG, low: \.fatMinG, high: \.fatMaxG) }
+    private var carbs: MealMacroTotal { MealMacroTotal(logs, exact: \.carbG, low: \.carbMinG, high: \.carbMaxG) }
+    private var nutritionTargets: DailyNutritionTargets {
+        let metric = store.profileMetric("body_mass")
+        let weight = metric?.observedAt.flatMap { Date().timeIntervalSince($0) < 90 * 86400 ? metric?.value : nil }
+        return DailyNutritionTargets.make(profile: store.profile, weightKg: weight, energyBaselineKcal: store.energyBaselineKcal, energyBaselineDays: store.energyBaselineDays)
+    }
     private var future: Bool { store.calendarKey > DayKey.string(Date(),zone: store.settings.timezone) }
     var body: some View {
         NavigationStack {
             List {
+                Section { PlanningCalendar(store: store,kind: "diet") }
                 Section("饮水") {
                     Text("\(store.water(on: store.calendarKey)) / \(store.profile.waterGoalMl) ml").font(.headline)
                     HStack { Button("+ 250 ml") { water(250) }; Spacer(); Button("+ 500 ml") { water(500) } }.buttonStyle(.bordered).disabled(future)
                     NavigationLink("饮水记录、补记与提醒") { WaterView(store: store) }
                 }
-                Section { PlanningCalendar(store: store,kind: "diet") }
                 Section {
                     HStack {
                         Button { common = true } label: { Label("常用", systemImage: "star") }.disabled(future)
@@ -479,20 +487,22 @@ struct DietView: View {
                         Button { photoEntry = true } label: { Label("拍照", systemImage: "camera") }.disabled(future)
                     }.buttonStyle(.bordered)
                     Button("和 AI 安排饮食周期") { planning = true }
+                    DisclosureGroup("当天食谱计划") {
+                        if let (_,day) = store.scheduled("diet",date: store.calendarKey) {
+                            ForEach(day.meals) { meal in NavigationLink { MealPlanDetail(store: store,meal: meal,date: day.date) } label: { VStack(alignment: .leading,spacing: 5) { Text(meal.name).font(.headline); Text(meal.foods.joined(separator: "、")).font(.subheadline).foregroundStyle(.secondary) } } }
+                        } else { Text("还没有采用食谱").foregroundStyle(.secondary) }
+                    }
                 }
                 Section("\(store.calendarKey) · 实际摄入") {
-                    if energy.rangeCount > 0 {
-                        Text("已记录热量约 \(energy.totalMidpointKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
-                    } else {
-                        Text("已记录热量 \(energy.singleKcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡").font(.headline)
-                    }
-                    if energy.unknownCount > 0 { Text("另有 \(energy.unknownCount) 笔热量未估算").font(.caption).foregroundStyle(.secondary) }
-                    ForEach(logs) { log in Button { editing = log } label: { MealLogRow(log: log) }.buttonStyle(.plain).swipeActions { Button("删除",role: .destructive) { store.remove(kind: "meal",id: log.id) } } }
+                    NutritionProgressRow(title: "热量", amount: energy.singleCount + energy.rangeCount > 0 ? energy.totalMidpointKcal : nil, target: nutritionTargets.energyKcal, unit: "千卡", estimated: energy.rangeCount > 0, unknownCount: energy.unknownCount)
+                    NutritionProgressRow(title: "蛋白质", amount: protein.hasData ? protein.midpointG : nil, target: nutritionTargets.proteinG, unit: "克", estimated: protein.hasEstimates, unknownCount: protein.unknownCount)
+                    NutritionProgressRow(title: "脂肪", amount: fat.hasData ? fat.midpointG : nil, target: nutritionTargets.fatG, unit: "克", estimated: fat.hasEstimates, unknownCount: fat.unknownCount)
+                    NutritionProgressRow(title: "碳水化合物", amount: carbs.hasData ? carbs.midpointG : nil, target: nutritionTargets.carbG, unit: "克", estimated: carbs.hasEstimates, unknownCount: carbs.unknownCount)
+                    Text("目标：\(nutritionTargets.energySource)；可在我的健康档案调整。记录缺项不计入进度。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                Section("当天食谱计划") {
-                    if let (_,day) = store.scheduled("diet",date: store.calendarKey) {
-                        ForEach(day.meals) { meal in NavigationLink { MealPlanDetail(store: store,meal: meal,date: day.date) } label: { VStack(alignment: .leading,spacing: 5) { Text(meal.name).font(.headline); Text(meal.foods.joined(separator: "、")).font(.subheadline).foregroundStyle(.secondary) } } }
-                    } else { Text("还没有采用食谱。没有计划也可以记录实际吃喝。").foregroundStyle(.secondary) }
+                Section("当天记录") {
+                    ForEach(logs) { log in Button { editing = log } label: { MealLogRow(log: log) }.buttonStyle(.plain).swipeActions { Button("删除",role: .destructive) { store.remove(kind: "meal",id: log.id) } } }
                 }
             }.navigationTitle("饮食").sheet(item: $editing) { log in MealLogEditor(store: store,log: log) }.sheet(isPresented: $planning) { PlanningRequestView(store: store,kind: "diet") }
                 .sheet(isPresented: $store.showWaterEntryFromReminder) { WaterView(store: store) }
@@ -504,6 +514,21 @@ struct DietView: View {
     private func makeLog() -> MealLog { MealLog(description: "",eatenAt: mealEntryTime(for: store.calendarDate, zone: store.settings.timezone),timezone: store.settings.timezone) }
     private func water(_ amount: Int) { store.addWater(amount,date: DayKey.calendar(store.settings.timezone).isDate(store.calendarDate,inSameDayAs: Date()) ? Date() : store.calendarDate) }
 }
+private struct NutritionProgressRow: View {
+    let title: String; let amount: Double?; let target: Double?; let unit: String; let estimated: Bool; let unknownCount: Int
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(title).fontWeight(.medium)
+                Spacer()
+                Text(amount.map { "\(estimated ? "约 " : "")\($0.formatted(.number.precision(.fractionLength(0))))" } ?? "待估算")
+                Text("/ \(target.map { $0.formatted(.number.precision(.fractionLength(0))) } ?? "待计算") \(unit)").foregroundStyle(.secondary)
+            }
+            if let amount, let target, target > 0 { ProgressView(value: min(amount / target, 1)).tint(.green) }
+            if unknownCount > 0 { Text("\(unknownCount) 笔未估算").font(.caption2).foregroundStyle(.secondary) }
+        }
+    }
+}
 struct MealLogRow: View {
     let log: MealLog
     private var energyText: String {
@@ -511,7 +536,20 @@ struct MealLogRow: View {
         if let low = log.estimateMinKcal, let high = log.estimateMaxKcal { return "约 \(low.formatted(.number.precision(.fractionLength(0))))–\(high.formatted(.number.precision(.fractionLength(0)))) 千卡 · AI 粗估" }
         return "热量待估算"
     }
-    var body: some View { VStack(alignment: .leading,spacing: 5) { HStack { Text(mealSlots.first { $0.0 == log.slot }?.1 ?? "饮食").font(.headline); Spacer(); Text(log.eatenAt,format: .dateTime.hour().minute()).font(.caption) }; Text(log.description); Text(energyText).font(.caption).foregroundStyle(.secondary) } }
+    private func nutrient(_ exact: Double?, _ low: Double?, _ high: Double?) -> String {
+        if let exact { return "\(exact.formatted(.number.precision(.fractionLength(0...1))))g" }
+        if let low, let high { return "约\(((low + high) / 2).formatted(.number.precision(.fractionLength(0...1))))g" }
+        return "未知"
+    }
+    var body: some View {
+        VStack(alignment: .leading,spacing: 5) {
+            HStack { Text(mealSlots.first { $0.0 == log.slot }?.1 ?? "饮食").font(.headline); Spacer(); Text(log.eatenAt,format: .dateTime.hour().minute()).font(.caption) }
+            Text(log.description)
+            Text(energyText).font(.caption).foregroundStyle(.secondary)
+            Text("蛋白质 \(nutrient(log.proteinG, log.proteinMinG, log.proteinMaxG)) · 脂肪 \(nutrient(log.fatG, log.fatMinG, log.fatMaxG)) · 碳水 \(nutrient(log.carbG, log.carbMinG, log.carbMaxG))")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
 }
 struct MealPlanDetail: View {
     @Bindable var store: AppStore; let meal: NutritionMeal; let date: String
@@ -539,7 +577,7 @@ struct MealLogEditor: View {
         NavigationStack { Form {
             Section("实际吃喝") {
                 Picker("餐次",selection: $log.slot) { ForEach(mealSlots,id: \.0) { Text($0.1).tag($0.0) } }
-                TextField("吃了什么、多少，例如一小块蛋糕",text: $log.description,axis: .vertical).accessibilityIdentifier("meal-description")
+                LabeledContent("食物与份量") { TextField("例如一小块蛋糕",text: $log.description,axis: .vertical).multilineTextAlignment(.trailing).accessibilityIdentifier("meal-description") }
                 DatePicker("发生时间",selection: $log.eatenAt,in: ...Date())
             }
             Section("热量（选填）") {
@@ -549,16 +587,30 @@ struct MealLogEditor: View {
                 if let estimateNote { Text(estimateNote).font(.caption).foregroundStyle(.secondary) }
                 Picker("记录方式",selection: $log.energyMethod) { Text("热量待估算，先保存").tag("unknown"); Text("按标签与克数计算").tag("label"); Text("填写已知热量").tag("manual"); Text("填写估算热量").tag("estimated"); Text("手动填写粗估范围").tag("estimated_range") }
                 if log.energyMethod == "label" {
-                    TextField("实际吃了多少克",value: $log.grams,format: .number).keyboardType(.decimalPad)
-                    TextField("标签每 100 克多少千卡",value: $log.kcalPer100,format: .number).keyboardType(.decimalPad)
+                    LabeledNumberField("实际吃了多少", unit: "克", value: $log.grams)
+                    LabeledNumberField("标签能量 / 100 克", unit: "千卡", value: $log.kcalPer100)
                     if let kcal = calculated.energyKcal { Text("本次 \(kcal.formatted(.number.precision(.fractionLength(0...1)))) 千卡") }
                 } else if log.energyMethod == "estimated_range" {
                     Text("范围可手动填写，也可由上方 AI 粗估带入。没有可靠数值时可选“热量待估算，先保存”。").font(.caption).foregroundStyle(.secondary)
-                    TextField("粗估下限（千卡）", value: $log.estimateMinKcal, format: .number).keyboardType(.decimalPad)
-                    TextField("粗估上限（千卡）", value: $log.estimateMaxKcal, format: .number).keyboardType(.decimalPad)
-                    TextField("估算依据", text: Binding(get: { log.nutritionSource ?? "" }, set: { log.nutritionSource = $0 }), axis: .vertical)
-                } else if log.energyMethod != "unknown" { TextField("本次总热量（千卡）",value: $log.energyKcal,format: .number).keyboardType(.decimalPad) }
+                    LabeledNumberField("粗估下限", unit: "千卡", value: $log.estimateMinKcal)
+                    LabeledNumberField("粗估上限", unit: "千卡", value: $log.estimateMaxKcal)
+                    LabeledContent("估算依据") { TextField("可留空", text: Binding(get: { log.nutritionSource ?? "" }, set: { log.nutritionSource = $0 }), axis: .vertical).multilineTextAlignment(.trailing) }
+                } else if log.energyMethod != "unknown" { LabeledNumberField("本次总热量", unit: "千卡", value: $log.energyKcal) }
                 Text("千焦 ÷ 4.184 = 千卡。拍照识别会生成待确认结果；份量或配方不清楚时可保留粗估范围或留空，不会把未知值算成 0。").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("蛋白质、脂肪与碳水化合物（克，可选）") {
+                if log.proteinMinG != nil || log.fatMinG != nil || log.carbMinG != nil {
+                    if let low = log.proteinMinG, let high = log.proteinMaxG { Text("蛋白质约 \(low.formatted())–\(high.formatted()) 克") }
+                    if let low = log.fatMinG, let high = log.fatMaxG { Text("脂肪约 \(low.formatted())–\(high.formatted()) 克") }
+                    if let low = log.carbMinG, let high = log.carbMaxG { Text("碳水约 \(low.formatted())–\(high.formatted()) 克") }
+                    Button("改为手动填写") { log.clearEstimatedMacros(); log.macroSource = "手动填写" }
+                } else {
+                    LabeledNumberField("蛋白质", unit: "克", value: $log.proteinG)
+                    LabeledNumberField("脂肪", unit: "克", value: $log.fatG)
+                    LabeledNumberField("碳水化合物", unit: "克", value: $log.carbG)
+                }
+                Text(log.macroSource ?? "没有可靠数据时留空，不按 0 克统计。")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }.navigationTitle("饮食记录").toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("保存") { if store.save(calculated,kind: "meal",id: log.id) { dismiss() } }.disabled(!calculated.valid).accessibilityIdentifier("save-meal-log") } }
             .sheet(isPresented: $photoEstimate, onDismiss: { if photoSaved { dismiss() } }) {
@@ -567,7 +619,7 @@ struct MealLogEditor: View {
             .onChange(of: log.description) { _, value in
                 if !aiEstimateDescription.isEmpty && value != aiEstimateDescription {
                     log.energyMethod = "unknown"; log.estimateMinKcal = nil; log.estimateMaxKcal = nil
-                    log.nutritionSource = nil; estimateNote = "食物描述已改变，请重新估算。"
+                    log.nutritionSource = nil; log.clearMacros(); estimateNote = "食物描述已改变，请重新估算。"
                     aiEstimateDescription = ""
                 }
             }
@@ -583,6 +635,7 @@ struct MealLogEditor: View {
                 aiEstimateDescription = log.description
                 estimateNote = "AI 粗估约 \(low.formatted(.number.precision(.fractionLength(0))))–\(high.formatted(.number.precision(.fractionLength(0)))) 千卡；请核对份量后保存。"
             } else { log.energyMethod = "unknown"; estimateNote = result.estimateBasis.isEmpty ? "份量信息不足，已改为热量待估算，可先保存。" : result.estimateBasis }
+            applyEstimatedMacros(&log, protein: (result.proteinMinG, result.proteinMaxG), fat: (result.fatMinG, result.fatMaxG), carbs: (result.carbMinG, result.carbMaxG), source: "AI 文字粗估：" + String(result.estimateBasis.prefix(280)))
         } catch { store.error = error.localizedDescription }
     }
 }
@@ -626,7 +679,7 @@ struct CyclePreviewView: View {
     var body: some View {
         NavigationStack { Form {
             Section("安排周期") {
-                TextField("名称",text: $cycle.name)
+                HStack { Text("周期名称"); Spacer(); TextField("输入名称",text: $cycle.name).multilineTextAlignment(.trailing) }
                 DatePicker("开始日期",selection: Binding(get: { DayKey.date(cycle.startDate,zone: cycle.timezone) ?? Date() },set: { cycle.shift(to: $0) }),displayedComponents: .date)
                 Text("\(cycle.startDate) — \(cycle.endDate) · 选择 \(selected.days.count) / \(cycle.days.count) 天").font(.subheadline)
                 Button("回到聊天调整周期或要求") { store.coachPromptDraft = "请调整刚才的\(cycle.kind == "diet" ? "饮食" : "训练")周期计划："; store.selectedTab = "coach"; dismiss() }
@@ -665,24 +718,29 @@ struct CyclePreviewView: View {
                             Picker("运动大类", selection: Binding(get: { day.activity?.resolvedSport ?? "walking" }, set: { day.activity?.sport = $0 })) {
                                 ForEach(sportOptions.filter { $0.code != "strength" }, id: \.code) { option in Text(option.title).tag(option.code) }
                             }
-                            TextField("运动项目", text: Binding(get: { day.activity?.name ?? "" }, set: { day.activity?.name = $0 }))
-                            TextField("目标分钟数（可选）", value: Binding(get: { day.activity?.targetMinutes }, set: { day.activity?.targetMinutes = $0 }), format: .number).keyboardType(.numberPad)
+                            HStack { Text("运动项目"); Spacer(); TextField("输入名称", text: Binding(get: { day.activity?.name ?? "" }, set: { day.activity?.name = $0 })).multilineTextAlignment(.trailing) }
+                            HStack { Text("目标时长"); Spacer(); TextField("可留空", value: Binding(get: { day.activity?.targetMinutes }, set: { day.activity?.targetMinutes = $0 }), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing); Text("分钟") }
                             if ["swimming", "running", "cycling", "walking", "hiking", "rowing"].contains(day.activity?.resolvedSport ?? "") {
-                                TextField("目标距离（米，可选）", value: Binding(get: { day.activity?.targetDistanceMeters }, set: { day.activity?.targetDistanceMeters = $0 }), format: .number).keyboardType(.decimalPad)
+                                HStack { Text("目标距离"); Spacer(); TextField("可留空", value: Binding(get: { day.activity?.targetDistanceMeters }, set: { day.activity?.targetDistanceMeters = $0 }), format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("米") }
                             }
-                            TextField("目标消耗（千卡，可选）", value: Binding(get: { day.activity?.targetEnergyKcal }, set: { day.activity?.targetEnergyKcal = $0 }), format: .number).keyboardType(.decimalPad)
+                            HStack { Text("目标消耗"); Spacer(); TextField("可留空", value: Binding(get: { day.activity?.targetEnergyKcal }, set: { day.activity?.targetEnergyKcal = $0 }), format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("千卡") }
                             if day.activity?.resolvedSport == "swimming" {
                                 Picker("游泳地点", selection: Binding(get: { day.activity?.swimLocation ?? "" }, set: { value in day.activity?.swimLocation = value.isEmpty ? nil : value; if value != "pool" { day.activity?.poolLengthMeters = nil } })) {
                                     Text("请选择").tag(""); Text("泳池游泳").tag("pool"); Text("开放水域游泳").tag("open_water")
                                 }
                                 if day.activity?.swimLocation == "pool" {
-                                    TextField("泳池长度（米）", value: Binding(get: { day.activity?.poolLengthMeters }, set: { day.activity?.poolLengthMeters = $0 }), format: .number).keyboardType(.decimalPad)
+                                    HStack { Text("泳池长度"); Spacer(); TextField("数值", value: Binding(get: { day.activity?.poolLengthMeters }, set: { day.activity?.poolLengthMeters = $0 }), format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("米") }
                                 }
                             }
                         }
                         else if let plan = day.plan, let d = plan.days.first { Text(d.name).font(.headline); ForEach(d.exercises) { e in NavigationLink { ExerciseGuideView(store: store,exerciseId: e.exerciseId,name: e.name) } label: { Text("\(e.name) · \(e.sets.count) 组") } } }
                     } else {
-                        ForEach($day.meals) { $meal in DisclosureGroup(meal.name) { TextField("餐次名称",text: $meal.name); TextField("食物与份量",text: Binding(get: { meal.foods.joined(separator: "、") },set: { meal.foods = [$0] }),axis: .vertical); Text(meal.preparation).font(.footnote); ForEach(Array(meal.alternatives.enumerated()),id: \.offset) { _,text in Text(text).font(.caption) } } }
+                        ForEach($day.meals) { $meal in DisclosureGroup(meal.name) {
+                            HStack { Text("餐次名称"); Spacer(); TextField("输入名称",text: $meal.name).multilineTextAlignment(.trailing) }
+                            LabeledContent("食物与份量") { TextField("填写内容",text: Binding(get: { meal.foods.joined(separator: "、") },set: { meal.foods = [$0] }),axis: .vertical).multilineTextAlignment(.trailing) }
+                            Text(meal.preparation).font(.footnote)
+                            ForEach(Array(meal.alternatives.enumerated()),id: \.offset) { _,text in Text(text).font(.caption) }
+                        } }
                     }
                 }
             }

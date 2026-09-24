@@ -5,28 +5,33 @@ struct WaterView: View {
     @State private var custom = 300; @State private var date = Date(); @State private var reminders = false
     @State private var start = 8; @State private var end = 22; @State private var interval = 2
     @State private var reminderStatus = ""
+    private var selectedDay: String { store.calendarKey }
+    private var selectedWaters: [WaterLog] { store.waters(on: selectedDay) }
+    private var future: Bool { selectedDay > DayKey.string(Date(), zone: store.settings.timezone) }
+    private var selectedEntryTime: Date { mealEntryTime(for: store.calendarDate, zone: store.settings.timezone) }
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 18) {
-                        Label("今天已记录", systemImage: "drop.fill").foregroundStyle(Theme.green)
-                        HStack(alignment: .firstTextBaseline) { Text("\(store.waterToday)").font(.system(size: 48, weight: .bold, design: .rounded)); Text("/ \(store.profile.waterGoalMl) ml").foregroundStyle(.secondary) }
-                        ProgressView(value: min(Double(store.waterToday) / Double(store.profile.waterGoalMl), 1))
-                        HStack { Button("+ 250 ml") { store.addWater(250) }; Spacer(); Button("+ 500 ml") { store.addWater(500) } }.buttonStyle(.bordered)
+                        Label("\(selectedDay) 已记录", systemImage: "drop.fill").foregroundStyle(Theme.green)
+                        HStack(alignment: .firstTextBaseline) { Text("\(store.water(on: selectedDay))").font(.system(size: 48, weight: .bold, design: .rounded)); Text("/ \(store.profile.waterGoalMl) ml").foregroundStyle(.secondary) }
+                        ProgressView(value: min(Double(store.water(on: selectedDay)) / Double(store.profile.waterGoalMl), 1))
+                        HStack { Button("+ 250 ml") { store.addWater(250, date: selectedEntryTime) }; Spacer(); Button("+ 500 ml") { store.addWater(500, date: selectedEntryTime) } }.buttonStyle(.bordered).disabled(future)
                         Text("未登记不代表未喝水；目标可在个人档案中调整。").font(.caption).foregroundStyle(.secondary)
                     }.padding(.vertical, 12)
                 }
-                Section("最近记录 · 左滑可删除") {
-                    ForEach(Array(store.waters.prefix(50))) { w in
+                Section("当天记录 · 左滑可删除") {
+                    if selectedWaters.isEmpty { Text("这一天还没有饮水记录").foregroundStyle(.secondary) }
+                    ForEach(selectedWaters) { w in
                         HStack { Label("\(w.amountMl) ml", systemImage: "drop"); Spacer(); Text(w.drankAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.secondary) }
                             .swipeActions { Button("删除", role: .destructive) { store.remove(kind: "water", id: w.id) } }
                     }
                 }
                 Section("自定义 / 补记") {
                     HStack { Text("饮水量"); TextField("ml", value: $custom, format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing); Text("ml") }
-                    DatePicker("饮水时间", selection: $date, in: ...Date())
-                    Button("记录这次饮水") { store.addWater(custom, date: date); date = Date() }.disabled(custom < 1 || custom > 5000)
+                    DatePicker("饮水时间", selection: $date, in: ...Date(), displayedComponents: .hourAndMinute)
+                    Button("记录这次饮水") { store.addWater(custom, date: date); date = selectedEntryTime }.disabled(custom < 1 || custom > 5000 || future)
                 }
                 Section("提醒") {
                     Stepper("开始：\(start):00", value: $start, in: 0...22)
@@ -37,9 +42,10 @@ struct WaterView: View {
                     if !reminderStatus.isEmpty { Text(reminderStatus).font(.caption).foregroundStyle(.secondary) }
                 }
             }.navigationTitle("饮水").onAppear {
+                date = selectedEntryTime
                 let settings = Notifications.shared.savedSettings(); start = settings.start; end = settings.end; interval = settings.interval
                 reminderStatus = settings.enabled ? "已安排 \(start):00–\(end):00 的每日提醒" : "提醒尚未开启"
-            }
+            }.onChange(of: store.calendarDate) { _, _ in date = selectedEntryTime }
         }
     }
 }
@@ -212,9 +218,9 @@ struct AIConfigurationView: View {
     var body: some View {
         Form {
             Section("OpenAI 兼容接口") {
-                TextField("https://api.example.com/v1", text: $baseURL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                TextField("模型名称", text: $model).textInputAutocapitalization(.never).autocorrectionDisabled()
-                AccountSecureField(placeholder: keyConfigured ? "密钥已配置；留空保持不变" : "输入 API 密钥", text: $key, contentType: nil).frame(height: 36)
+                LabeledContent("接口地址") { TextField("https://api.example.com/v1", text: $baseURL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled().multilineTextAlignment(.trailing) }
+                HStack { Text("模型名称"); Spacer(); TextField("模型", text: $model).textInputAutocapitalization(.never).autocorrectionDisabled().multilineTextAlignment(.trailing) }
+                LabeledContent("API 密钥") { AccountSecureField(placeholder: keyConfigured ? "留空保持不变" : "输入密钥", text: $key, contentType: nil).frame(height: 36) }
                 Label(keyConfigured ? "密钥已配置" : "尚未配置密钥", systemImage: keyConfigured ? "checkmark.shield" : "key").foregroundStyle(keyConfigured ? Theme.green : .secondary)
             }
             Section {
@@ -259,23 +265,53 @@ struct ProfileEditor: View {
             Form {
                 Section("已有健康数据") { HealthProfileMeasurements(store: store) }
                 Section("手动补充测量（可留空）") {
-                    TextField("身高（cm，可不填）", value: $profile.heightCm, format: .number).keyboardType(.decimalPad)
-                    TextField("腰围（cm，可不填）", value: $profile.waistCm, format: .number).keyboardType(.decimalPad)
+                    LabeledNumberField("身高", unit: "cm", value: $profile.heightCm)
+                    LabeledNumberField("体重", unit: "kg", value: $profile.bodyMassKg)
+                    LabeledNumberField("腰围", unit: "cm", value: $profile.waistCm)
                     DatePicker("测量日期", selection: $profile.measuredAt, in: ...Date(), displayedComponents: .date)
                     Text("每次保存产生新档案记录，历史测量不会被覆盖。").font(.caption).foregroundStyle(.secondary)
                 }
                 Section("目标与运动限制") {
-                    TextField("当前目标", text: $profile.goal)
-                    TextField("自述运动限制或医生建议（可选）", text: $profile.restrictions, axis: .vertical)
+                    HStack { Text("当前目标"); Spacer(); TextField("填写目标", text: $profile.goal).multilineTextAlignment(.trailing) }
+                    Picker("蛋白质参考倍率", selection: $profile.proteinFactor) {
+                        Text("按目标自动选择").tag(nil as Double?)
+                        ForEach([1.4, 1.6, 1.8, 2.0], id: \.self) { factor in Text("\(factor.formatted(.number.precision(.fractionLength(1)))) 克/公斤").tag(factor as Double?) }
+                    }
+                    Text("根据最近体重计算每日参考目标；普通健康成人训练参考范围 1.4–2.0 克/公斤。特殊疾病或医生限制应以专业建议为准。")
+                        .font(.caption).foregroundStyle(.secondary)
+                    LabeledContent("运动限制或医嘱") { TextField("可留空", text: $profile.restrictions, axis: .vertical).multilineTextAlignment(.trailing) }
                     Stepper("每日饮水目标 \(profile.waterGoalMl) ml", value: $profile.waterGoalMl, in: 100...10000, step: 100)
+                }
+                Section("每日饮食目标（留空自动计算）") {
+                    LabeledNumberField("热量", unit: "千卡", value: $profile.energyGoalKcal)
+                    LabeledNumberField("蛋白质", unit: "克", value: $profile.proteinGoalG)
+                    LabeledNumberField("脂肪", unit: "克", value: $profile.fatGoalG)
+                    LabeledNumberField("碳水化合物", unit: "克", value: $profile.carbGoalG)
+                    Text("留空时：热量参考近 7 天 Apple 健康的静息与活动能量；蛋白质参考最近体重和目标；脂肪、碳水参考热量分配。数据不足则显示待计算。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }.navigationTitle("基础档案").toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("保存") {
-                    guard profile.heightCm == nil || (50...250).contains(profile.heightCm!), profile.waistCm == nil || (20...300).contains(profile.waistCm!) else { store.error = "请检查身高和腰围的单位与数值"; return }
+                    guard profile.heightCm == nil || (50...250).contains(profile.heightCm!), profile.bodyMassKg == nil || (20...400).contains(profile.bodyMassKg!), profile.waistCm == nil || (20...300).contains(profile.waistCm!) else { store.error = "请检查身高、体重和腰围的单位与数值"; return }
+                    guard profile.energyGoalKcal == nil || (500...10000).contains(profile.energyGoalKcal!), profile.proteinGoalG == nil || (1...500).contains(profile.proteinGoalG!), profile.fatGoalG == nil || (1...500).contains(profile.fatGoalG!), profile.carbGoalG == nil || (1...1000).contains(profile.carbGoalG!) else { store.error = "请检查每日饮食目标的数值与单位"; return }
                     profile.id = newID(); profile.updatedAt = Date(); if store.save(profile, kind: "profile", id: profile.id) { dismiss() }
                 } }
             }
+        }
+    }
+}
+
+struct LabeledNumberField: View {
+    let title: String; let unit: String; @Binding var value: Double?
+    init(_ title: String, unit: String, value: Binding<Double?>) { self.title = title; self.unit = unit; self._value = value }
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer(minLength: 12)
+            TextField("自动", value: $value, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                .accessibilityLabel(title).frame(minWidth: 55)
+            Text(unit).foregroundStyle(.secondary).fixedSize()
         }
     }
 }
@@ -326,7 +362,7 @@ struct DeleteAccountView: View {
         NavigationStack {
             Form {
                 Text("删除账号将删除服务器中的训练、健康样本、报告和当前设备的账号记录；你创建的团队也会解散，其他团队中的排名会移除。无法恢复。不会删除 Apple 健康中的原始数据。")
-                AccountSecureField(placeholder: "输入当前账号密码", text: $password).frame(height: 36)
+                LabeledContent("当前密码") { AccountSecureField(placeholder: "输入密码", text: $password).frame(height: 36) }
                 Link("忘记密码或无法完成删除？联系支持", destination: URL(string: "https://health.gzqy.xyz/support")!)
                 Button("永久删除", role: .destructive) { dismissInputKeyboard(); confirm = true }.disabled(password.isEmpty)
             }.navigationTitle("删除账号").toolbar { Button("取消") { dismiss() } }

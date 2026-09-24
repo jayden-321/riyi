@@ -88,6 +88,18 @@ struct MealLog: Codable, Identifiable {
     var foodProductId: String?; var nutritionSource: String?
     var quantity: Double?; var quantityUnit: String?
     var energyBasisUnit: String?; var estimateMinKcal: Double?; var estimateMaxKcal: Double?
+    var proteinG: Double?; var proteinMinG: Double?; var proteinMaxG: Double?
+    var fatG: Double?; var fatMinG: Double?; var fatMaxG: Double?
+    var carbG: Double?; var carbMinG: Double?; var carbMaxG: Double?
+    var macroSource: String?
+    mutating func clearMacros() {
+        proteinG = nil; proteinMinG = nil; proteinMaxG = nil
+        fatG = nil; fatMinG = nil; fatMaxG = nil
+        carbG = nil; carbMinG = nil; carbMaxG = nil; macroSource = nil
+    }
+    mutating func clearEstimatedMacros() {
+        proteinMinG = nil; proteinMaxG = nil; fatMinG = nil; fatMaxG = nil; carbMinG = nil; carbMaxG = nil
+    }
     mutating func calculateEnergy() {
         if energyMethod == "unknown" {
             energyKcal = nil; grams = nil; kcalPer100 = nil; estimateMinKcal = nil; estimateMaxKcal = nil
@@ -102,12 +114,84 @@ struct MealLog: Codable, Identifiable {
     }
     var valid: Bool {
         guard !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, description.utf8.count <= 2000, eatenAt <= Date(), mealSlots.contains(where: { $0.0 == slot }) else { return false }
+        for (exact, low, high) in [(proteinG, proteinMinG, proteinMaxG), (fatG, fatMinG, fatMaxG), (carbG, carbMinG, carbMaxG)] {
+            if let exact, !exact.isFinite || !(0...10000).contains(exact) || low != nil || high != nil { return false }
+            if (low == nil) != (high == nil) { return false }
+            if let low, let high, !low.isFinite || !high.isFinite || !(0...10000).contains(low) || !(low...10000).contains(high) || macroSource?.isEmpty != false { return false }
+        }
         if energyMethod == "estimated_range" { guard energyKcal == nil, grams == nil, kcalPer100 == nil, let low = estimateMinKcal, let high = estimateMaxKcal else { return false }; return low.isFinite && high.isFinite && (0...30000).contains(low) && (low...30000).contains(high) && nutritionSource?.isEmpty == false }
         if energyMethod == "unknown" { return energyKcal == nil && estimateMinKcal == nil && estimateMaxKcal == nil }
         if estimateMinKcal != nil || estimateMaxKcal != nil { return false }
         guard let energyKcal, energyKcal.isFinite, (0...30000).contains(energyKcal) else { return false }
         if energyMethod == "label" { guard let grams, let kcalPer100, grams.isFinite, kcalPer100.isFinite, (0.1...10000).contains(grams), (0...1000).contains(kcalPer100) else { return false }; return abs(energyKcal - grams * kcalPer100 / 100) < 0.01 }
         return ["manual", "estimated"].contains(energyMethod)
+    }
+}
+
+struct MealMacroTotal {
+    let exactG: Double
+    let exactCount: Int
+    let minG: Double
+    let maxG: Double
+    let rangeCount: Int
+    let unknownCount: Int
+    var midpointG: Double { exactG + (minG + maxG) / 2 }
+    var hasEstimates: Bool { rangeCount > 0 }
+    var hasData: Bool { exactCount + rangeCount > 0 }
+    init(_ logs: [MealLog], exact: KeyPath<MealLog, Double?>, low: KeyPath<MealLog, Double?>, high: KeyPath<MealLog, Double?>) {
+        var exactTotal = 0.0, minTotal = 0.0, maxTotal = 0.0, unknown = 0, ranges = 0, singles = 0
+        for log in logs {
+            if let value = log[keyPath: exact], value.isFinite, value >= 0 { exactTotal += value; singles += 1 }
+            else if let minimum = log[keyPath: low], let maximum = log[keyPath: high], minimum.isFinite, maximum.isFinite, minimum >= 0, maximum >= minimum {
+                minTotal += minimum; maxTotal += maximum; ranges += 1
+            } else { unknown += 1 }
+        }
+        exactG = exactTotal; exactCount = singles; minG = minTotal; maxG = maxTotal; rangeCount = ranges; unknownCount = unknown
+    }
+}
+
+struct ProteinTarget {
+    let weightKg: Double
+    let factor: Double
+    var grams: Double { weightKg * factor }
+    static func make(weightKg: Double?, goal: String, chosenFactor: Double?) -> ProteinTarget? {
+        guard let weightKg, weightKg.isFinite, (20...400).contains(weightKg) else { return nil }
+        let factor: Double
+        if let chosenFactor { factor = chosenFactor }
+        else if goal.contains("减脂") || goal.contains("减重") { factor = 1.8 }
+        else if goal.contains("增肌") || goal.contains("力量") { factor = 1.6 }
+        else { factor = 1.4 }
+        guard (1.4...2.0).contains(factor) else { return nil }
+        return ProteinTarget(weightKg: weightKg, factor: factor)
+    }
+}
+
+struct DailyNutritionTargets {
+    let energyKcal: Double?
+    let proteinG: Double?
+    let fatG: Double?
+    let carbG: Double?
+    let energySource: String
+
+    static func make(profile: Profile, weightKg: Double?, energyBaselineKcal: Double?, energyBaselineDays: Int) -> Self {
+        let energy: Double?
+        let energySource: String
+        if let manual = profile.energyGoalKcal {
+            energy = manual; energySource = "手动目标"
+        } else if let baseline = energyBaselineKcal, energyBaselineDays >= 3 {
+            let factor = profile.goal.contains("减脂") || profile.goal.contains("减重") ? 0.9 : profile.goal.contains("增肌") || profile.goal.contains("增重") ? 1.1 : 1.0
+            energy = (baseline * factor / 10).rounded() * 10
+            energySource = "Apple 健康近\(energyBaselineDays)日消耗参考"
+        } else { energy = nil; energySource = "等待健康数据" }
+        let protein = profile.proteinGoalG ?? ProteinTarget.make(weightKg: weightKg, goal: profile.goal, chosenFactor: profile.proteinFactor)?.grams
+        let fat = profile.fatGoalG ?? energy.map { ($0 * 0.3 / 9).rounded() }
+        let carb = profile.carbGoalG ?? {
+            guard let energy, let protein, let fat else { return nil }
+            let remaining = energy - protein * 4 - fat * 9
+            guard remaining > 0 else { return nil }
+            return (remaining / 4).rounded()
+        }()
+        return Self(energyKcal: energy, proteinG: protein, fatG: fat, carbG: carb, energySource: energySource)
     }
 }
 
@@ -395,7 +479,8 @@ extension AppStore {
     }
     func meals(on date: String) -> [MealLog] { mealLogs.filter { DayKey.string($0.eatenAt, zone: settings.timezone) == date }.sorted { $0.eatenAt < $1.eatenAt } }
     func workouts(on date: String) -> [Workout] { workouts.filter { DayKey.string($0.startedAt, zone: settings.timezone) == date } }
-    func water(on date: String) -> Int { waters.filter { DayKey.string($0.drankAt, zone: settings.timezone) == date }.reduce(0) { $0 + $1.amountMl } }
+    func waters(on date: String) -> [WaterLog] { waters.filter { DayKey.string($0.drankAt, zone: settings.timezone) == date } }
+    func water(on date: String) -> Int { waters(on: date).reduce(0) { $0 + $1.amountMl } }
     func openPlanningChat(kind: String, start: Date, end: Date) {
         let from = DayKey.string(start, zone: settings.timezone), until = DayKey.string(end, zone: settings.timezone)
         var text = "请为我制定 \(from) 到 \(until)（含首尾日期）的\(kind == "diet" ? "饮食" : "训练")周期计划，按每天分别安排。"

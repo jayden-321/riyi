@@ -103,12 +103,22 @@ extension AppStore {
         let requestIdentity = message + "\nanalysis_date=" + (analysisDate ?? "")
         if coachPendingMessage != requestIdentity || coachPendingOwner != owner { coachPendingID = newID(); coachPendingMessage = requestIdentity; coachPendingOwner = owner }
         let submittedID = coachPendingID
+        // The server builds coach context from cloud meal_log, not local drafts.
+        // Never analyze a partial dinner while records are still in the outbox.
+        if pending.contains(where: { $0.kind == "meal" }) {
+            await synchronize(showErrors: false, recordsOnly: true)
+            for _ in 0..<20 where scope == owner && pending.contains(where: { $0.kind == "meal" }) {
+                try? await Task.sleep(for: .seconds(1))
+            }
+            guard scope == owner else { return false }
+            if pending.contains(where: { $0.kind == "meal" }) {
+                coachError = "饮食记录还没同步到云端，请在「我的 → 同步」检查待同步项目后重试，避免教练漏看。"
+                return false
+            }
+        }
         do {
             var body = ["request_id": coachPendingID, "message": message]
             if let analysisDate { body["analysis_date"] = analysisDate }
-            #if DEBUG
-            body["compare"] = "ab"
-            #endif
             let run: CoachRun = try Wire.read(await client.request("/v1/coach/message", method: "POST", body: Wire.data(body)))
             guard scope == owner else { return false }
             if run.status == "failed" { coachPendingID = newID(); coachError = "上次生成未完成，请点发送重试。"; await loadCoach(); return false }

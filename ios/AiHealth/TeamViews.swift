@@ -223,12 +223,12 @@ private struct TeamEntrySheet: View {
                     Section("邀请码") { TextField("粘贴队长发来的邀请码", text: $inviteCode).textInputAutocapitalization(.never).autocorrectionDisabled() }
                 }
                 Section("队内昵称") {
-                    TextField("队友看到的名字", text: $displayName)
+                    HStack { Text("显示名称"); Spacer(); TextField("队友看到的名字", text: $displayName).multilineTextAlignment(.trailing) }
                     Text("队友不会看到你的邮箱、训练详情或饮食内容。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("我的每日热量目标") {
-                    HStack { TextField("目标千卡", value: $calorieTarget, format: .number).keyboardType(.numberPad); Text("千卡") }
+                    HStack { Text("目标热量"); Spacer(); TextField("数值", value: $calorieTarget, format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing); Text("千卡") }
                     Text("按个人目标比较已记录的实际摄入：过多或明显不足都会少得分。请填写适合自己的目标，不要为了排名刻意少吃。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -315,7 +315,7 @@ private struct TeamDetailView: View {
                 Section("我的饮食目标") {
                     Text("本周每天 \(detail.myCalorieTarget) 千卡；队友看不到这个数字。")
                     if let next = detail.nextCalorieTarget, let week = detail.nextGoalWeek { Text("下周 \(week) 起：\(next) 千卡").font(.caption).foregroundStyle(.secondary) }
-                    HStack { TextField("调整为", value: $targetDraft, format: .number).keyboardType(.numberPad); Text("千卡") }
+                    HStack { Text("调整目标"); Spacer(); TextField("数值", value: $targetDraft, format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing); Text("千卡") }
                     Button("下周开始使用新目标") { Task { await scheduleGoal() } }
                         .disabled(busy || !(1200...4500).contains(targetDraft) || targetDraft == detail.myCalorieTarget)
                     Text("本周目标固定，调整后从下周一生效。目标应按个人情况设定，分数只反映记录与目标的接近程度。")

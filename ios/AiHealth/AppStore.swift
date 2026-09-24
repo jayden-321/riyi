@@ -70,6 +70,7 @@ import Observation
     var localHealthReadAt: Date?
     var localHealthSampleCount = 0
     var recentHealthSamples: [HealthSample] = []
+    var energyBaselineKcal: Double?; var energyBaselineDays = 0
     var error: String?; var syncing = false; var reportLoading = false; var lastSync: Date?
     var healthExportMessage: String?
     var healthStatus = "尚未读取健康数据"
@@ -90,10 +91,12 @@ import Observation
     func profileMetric(_ type: String) -> HealthMetric? {
         let local = localSummary?.metrics[type]
         let health = local?.value == nil ? cloudSummary?.metrics[type] : local
-        let manualRecord = (values("profile") as [Profile]).filter { type == "height_cm" ? $0.heightCm != nil : type == "waist_cm" && $0.waistCm != nil }.max { $0.measuredAt == $1.measuredAt ? $0.updatedAt < $1.updatedAt : $0.measuredAt < $1.measuredAt }
-        let manual = type == "height_cm" ? manualRecord?.heightCm : type == "waist_cm" ? manualRecord?.waistCm : nil
+        let manualRecord = (values("profile") as [Profile]).filter {
+            type == "height_cm" ? $0.heightCm != nil : type == "body_mass" ? $0.bodyMassKg != nil : type == "waist_cm" && $0.waistCm != nil
+        }.max { $0.measuredAt == $1.measuredAt ? $0.updatedAt < $1.updatedAt : $0.measuredAt < $1.measuredAt }
+        let manual = type == "height_cm" ? manualRecord?.heightCm : type == "body_mass" ? manualRecord?.bodyMassKg : type == "waist_cm" ? manualRecord?.waistCm : nil
         if let manual, let manualRecord, health?.value == nil || manualRecord.measuredAt >= (health?.observedAt ?? .distantPast) {
-            return HealthMetric(value: manual, unit: "cm", observedAt: manualRecord.measuredAt, source: "手动记录", samples: 1, coverage: "logged_only", method: "manual_profile_measurement")
+            return HealthMetric(value: manual, unit: type == "body_mass" ? "kg" : "cm", observedAt: manualRecord.measuredAt, source: "手动记录", samples: 1, coverage: "logged_only", method: "manual_profile_measurement")
         }
         return health
     }
@@ -221,7 +224,7 @@ import Observation
                                             rememberedAlias: base.absoluteString == Network.defaultURL ? UserDefaults.standard.string(forKey: CloudAccountScope.aliasKey(userID: accountID)) : nil)
             needsReauthentication = false; showReauthentication = false
             UserDefaults.standard.set(base.absoluteString, forKey: "serverURL"); UserDefaults.standard.set(false, forKey: "localDemo")
-            cloudSummary = nil; localSummary = nil; report = nil; lastSync = nil; restoreSettings(); reload(); Task { [weak self] in await self?.refreshLocalHealth() }
+            cloudSummary = nil; localSummary = nil; energyBaselineKcal = nil; energyBaselineDays = 0; report = nil; lastSync = nil; restoreSettings(); reload(); Task { [weak self] in await self?.refreshLocalHealth() }
             settings = try Wire.read(await client.request("/v1/settings")); persistSettings()
             syncing = false; await synchronize()
         } catch { self.error = error.localizedDescription }
@@ -237,7 +240,7 @@ import Observation
         coachPollTask?.cancel(); coachPollTask = nil; coachPollOwner = ""; coachPollRunID = ""
         coachState = nil; coachOwner = ""; coachError = nil; selectedTab = "today"; showWaterEntryFromReminder = false
         network.forget(); Keychain.remove(key: CloudAccountScope.previousURL); needsReauthentication = false; showReauthentication = false; UserDefaults.standard.set(false, forKey: "localDemo"); scope = ""; cloudSummary = nil; localSummary = nil; report = nil
-        lastSync = nil; settings = CloudSettings(); healthReadingEnabled = false; localHealthReadAt = nil; localHealthSampleCount = 0; recentHealthSamples = []; reload()
+        lastSync = nil; settings = CloudSettings(); healthReadingEnabled = false; localHealthReadAt = nil; localHealthSampleCount = 0; recentHealthSamples = []; energyBaselineKcal = nil; energyBaselineDays = 0; reload()
     }
     func logout() async {
         guard !syncing else { error = "同步进行中，请稍后退出"; return }
@@ -300,6 +303,13 @@ import Observation
             else { context.insert(PendingChange(scope: scope, kind: kind, recordId: id, payload: payload, deleted: deleted)) }
         }
         try context.save(); reload()
+        if kind == "meal" && !isDemo {
+            let owner = scope
+            Task { [weak self] in
+                guard let self, self.scope == owner else { return }
+                await self.synchronize(showErrors: false, recordsOnly: true)
+            }
+        }
     }
     func addWater(_ amount: Int, date: Date = Date(), source: String = "manual", id: String = newID()) {
         guard amount > 0 && amount <= 5000 else { error = "饮水量需为 1–5000 ml"; return }
@@ -318,7 +328,7 @@ import Observation
         let workout = Workout(activity: activity, scheduledBlockId: scheduledBlockId)
         if save(workout, kind: "workout", id: workout.id) { companionStarted?() }
     }
-    func synchronize(showErrors: Bool = true) async {
+    func synchronize(showErrors: Bool = true, recordsOnly: Bool = false) async {
         guard signedIn && !isDemo else { return }
         if syncing { syncAgain = true; return }
         syncing = true
@@ -344,6 +354,7 @@ import Observation
                 else { if let r = records.first(where: { $0.kind == q.kind && $0.recordId == q.recordId }) { r.version = reply.record.version }; context.delete(q) }
                 try context.save(); reload()
             }
+            if recordsOnly { if pending.isEmpty { lastSync = Date() }; return }
             let worker = await healthStorage.value
             var uploadedHealth = false
             if settings.healthConsent && !healthUploadPaused {
@@ -439,6 +450,7 @@ import Observation
                     let result = try await worker.overview(scope: owner, zone: self.settings.timezone, now: Date(), water: self.waterToday, since: self.healthWindowStart)
                     guard self.scope == owner && self.healthHistoryWindow == window else { continue }
                     self.localHealthSampleCount = result.count; self.recentHealthSamples = result.latest
+                    self.energyBaselineKcal = result.energyBaselineKcal; self.energyBaselineDays = result.energyBaselineDays ?? 0
                     self.localSummary = result.count > 0 || self.healthReadingEnabled ? result.summary : nil
                     if self.localHealthReadAt != nil && self.healthStatus == "尚未读取健康数据" { self.healthStatus = result.count > 0 ? "所选范围内已保存 \(result.count) 条健康记录" : "上次未读到可访问记录，请检查系统健康授权" }
                     self.reload()

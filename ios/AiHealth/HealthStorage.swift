@@ -3,7 +3,10 @@ import SwiftData
 
 struct HealthUploadBatch: Sendable { let id: String; let payload: Data; let count: Int }
 struct HealthUploadProgress: Sendable { let uploaded: Int; let target: Int; let pendingBatches: Int; let finished: Bool }
-struct HealthOverviewSnapshot: Codable { let count: Int; let latest: [HealthSample]; var summary: DailySummary }
+struct HealthOverviewSnapshot: Codable {
+    let count: Int; let latest: [HealthSample]; var summary: DailySummary
+    var energyBaselineKcal: Double?; var energyBaselineDays: Int?
+}
 struct LocalOverviewCache: Codable {
     let algorithm: Int
     let timezone: String
@@ -12,7 +15,7 @@ struct LocalOverviewCache: Codable {
     var water: Int
     var snapshot: HealthOverviewSnapshot
     init(timezone: String, date: String, since: Date, water: Int, snapshot: HealthOverviewSnapshot) {
-        algorithm = 1; self.timezone = timezone; self.date = date; self.since = since; self.water = water; self.snapshot = snapshot
+        algorithm = 2; self.timezone = timezone; self.date = date; self.since = since; self.water = water; self.snapshot = snapshot
     }
 }
 struct SleepDayCache: Codable {
@@ -327,7 +330,7 @@ actor HealthStorage {
         let key = scope + "/health_overview_cache/" + id
         var lookup = FetchDescriptor<LocalRecord>(predicate: #Predicate { $0.key == key }); lookup.fetchLimit = 1
         if let record = try modelContext.fetch(lookup).first,
-           var saved: LocalOverviewCache = try? Wire.read(record.payload), saved.algorithm == 1,
+           var saved: LocalOverviewCache = try? Wire.read(record.payload), saved.algorithm == 2,
            saved.timezone == zone, saved.date == date, saved.since == since {
             if saved.water != water {
                 saved.water = water
@@ -346,13 +349,14 @@ actor HealthStorage {
             newest.fetchLimit = 1
             if let row = try modelContext.fetch(newest).first { let s = try decoder.decode(HealthSample.self, from: row.payload); latest.append(s); samples.append(s) }
             guard !["height_cm", "waist_cm", "body_fat_percentage", "bmi", "lean_body_mass", "vo2_max", "workout"].contains(type) else { continue }
-            let days = type == "body_mass" ? 13 : type == "sleep_analysis" ? 2 : 1
+            let days = type == "body_mass" ? 13 : type == "sleep_analysis" ? 2 : ["active_energy", "basal_energy"].contains(type) ? 7 : 1
             let from = max(since, calendar.date(byAdding: .day, value: -days, to: today)!)
             let end = ["body_mass", "sleep_analysis"].contains(type) ? now : today
             let q = FetchDescriptor<LocalHealthRecord>(predicate: #Predicate { $0.scope == scope && !$0.tombstoned && $0.type == type && $0.endAt != nil && $0.endAt! >= from && $0.endAt! <= end })
             for row in try modelContext.fetch(q) { if row.sampleId != latest.last?.healthkitUuid { samples.append(try decoder.decode(HealthSample.self, from: row.payload)) } }
         }
-        let result = HealthOverviewSnapshot(count: count, latest: latest, summary: LocalHealthOverview.make(samples: samples, zone: zone, now: now, water: water))
+        let baseline = LocalHealthOverview.energyBaseline(samples: samples, zone: zone, now: now)
+        let result = HealthOverviewSnapshot(count: count, latest: latest, summary: LocalHealthOverview.make(samples: samples, zone: zone, now: now, water: water), energyBaselineKcal: baseline?.kcal, energyBaselineDays: baseline?.days)
         let record = try modelContext.fetch(lookup).first ?? LocalRecord(scope: scope, kind: "health_overview_cache", id: id, payload: Data())
         if record.modelContext == nil { modelContext.insert(record) }
         record.payload = try Wire.data(LocalOverviewCache(timezone: zone, date: date, since: since, water: water, snapshot: result)); record.updatedAt = now

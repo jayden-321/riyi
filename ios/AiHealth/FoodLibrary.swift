@@ -11,12 +11,16 @@ struct FoodProduct: Codable, Identifiable {
     var energyPer100: Double
     var energyUnit = "kJ"
     var basisUnit = "g"
+    var proteinPer100: Double?
+    var fatPer100: Double?
+    var carbPer100: Double?
     var source = "label"
     var sourceUrl: String?
     var originShareCode: String?
     var verifiedAt = Date()
 
     var kcalPer100: Double { energyUnit == "kJ" ? energyPer100 / 4.184 : energyPer100 }
+    func macroGrams(per100: Double?, amount: Double) -> Double? { per100.map { amount * $0 / 100 } }
     var amountPerUnit: Double? {
         guard let unitsPerPackage, unitsPerPackage > 0 else { return nil }
         return packageAmount / unitsPerPackage
@@ -37,7 +41,8 @@ struct FoodProduct: Codable, Identifiable {
         (0.1...100000).contains(packageAmount) && (0.1...10000).contains(energyPer100) &&
         packageUnit == basisUnit && ["g", "ml"].contains(basisUnit) && ["kJ", "kcal"].contains(energyUnit) &&
         (unitsPerPackage == nil || (unitsPerPackage!.isFinite && unitsPerPackage! >= 1 && unitsPerPackage! <= 10000)) &&
-        (unitsPerPackage == nil || !servingUnit.isEmpty && servingUnit.count <= 12)
+        (unitsPerPackage == nil || !servingUnit.isEmpty && servingUnit.count <= 12) &&
+        [proteinPer100, fatPer100, carbPer100].allSatisfy { $0 == nil || $0!.isFinite && (0...100).contains($0!) }
     }
 }
 
@@ -46,21 +51,38 @@ struct FoodPackageExtraction: Decodable {
     var packageAmount: Double?; var packageUnit: String?
     var unitsPerPackage: Double?; var servingUnit: String?
     var energyPer100: Double?; var energyUnit: String?; var basisUnit: String?
+    var proteinPer100: Double?; var fatPer100: Double?; var carbPer100: Double?
     var warnings: [String]
 }
 
 struct FoodMealRecognition: Decodable {
     var name: String; var foodKey: String; var quantity: Double?; var unit: String
     var additionsUnknown: Bool; var estimateMinKcal: Double?; var estimateMaxKcal: Double?; var estimateBasis: String; var questions: [String]
+    var proteinMinG: Double?; var proteinMaxG: Double?; var fatMinG: Double?; var fatMaxG: Double?; var carbMinG: Double?; var carbMaxG: Double?
 }
 
 struct FoodTextEstimate: Decodable {
     var estimateMinKcal: Double?; var estimateMaxKcal: Double?; var estimateBasis: String; var questions: [String]
+    var proteinMinG: Double?; var proteinMaxG: Double?; var fatMinG: Double?; var fatMaxG: Double?; var carbMinG: Double?; var carbMaxG: Double?
     var usableRange: (Double, Double)? {
         guard let low = estimateMinKcal, let high = estimateMaxKcal, low.isFinite, high.isFinite,
               (0...5000).contains(low), (low...5000).contains(high), !estimateBasis.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         return (low, high)
     }
+}
+
+func foodMacroRange(_ low: Double?, _ high: Double?) -> (Double, Double)? {
+    guard let low, let high, low.isFinite, high.isFinite, (0...1000).contains(low), (low...1000).contains(high) else { return nil }
+    return (low, high)
+}
+
+func applyEstimatedMacros(_ log: inout MealLog,
+                          protein: (Double?, Double?), fat: (Double?, Double?), carbs: (Double?, Double?), source: String) {
+    log.clearMacros()
+    if let range = foodMacroRange(protein.0, protein.1) { log.proteinMinG = range.0; log.proteinMaxG = range.1 }
+    if let range = foodMacroRange(fat.0, fat.1) { log.fatMinG = range.0; log.fatMaxG = range.1 }
+    if let range = foodMacroRange(carbs.0, carbs.1) { log.carbMinG = range.0; log.carbMaxG = range.1 }
+    if log.proteinMinG != nil || log.fatMinG != nil || log.carbMinG != nil { log.macroSource = source }
 }
 
 struct SharedFood: Decodable, Identifiable {
@@ -81,6 +103,12 @@ extension AppStore {
         var log = MealLog(slot: slot, description: "\(product.name) \(quantity.formatted(.number.precision(.fractionLength(0...1))))\(unit)", eatenAt: date, timezone: settings.timezone)
         log.energyMethod = "label"; log.grams = result.amount; log.kcalPer100 = product.kcalPer100
         log.energyKcal = result.kcal; log.foodProductId = product.id
+        log.proteinG = product.macroGrams(per100: product.proteinPer100, amount: result.amount)
+        log.fatG = product.macroGrams(per100: product.fatPer100, amount: result.amount)
+        log.carbG = product.macroGrams(per100: product.carbPer100, amount: result.amount)
+        if log.proteinG != nil || log.fatG != nil || log.carbG != nil {
+            log.macroSource = product.source == "imported" ? "导入商品的营养表" : "已核对的包装营养表"
+        }
         log.energyBasisUnit = product.basisUnit
         log.nutritionSource = product.source == "imported" ? "导入商品的包装营养表" : "已核对的商品包装营养表"
         log.quantity = quantity; log.quantityUnit = unit
@@ -178,7 +206,15 @@ extension AppStore {
     }
 
     func importSharedFood(_ shared: SharedFood) async throws -> FoodProduct {
-        if let existing = foodProducts.first(where: { $0.originShareCode == shared.code || $0.brand == shared.product.brand && $0.name == shared.product.name && $0.packageAmount == shared.product.packageAmount && $0.energyPer100 == shared.product.energyPer100 }) {
+        if let existing = foodProducts.first(where: { $0.originShareCode == shared.code }) {
+            let incoming = shared.product
+            if existing.name == incoming.name && existing.brand == incoming.brand && existing.packageAmount == incoming.packageAmount && existing.packageUnit == incoming.packageUnit && existing.unitsPerPackage == incoming.unitsPerPackage && existing.servingUnit == incoming.servingUnit && existing.energyPer100 == incoming.energyPer100 && existing.energyUnit == incoming.energyUnit && existing.basisUnit == incoming.basisUnit && existing.proteinPer100 == incoming.proteinPer100 && existing.fatPer100 == incoming.fatPer100 && existing.carbPer100 == incoming.carbPer100 { return existing }
+            var updated = shared.product; updated.id = existing.id; updated.source = "imported"; updated.originShareCode = shared.code; updated.verifiedAt = Date()
+            guard updated.valid, save(updated, kind: "food", id: updated.id) else { throw AppError.message("来源商品更新未保存") }
+            if !isDemo { await synchronize(showErrors: true) }
+            return updated
+        }
+        if let existing = foodProducts.first(where: { $0.brand == shared.product.brand && $0.name == shared.product.name && $0.packageAmount == shared.product.packageAmount && $0.energyPer100 == shared.product.energyPer100 }) {
             return existing
         }
         var copy = shared.product; copy.id = newID(); copy.source = "imported"; copy.originShareCode = shared.code; copy.verifiedAt = Date()

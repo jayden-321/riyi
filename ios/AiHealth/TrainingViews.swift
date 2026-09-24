@@ -70,13 +70,13 @@ struct PlanEditor: View {
                     }.accessibilityIdentifier("plan-sport-category")
                 }
                 Section("训练项目") {
-                    TextField("名称", text: $plan.name)
+                    HStack { Text("计划名称"); Spacer(); TextField("输入名称", text: $plan.name).multilineTextAlignment(.trailing) }
                     if strength { Text("选择动作后，在每个动作中填写组数、重量、次数和组模式。").font(.caption).foregroundStyle(.secondary) }
                     else { Text("\(sportTitle(plan.resolvedCategory))按实际运动时长记录；游泳、跑步等也可设距离目标。").font(.caption).foregroundStyle(.secondary) }
                 }
                 ForEach($plan.days) { $day in
                     Section(day.name) {
-                        TextField("训练日名称", text: $day.name)
+                        HStack { Text("训练日名称"); Spacer(); TextField("输入名称", text: $day.name).multilineTextAlignment(.trailing) }
                         if strength {
                             if day.exercises.isEmpty { Text("先从动作库选择动作").font(.caption).foregroundStyle(.secondary) }
                             Button { selectingDayID = day.id; replacingExerciseID = nil } label: { Label("从动作库选择动作", systemImage: "square.grid.2x2") }
@@ -84,17 +84,17 @@ struct PlanEditor: View {
                             Text(day.plannedVolumeKg > 0 ? "计划容量 \((day.plannedVolumeKg / 1000).formatted(.number.precision(.fractionLength(0...2)))) 吨 · 按下方正式组自动计算" : "填写正式组重量和次数后，自动计算计划容量")
                                 .font(.caption).foregroundStyle(.secondary)
                         } else {
-                            TextField("目标分钟数（可选）", value: Binding(get: { day.activity?.targetMinutes }, set: { day.activity?.targetMinutes = $0 }), format: .number).keyboardType(.numberPad)
+                            HStack { Text("目标时长"); Spacer(); TextField("可留空", value: Binding(get: { day.activity?.targetMinutes }, set: { day.activity?.targetMinutes = $0 }), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing); Text("分钟") }
                             if distanceSport {
-                                TextField("目标距离（米，可选）", value: Binding(get: { day.activity?.targetDistanceMeters }, set: { day.activity?.targetDistanceMeters = $0 }), format: .number).keyboardType(.decimalPad)
+                                HStack { Text("目标距离"); Spacer(); TextField("可留空", value: Binding(get: { day.activity?.targetDistanceMeters }, set: { day.activity?.targetDistanceMeters = $0 }), format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("米") }
                             }
-                            TextField("目标消耗（千卡，可选）", value: Binding(get: { day.activity?.targetEnergyKcal }, set: { day.activity?.targetEnergyKcal = $0 }), format: .number).keyboardType(.decimalPad)
+                            HStack { Text("目标消耗"); Spacer(); TextField("可留空", value: Binding(get: { day.activity?.targetEnergyKcal }, set: { day.activity?.targetEnergyKcal = $0 }), format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("千卡") }
                             if plan.resolvedCategory == "swimming" {
                                 Picker("游泳地点", selection: Binding(get: { day.activity?.swimLocation ?? "" }, set: { value in day.activity?.swimLocation = value.isEmpty ? nil : value; if value != "pool" { day.activity?.poolLengthMeters = nil } })) {
                                     Text("请选择").tag(""); Text("泳池游泳").tag("pool"); Text("开放水域游泳").tag("open_water")
                                 }
                                 if day.activity?.swimLocation == "pool" {
-                                    TextField("泳池长度（米）", value: Binding(get: { day.activity?.poolLengthMeters }, set: { day.activity?.poolLengthMeters = $0 }), format: .number).keyboardType(.decimalPad)
+                                    HStack { Text("泳池长度"); Spacer(); TextField("数值", value: Binding(get: { day.activity?.poolLengthMeters }, set: { day.activity?.poolLengthMeters = $0 }), format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("米") }
                                 }
                                 if !day.activity!.validConfiguration { Text("泳池游泳需填写实际泳池长度；开放水域不用填写泳池长度。").font(.caption).foregroundStyle(.orange) }
                             }
@@ -104,7 +104,7 @@ struct PlanEditor: View {
                     if strength {
                         ForEach($day.exercises) { $exercise in
                             Section(exercise.name) {
-                                if exercise.exerciseId == "custom" { TextField("自定义动作名称", text: $exercise.name) }
+                                if exercise.exerciseId == "custom" { HStack { Text("动作名称"); Spacer(); TextField("输入名称", text: $exercise.name).multilineTextAlignment(.trailing) } }
                                 else { Text(exercise.name).font(.headline) }
                                 Button("从动作库更换动作") { selectingDayID = day.id; replacingExerciseID = exercise.id }
                                 NavigationLink { ExerciseGuideView(store: store, exerciseId: exercise.exerciseId, name: exercise.name) } label: { Label("动作图解与说明", systemImage: "figure.strengthtraining.traditional") }
@@ -117,9 +117,9 @@ struct PlanEditor: View {
                                 ForEach($exercise.sets) { $set in
                                     HStack {
                                         Picker("组类型", selection: $set.role) { Text("正式").tag("working"); Text("热身").tag("warmup") }.pickerStyle(.menu).buttonStyle(.borderless).labelsHidden().frame(width: 85)
-                                        TextField("kg", value: $set.weight, format: .number).keyboardType(.decimalPad).frame(minWidth: 45)
+                                        Text("重量"); TextField("kg", value: $set.weight, format: .number).keyboardType(.decimalPad).frame(minWidth: 45)
                                         Text("kg ×").foregroundStyle(.secondary)
-                                        TextField("次数", value: $set.reps, format: .number).keyboardType(.numberPad).frame(minWidth: 30)
+                                        Text("次数"); TextField("次数", value: $set.reps, format: .number).keyboardType(.numberPad).frame(minWidth: 30)
                                         Button { exercise.sets.removeAll { $0.id == set.id } } label: { Image(systemName: "minus.circle").foregroundStyle(.red) }.buttonStyle(.borderless)
                                     }
                                 }
@@ -192,7 +192,7 @@ struct GroupEditor: View {
             }
             ForEach(groups) { $group in
                 Section("\(group.name) · \(groupTitle(group.style))") {
-                    TextField("组合名称", text: $group.name)
+                    HStack { Text("组合名称"); Spacer(); TextField("输入名称", text: $group.name).multilineTextAlignment(.trailing) }
                     ForEach(day.exercises) { exercise in
                         Toggle(exercise.name, isOn: Binding(get: { group.exerciseIds.contains(exercise.id) }, set: { selected in
                             if selected { group.exerciseIds.append(exercise.id) }
@@ -322,7 +322,7 @@ struct WorkoutView: View {
                     if active { TimelineView(.periodic(from: .now, by: 1)) { context in Text("\(paused ? "已暂停 · " : "")已运动 \(Int(workout.elapsedSeconds(at: context.date) / 60)) 分钟").monospacedDigit() } }
                     else if workout.finishedAt != nil { Text("实际 \(Int(workout.elapsedSeconds(at: Date()) / 60)) 分钟") }
                     if active {
-                        TextField("实际距离（米，可选）", value: $workout.actualDistanceMeters, format: .number).keyboardType(.decimalPad)
+                        HStack { Text("实际距离"); Spacer(); TextField("可留空", value: $workout.actualDistanceMeters, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text("米") }
                     } else if let distance = workout.actualDistanceMeters { Text("实际距离 \(distance.formatted()) 米") }
                 }
                 if active, workout.restUntil != nil {
@@ -385,7 +385,7 @@ struct WorkoutView: View {
                 RatingPicker(title: "训练前疼痛", value: $workout.feedback.painBefore)
                 RatingPicker(title: "训练中疼痛", value: $workout.feedback.painDuring)
                 RatingPicker(title: "疲劳程度", value: $workout.feedback.fatigue)
-                TextField("备注", text: $workout.feedback.note, axis: .vertical)
+                LabeledContent("训练备注") { TextField("可留空", text: $workout.feedback.note, axis: .vertical).multilineTextAlignment(.trailing) }
             }.disabled(!active)
             if workout.status == "completed" {
                 Section("Apple 健康") {
@@ -436,9 +436,9 @@ struct SetRow: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack { Text(set.role == "warmup" ? "热身组" : "正式组").font(.caption).foregroundStyle(.secondary); Spacer(); Text("计划 \(set.plannedWeight.formatted()) kg × \(set.plannedReps)").font(.subheadline) }
             HStack {
-                TextField("重量", value: Binding(get: { set.actualWeight ?? set.plannedWeight }, set: { set.actualWeight = $0 }), format: .number).keyboardType(.decimalPad)
+                Text("重量"); TextField("重量", value: Binding(get: { set.actualWeight ?? set.plannedWeight }, set: { set.actualWeight = $0 }), format: .number).keyboardType(.decimalPad)
                 Text("kg ×").foregroundStyle(.secondary)
-                TextField("次数", value: Binding(get: { set.actualReps ?? set.plannedReps }, set: { set.actualReps = $0 }), format: .number).keyboardType(.numberPad).accessibilityIdentifier("actual-reps-\(set.id)")
+                Text("次数"); TextField("次数", value: Binding(get: { set.actualReps ?? set.plannedReps }, set: { set.actualReps = $0 }), format: .number).keyboardType(.numberPad).accessibilityIdentifier("actual-reps-\(set.id)")
                 if set.status == "completed" { Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.green) }
                 if set.status == "skipped" { Text("已跳过").font(.caption).foregroundStyle(.secondary) }
             }.disabled(!editable || set.status != "pending")
@@ -451,7 +451,7 @@ struct SetRow: View {
             }
             DifficultyStars(value: $set.rpe).disabled(!editable)
             DisclosureGroup("本组备注") {
-                TextField("本组备注", text: $set.note)
+                HStack { Text("本组备注"); Spacer(); TextField("可留空", text: $set.note).multilineTextAlignment(.trailing) }
             }.font(.caption).disabled(!editable)
         }.padding(.vertical, 6)
     }
@@ -495,8 +495,9 @@ struct CheckinView: View {
             Form {
                 DatePicker("记录时间", selection: $value.recordedAt, in: ...Date())
                 RatingPicker(title: "疲劳程度", value: $value.fatigue); RatingPicker(title: "疼痛程度", value: $value.pain)
-                TextField("睡眠感受", text: $value.sleepFeeling); TextField("身体感受或症状", text: $value.note, axis: .vertical)
-                TextField("饮食情况（可选）", text: Binding(get: { value.dietNote ?? "" }, set: { value.dietNote = $0 }), axis: .vertical)
+                HStack { Text("睡眠感受"); Spacer(); TextField("填写感受", text: $value.sleepFeeling).multilineTextAlignment(.trailing) }
+                LabeledContent("身体感受或症状") { TextField("填写情况", text: $value.note, axis: .vertical).multilineTextAlignment(.trailing) }
+                LabeledContent("饮食情况") { TextField("可留空", text: Binding(get: { value.dietNote ?? "" }, set: { value.dietNote = $0 }), axis: .vertical).multilineTextAlignment(.trailing) }
                 Picker("关联训练（如次日反馈）", selection: Binding(get: { value.relatedWorkoutId ?? "" }, set: { value.relatedWorkoutId = $0.isEmpty ? nil : $0 })) {
                     Text("不关联").tag(""); ForEach(Array(store.workouts.prefix(20))) { w in Text("\(w.name) · \(w.startedAt.formatted(date: .abbreviated, time: .omitted))").tag(w.id) }
                 }
