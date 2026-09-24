@@ -265,7 +265,9 @@ extension AppStore {
         return []
     }
     func associatedBlockID(for workout: Workout, on date: String) -> String? {
-        let blocks = trainingBlocks(on: date)
+        associatedBlockID(for: workout, blocks: trainingBlocks(on: date))
+    }
+    func associatedBlockID(for workout: Workout, blocks: [TrainingBlock]) -> String? {
         if let id = workout.scheduledBlockId { return blocks.contains(where: { $0.id == id }) ? id : nil }
         if let planID = workout.planId {
             let matching = blocks.filter { $0.plan?.id == planID }

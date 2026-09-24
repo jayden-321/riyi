@@ -1,6 +1,24 @@
 import XCTest
 
 final class PlanningUITests: XCTestCase {
+    func testActivityRingsOpenSelectedDayDetails() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["AIHEALTH_UI_TEST_STORE"] = UUID().uuidString
+        app.launchArguments = ["--activity-rings-ui-test"]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["训练"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["open-activity-details"].waitForExistence(timeout: 5))
+        app.buttons["open-activity-details"].tap()
+        XCTAssertTrue(app.navigationBars["活动详情"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["选择日期"].exists)
+        XCTAssertTrue(app.buttons["上一周"].exists)
+        XCTAssertTrue(app.staticTexts["284/1,500 千卡"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["11/30 分钟"].exists)
+        XCTAssertTrue(app.staticTexts["10/12 小时"].exists)
+        XCTAssertTrue(app.staticTexts["2,559"].exists)
+        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "三环每日详情"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
     func testAppleFitnessHIITAppearsAsCompletedTraining() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -14,6 +32,7 @@ final class PlanningUITests: XCTestCase {
         workout.tap()
         XCTAssertTrue(app.staticTexts["从 Apple 健康导入 · Apple Watch"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["写入 Apple 健康"].exists)
+        XCTAssertFalse(app.staticTexts["当天活动圆环"].exists)
     }
     func testSelectedDateCanCreateSportTrainingDirectly() {
         continueAfterFailure = false

@@ -358,7 +358,6 @@ struct WorkoutView: View {
             }
             if !active {
                 WorkoutInsightsSection(store: store, workout: workout)
-                Section { DailyActivityRingsCard(date: workout.finishedAt ?? workout.startedAt, timezone: workout.timezone, refreshToken: store.localHealthReadAt) }
             }
             ForEach(workout.exercises.indices, id: \.self) { index in
                 if let group = (workout.groups ?? []).first(where: { $0.exerciseIds.contains(workout.exercises[index].id) }) {

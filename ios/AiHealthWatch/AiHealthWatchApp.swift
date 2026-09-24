@@ -51,14 +51,19 @@ struct WatchTrainingView: View {
     @State private var selectedOfferIndex = 0
     @State private var editDraft: WatchActualDraft?
     @State private var showStatus = false
+    @State private var ringRefreshRevision = 0
     @Environment(\.scenePhase) var scenePhase
     private let green = Color(red: 0.10, green: 0.37, blue: 0.27)
     private let cream = Color(red: 0.96, green: 0.98, blue: 0.94)
+    private var allOffersFinished: Bool {
+        !store.todayOffers.isEmpty && store.todayOffers.allSatisfy { $0.lastStatus == "completed" || $0.lastStatus == "cancelled" }
+    }
+    private var showIdleRings: Bool { allOffersFinished || store.todayOffers.isEmpty && store.todayStatus?.activityName == nil }
     var body: some View {
         GeometryReader { geometry in
             TimelineView(.periodic(from: .now, by: 1)) { timeline in
                 VStack(alignment: .leading, spacing: 5) {
-                    if let workout = store.displayWorkout {
+                    if let workout = store.displayWorkout, workout.status == "in_progress" {
                         if workout.status == "in_progress", workout.pausedAt != nil {
                             Text("训练已暂停").font(.headline)
                             Text("已运动 \(Int(workout.elapsedSeconds(at: timeline.date) / 60)) 分钟").font(.caption)
@@ -140,7 +145,10 @@ struct WatchTrainingView: View {
                         }.font(.system(size: 13, weight: .medium)).frame(height: 20)
                     } else {
                         VStack(alignment: .leading, spacing: 5) {
-                            if let offer = selectedOffer {
+                            if allOffersFinished {
+                                Text("今日训练已完成").font(.headline)
+                                Text("活动圆环按苹果当天进度显示").font(.caption2)
+                            } else if let offer = selectedOffer {
                                 Text(offer.day.name).font(.system(size: 16, weight: .semibold)).lineLimit(2)
                                 Text("\(sportTitle(offer.plan.resolvedCategory)) · \(selectedOfferIndex + 1)/\(store.todayOffers.count) · 左右滑动切换").font(.caption2)
                             } else if let name = store.todayStatus?.activityName {
@@ -163,6 +171,9 @@ struct WatchTrainingView: View {
                                 if value.translation.width < -25 { selectedOfferIndex = min(store.todayOffers.count - 1, selectedOfferIndex + 1) }
                                 if value.translation.width > 25 { selectedOfferIndex = max(0, selectedOfferIndex - 1) }
                             })
+                        if showIdleRings {
+                            WatchIdleActivityRings(now: timeline.date, refreshRevision: ringRefreshRevision)
+                        }
                         Spacer(minLength: 12)
                         if selectedOffer != nil { todayStartButton }
                     }
@@ -186,7 +197,7 @@ struct WatchTrainingView: View {
         .confirmationDialog("结束并保存这次运动？", isPresented: $activityFinishConfirm) {
             Button("完成运动") { store.finishActivity() }
         }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { store.flush() } }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { store.flush(); ringRefreshRevision += 1 } }
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--watch-editor-demo"),

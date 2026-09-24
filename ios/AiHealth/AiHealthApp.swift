@@ -42,6 +42,9 @@ import SwiftData
                 let cycle = PlanningCycle(name: "界面验证食谱",kind: "diet",startDate: date,endDate: date,timezone: state.settings.timezone,days: [CycleDay(date: date,meals: [meal])])
                 state.save(cycle,kind: "cycle",id: cycle.id)
             }
+            if ProcessInfo.processInfo.arguments.contains("--activity-rings-ui-test") {
+                state.startDemo(); state.selectedTab = "training"
+            }
             if ProcessInfo.processInfo.arguments.contains("--external-workout-ui-test") {
                 state.startDemo(); state.setHealthReading(true); state.selectedTab = "training"
                 let end = Date().addingTimeInterval(-30)

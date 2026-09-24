@@ -3,7 +3,7 @@ import UIKit
 import HealthKit
 import HealthKitUI
 
-private struct NativeActivityRings: UIViewRepresentable {
+struct NativeActivityRings: UIViewRepresentable {
     let summary: HKActivitySummary
     func makeUIView(context: Context) -> HKActivityRingView {
         let view = HKActivityRingView(frame: .zero)
@@ -14,8 +14,26 @@ private struct NativeActivityRings: UIViewRepresentable {
 }
 
 enum ActivityRingsReader {
-    static func load(date: Date, timezone: String) async throws -> HKActivitySummary? {
-        guard HKHealthStore.isHealthDataAvailable() else { return nil }
+    #if DEBUG
+    static func previewSummary() -> HKActivitySummary {
+        let summary = HKActivitySummary()
+        summary.activityMoveMode = .activeEnergy
+        summary.activeEnergyBurned = HKQuantity(unit: .kilocalorie(), doubleValue: 284)
+        summary.activeEnergyBurnedGoal = HKQuantity(unit: .kilocalorie(), doubleValue: 1500)
+        summary.appleExerciseTime = HKQuantity(unit: .minute(), doubleValue: 11)
+        summary.appleExerciseTimeGoal = HKQuantity(unit: .minute(), doubleValue: 30)
+        summary.appleStandHours = HKQuantity(unit: .count(), doubleValue: 10)
+        summary.appleStandHoursGoal = HKQuantity(unit: .count(), doubleValue: 12)
+        return summary
+    }
+    #endif
+    static func loadWeek(containing date: Date, timezone: String) async throws -> [String: HKActivitySummary] {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--activity-rings-ui-test") {
+            return [DayKey.string(date, zone: timezone): previewSummary()]
+        }
+        #endif
+        guard HKHealthStore.isHealthDataAvailable() else { return [:] }
         let health = HKHealthStore(), type = HKObjectType.activitySummaryType()
         let status = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HKAuthorizationRequestStatus, Error>) in
             health.getRequestStatusForAuthorization(toShare: [], read: [type]) { value, error in
@@ -24,67 +42,67 @@ enum ActivityRingsReader {
             }
         }
         if status == .shouldRequest { try await health.requestAuthorization(toShare: [], read: [type]) }
-        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: timezone) ?? .current
-        var day = calendar.dateComponents([.year, .month, .day], from: date)
-        day.calendar = calendar
-        guard let nextDate = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) else { return nil }
-        var nextDay = calendar.dateComponents([.year, .month, .day], from: nextDate)
-        nextDay.calendar = calendar
-        let predicate = HKQuery.predicate(forActivitySummariesBetweenStart: day, end: nextDay)
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HKActivitySummary?, Error>) in
+        var calendar = DayKey.calendar(timezone)
+        calendar.firstWeekday = 2
+        let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? calendar.startOfDay(for: date)
+        let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart)!
+        var first = calendar.dateComponents([.year, .month, .day], from: weekStart)
+        var last = calendar.dateComponents([.year, .month, .day], from: weekEnd)
+        first.calendar = calendar; last.calendar = calendar
+        let predicate = HKQuery.predicate(forActivitySummariesBetweenStart: first, end: last)
+        let summaries: [HKActivitySummary] = try await withCheckedThrowingContinuation { continuation in
             let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, error in
                 if let error { continuation.resume(throwing: error) }
-                else { continuation.resume(returning: summaries?.first(where: {
-                    let found = $0.dateComponents(for: calendar)
-                    return found.year == day.year && found.month == day.month && found.day == day.day
-                })) }
+                else { continuation.resume(returning: summaries ?? []) }
             }
             health.execute(query)
         }
+        var result: [String: HKActivitySummary] = [:]
+        for summary in summaries {
+            guard let day = calendar.date(from: summary.dateComponents(for: calendar)), day >= weekStart && day < weekEnd else { continue }
+            result[DayKey.string(day, zone: timezone)] = summary
+        }
+        return result
     }
 }
 
 struct DailyActivityRingsCard: View {
     let date: Date
     let timezone: String
-    var refreshToken: Date? = nil
-    @State private var summary: HKActivitySummary?
-    @State private var loading = true
+    let summary: HKActivitySummary?
+    let loading: Bool
+    let refresh: () -> Void
     private func number(_ value: Double) -> String { Int(value.rounded()).formatted() }
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("当天活动圆环").font(.headline)
                 Spacer()
-                Button("刷新") { Task { await load() } }.font(.caption).disabled(loading)
+                Button("刷新", action: refresh).font(.caption).disabled(loading)
             }
             if let summary {
-                HStack(spacing: 16) {
-                    NativeActivityRings(summary: summary).frame(width: 116, height: 116)
-                    VStack(alignment: .leading, spacing: 8) {
-                        if summary.activityMoveMode == .appleMoveTime {
-                            ringLine("活动", value: summary.appleMoveTime.doubleValue(for: .minute()), goal: summary.appleMoveTimeGoal.doubleValue(for: .minute()), unit: "分钟", color: .red)
-                        } else {
-                            ringLine("活动", value: summary.activeEnergyBurned.doubleValue(for: .kilocalorie()), goal: summary.activeEnergyBurnedGoal.doubleValue(for: .kilocalorie()), unit: "千卡", color: .red)
+                NavigationLink {
+                    ActivityRingsDetailView(date: date, timezone: timezone)
+                } label: {
+                    HStack(spacing: 16) {
+                        NativeActivityRings(summary: summary).frame(width: 116, height: 116)
+                        VStack(alignment: .leading, spacing: 8) {
+                            if summary.activityMoveMode == .appleMoveTime {
+                                ringLine("活动", value: summary.appleMoveTime.doubleValue(for: .minute()), goal: summary.appleMoveTimeGoal.doubleValue(for: .minute()), unit: "分钟", color: .red)
+                            } else {
+                                ringLine("活动", value: summary.activeEnergyBurned.doubleValue(for: .kilocalorie()), goal: summary.activeEnergyBurnedGoal.doubleValue(for: .kilocalorie()), unit: "千卡", color: .red)
+                            }
+                            ringLine("锻炼", value: summary.appleExerciseTime.doubleValue(for: .minute()), goal: summary.appleExerciseTimeGoal.doubleValue(for: .minute()), unit: "分钟", color: .green)
+                            ringLine("站立", value: summary.appleStandHours.doubleValue(for: .count()), goal: summary.appleStandHoursGoal.doubleValue(for: .count()), unit: "小时", color: .blue)
                         }
-                        ringLine("锻炼", value: summary.appleExerciseTime.doubleValue(for: .minute()), goal: summary.appleExerciseTimeGoal.doubleValue(for: .minute()), unit: "分钟", color: .green)
-                        ringLine("站立", value: summary.appleStandHours.doubleValue(for: .count()), goal: summary.appleStandHoursGoal.doubleValue(for: .count()), unit: "小时", color: .blue)
                     }
-                }
+                }.buttonStyle(.plain).accessibilityIdentifier("open-activity-details")
                 Text("苹果健康的全天进度，包含当天其他活动；不是这一场训练独得的三个分数。")
                     .font(.caption2).foregroundStyle(.secondary)
             } else if loading { ProgressView("读取 Apple 健康活动圆环…") }
             else { Text("这一天暂无可读取的活动圆环；请在 Apple 健康中允许日益读取活动汇总。")
                     .font(.caption).foregroundStyle(.secondary) }
         }
-        .task(id: DayKey.string(date, zone: timezone) + "/" + String(refreshToken?.timeIntervalSince1970 ?? 0)) {
-            await load()
-        }
-    }
-    private func load() async {
-        loading = true
-        summary = try? await ActivityRingsReader.load(date: date, timezone: timezone)
-        loading = false
     }
     private func ringLine(_ title: String, value: Double, goal: Double, unit: String, color: Color) -> some View {
         HStack(spacing: 4) {
@@ -238,9 +256,6 @@ struct WorkoutSummaryView: View {
                 WorkoutShareCard(workout: workout, heart: heart, energyKcal: displayedEnergyKcal)
                     .clipShape(RoundedRectangle(cornerRadius: 22))
                     .shadow(color: Color.black.opacity(0.06), radius: 14, y: 7)
-                DailyActivityRingsCard(date: workout.finishedAt ?? workout.startedAt, timezone: workout.timezone, refreshToken: store.localHealthReadAt)
-                    .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 18))
                 if loading { ProgressView("正在读取心率统计…") }
                 else if heart == nil {
                     Text("本次暂无可关联的手表心率采样；分享图不会显示虚构数值。")
