@@ -128,11 +128,34 @@ import Observation
     init(container: ModelContainer) {
         self.container = container; context = ModelContext(container); context.autosaveEnabled = false
         healthStorage = Task.detached { HealthStorage(modelContainer: container) }
-        let url = UserDefaults.standard.string(forKey: "serverURL") ?? Network.defaultURL
-        network = Network(baseURL: URL(string: url) ?? URL(string: "http://localhost:18089")!)
+        #if DEBUG
+        let url = ProcessInfo.processInfo.environment["AIHEALTH_TEST_SERVER_URL"] ?? Network.defaultURL
+        #else
+        let url = Network.defaultURL
+        #endif
+        let previousURL = UserDefaults.standard.string(forKey: "serverURL")
+        let fixed = URL(string: url) ?? URL(string: "https://health.gzqy.xyz")!
+        let client = Network(baseURL: fixed)
+        let previousSession = Keychain.read(key: CloudAccountScope.previousURL)
+        let previousTokens = previousSession.flatMap { try? Wire.read($0, as: Tokens.self) }
+        if url == Network.defaultURL, previousURL == CloudAccountScope.previousURL, let previousTokens {
+            UserDefaults.standard.set(CloudAccountScope.previousURL + "/" + previousTokens.userId,
+                                      forKey: CloudAccountScope.aliasKey(userID: previousTokens.userId))
+        }
+        if client.tokens == nil, url == Network.defaultURL, previousURL == CloudAccountScope.previousURL,
+           let previousSession, let previousTokens,
+           (try? Keychain.save(previousSession, key: fixed.absoluteString)) != nil {
+            client.tokens = previousTokens
+        }
+        network = client
         observeSessionExpiry()
-        if let t = network.tokens { scope = network.baseURL.absoluteString + "/" + t.userId }
+        if let t = network.tokens {
+            let key = CloudAccountScope.aliasKey(userID: t.userId)
+            scope = CloudAccountScope.value(currentURL: fixed.absoluteString, userID: t.userId,
+                                            rememberedAlias: UserDefaults.standard.string(forKey: key))
+        }
         else if UserDefaults.standard.bool(forKey: "localDemo") { scope = "local-demo" }
+        UserDefaults.standard.set(url, forKey: "serverURL")
         restoreSettings(); reload(); promoteWalkingRecovery(); Task { [weak self] in await self?.refreshLocalHealth() }
     }
     private func observeSessionExpiry() {
@@ -145,8 +168,10 @@ import Observation
     func reauthenticate(email: String, password: String) async -> Bool {
         guard signedIn, !isDemo, !reauthenticating else { return false }
         let owner = scope
-        guard owner.hasPrefix(network.baseURL.absoluteString + "/") else { error = "账号空间与服务器地址不一致"; return false }
-        let userID = String(owner.dropFirst(network.baseURL.absoluteString.count + 1))
+        guard let userID = network.tokens?.userId,
+              owner == CloudAccountScope.value(currentURL: network.baseURL.absoluteString, userID: userID,
+                                               rememberedAlias: UserDefaults.standard.string(forKey: CloudAccountScope.aliasKey(userID: userID)))
+        else { error = "账号空间与登录信息不一致"; return false }
         reauthenticating = true
         defer { reauthenticating = false }
         do {
@@ -190,7 +215,10 @@ import Observation
         syncing = true; defer { syncing = false }
         do {
             let client = Network(baseURL: base); try await client.authenticate(email: email, password: password, register: register)
-            network = client; observeSessionExpiry(); scope = base.absoluteString + "/" + client.tokens!.userId
+            network = client; observeSessionExpiry()
+            let accountID = client.tokens!.userId
+            scope = CloudAccountScope.value(currentURL: base.absoluteString, userID: accountID,
+                                            rememberedAlias: base.absoluteString == Network.defaultURL ? UserDefaults.standard.string(forKey: CloudAccountScope.aliasKey(userID: accountID)) : nil)
             needsReauthentication = false; showReauthentication = false
             UserDefaults.standard.set(base.absoluteString, forKey: "serverURL"); UserDefaults.standard.set(false, forKey: "localDemo")
             cloudSummary = nil; localSummary = nil; report = nil; lastSync = nil; restoreSettings(); reload(); Task { [weak self] in await self?.refreshLocalHealth() }
@@ -208,7 +236,7 @@ import Observation
         Notifications.shared.cancel()
         coachPollTask?.cancel(); coachPollTask = nil; coachPollOwner = ""; coachPollRunID = ""
         coachState = nil; coachOwner = ""; coachError = nil; selectedTab = "today"; showWaterEntryFromReminder = false
-        network.forget(); needsReauthentication = false; showReauthentication = false; UserDefaults.standard.set(false, forKey: "localDemo"); scope = ""; cloudSummary = nil; localSummary = nil; report = nil
+        network.forget(); Keychain.remove(key: CloudAccountScope.previousURL); needsReauthentication = false; showReauthentication = false; UserDefaults.standard.set(false, forKey: "localDemo"); scope = ""; cloudSummary = nil; localSummary = nil; report = nil
         lastSync = nil; settings = CloudSettings(); healthReadingEnabled = false; localHealthReadAt = nil; localHealthSampleCount = 0; recentHealthSamples = []; reload()
     }
     func logout() async {

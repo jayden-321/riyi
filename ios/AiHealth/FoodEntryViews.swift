@@ -400,7 +400,7 @@ struct FoodImportView: View {
                 Section {
                     Text("导入前请确认品牌、规格和营养表相同。朋友的饮食记录不会导入。").font(.caption).foregroundStyle(.secondary)
                     NavigationLink("管理已屏蔽来源") { BlockedFoodSourcesView(store: store) }
-                    Link("联系日益支持", destination: URL(string: "https://health.qyos.top/support")!)
+                    Link("联系日益支持", destination: URL(string: "https://health.gzqy.xyz/support")!)
                 }
                 if let notice { Section { Text(notice).foregroundStyle(Theme.green) } }
                 if let error { Section { Text(error).foregroundStyle(.red) } }

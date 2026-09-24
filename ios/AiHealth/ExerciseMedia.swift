@@ -19,7 +19,7 @@ actor ExerciseMediaCache {
         config.urlCache = nil; config.httpCookieStorage = nil; config.httpMaximumConnectionsPerHost = 3
         config.timeoutIntervalForRequest = 25; config.timeoutIntervalForResource = 45
         self.session = session ?? URLSession(configuration: config)
-        var address = "https://health.qyos.top/media/exercises/" + Self.version
+        var address = "https://health.gzqy.xyz/media/exercises/" + Self.version
         #if DEBUG
         if let testURL = ProcessInfo.processInfo.environment["AIHEALTH_EXERCISE_MEDIA_BASE"], testURL.hasPrefix("http://127.0.0.1:") { address = testURL }
         #endif
