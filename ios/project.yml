@@ -27,7 +27,7 @@ targets:
         INFOPLIST_FILE: AiHealth/Info.plist
         CODE_SIGN_ENTITLEMENTS: AiHealth/AiHealth.entitlements
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '57'
+        CURRENT_PROJECT_VERSION: '58'
     dependencies:
       - target: AiHealthWatch
     scheme:
@@ -64,7 +64,7 @@ targets:
         INFOPLIST_FILE: AiHealthWatch/Info.plist
         CODE_SIGN_ENTITLEMENTS: AiHealthWatch/AiHealthWatch.entitlements
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '57'
+        CURRENT_PROJECT_VERSION: '58'
     scheme:
       testTargets: [AiHealthWatchUITests]
   AiHealthWatchUITests:

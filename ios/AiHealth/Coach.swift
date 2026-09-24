@@ -106,6 +106,9 @@ extension AppStore {
         do {
             var body = ["request_id": coachPendingID, "message": message]
             if let analysisDate { body["analysis_date"] = analysisDate }
+            #if DEBUG
+            body["compare"] = "ab"
+            #endif
             let run: CoachRun = try Wire.read(await client.request("/v1/coach/message", method: "POST", body: Wire.data(body)))
             guard scope == owner else { return false }
             if run.status == "failed" { coachPendingID = newID(); coachError = "上次生成未完成，请点发送重试。"; await loadCoach(); return false }
