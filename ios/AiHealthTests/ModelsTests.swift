@@ -1,8 +1,25 @@
 import XCTest
 import SwiftData
+import HealthKit
 @testable import AiHealth
 
 final class ModelsTests: XCTestCase {
+    func testEveryTrainingCategoryHasTheIntendedAppleWorkoutType() {
+        let expected: [String: HKWorkoutActivityType] = [
+            "hiit": .highIntensityIntervalTraining, "pilates": .pilates, "swimming": .swimming,
+            "running": .running, "cycling": .cycling, "walking": .walking,
+            "yoga": .yoga, "hiking": .hiking, "rowing": .rowing,
+            "elliptical": .elliptical, "other": .other
+        ]
+        for option in sportOptions where option.code != "strength" {
+            var activity = TimedActivity(name: option.title, sport: option.code)
+            if option.code == "swimming" { activity.swimLocation = "pool"; activity.poolLengthMeters = 25 }
+            XCTAssertEqual(healthWorkoutConfiguration(for: Workout(activity: activity)).activityType, expected[option.code], option.code)
+        }
+        let plan = Plan.starter()
+        XCTAssertEqual(healthWorkoutConfiguration(for: Workout(plan: plan, day: plan.days[0])).activityType, .traditionalStrengthTraining)
+        XCTAssertEqual(healthWorkoutConfiguration(for: Workout(activity: TimedActivity(name: "新运动", sport: "future_sport"))).activityType, .other)
+    }
     @MainActor func testAppleFitnessHIITBecomesOneCompletedWorkoutAndFollowsDeletion() throws {
         let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let store = AppStore(container: container)

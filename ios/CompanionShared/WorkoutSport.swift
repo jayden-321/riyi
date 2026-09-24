@@ -22,8 +22,9 @@ func healthWorkoutConfiguration(for workout: Workout) -> HKWorkoutConfiguration 
     case "hiking": configuration.activityType = .hiking; configuration.locationType = .outdoor
     case "rowing": configuration.activityType = .rowing; configuration.locationType = .unknown
     case "elliptical": configuration.activityType = .elliptical; configuration.locationType = .indoor
+    case "strength": configuration.activityType = .traditionalStrengthTraining; configuration.locationType = .indoor
     case "other": configuration.activityType = .other; configuration.locationType = .unknown
-    default: configuration.activityType = .traditionalStrengthTraining; configuration.locationType = .indoor
+    default: configuration.activityType = .other; configuration.locationType = .unknown
     }
     return configuration
 }

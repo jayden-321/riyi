@@ -268,7 +268,7 @@ private struct WorkoutInsightsSection: View {
                 let volume = insights?.stats.completedVolumeKg ?? workout.completedVolumeKg
                 Text("实际容量 \((volume / 1000).formatted(.number.precision(.fractionLength(0...2)))) 吨")
             }
-            if let kcal = insights?.activeEnergyKcal { Text("Apple 健康记录活动能量 \(Int(kcal.rounded())) 千卡") }
+            if let kcal = insights?.activeEnergyKcal ?? workout.importedActiveEnergyKcal { Text("Apple 健康记录活动能量 \(Int(kcal.rounded())) 千卡") }
             if let heart = insights?.heartRate {
                 Text("心率采样均值 \(Int(heart.pointMeanBpm.rounded())) 次/分 · 最高 \(Int(heart.maxBpm.rounded())) · 最低 \(Int(heart.minBpm.rounded()))")
                 Text("共 \(heart.pointCount) 个采样点；这是采样点均值，不代表连续心率。")
@@ -356,7 +356,10 @@ struct WorkoutView: View {
                     }.accessibilityIdentifier("workout-summary")
                 }
             }
-            if !active { WorkoutInsightsSection(store: store, workout: workout) }
+            if !active {
+                WorkoutInsightsSection(store: store, workout: workout)
+                Section { DailyActivityRingsCard(date: workout.finishedAt ?? workout.startedAt, timezone: workout.timezone, refreshToken: store.localHealthReadAt) }
+            }
             ForEach(workout.exercises.indices, id: \.self) { index in
                 if let group = (workout.groups ?? []).first(where: { $0.exerciseIds.contains(workout.exercises[index].id) }) {
                     if group.exerciseIds.first == workout.exercises[index].id {

@@ -63,6 +63,9 @@ struct TrainingCalendarView: View {
         NavigationStack {
             List {
                 Section { PlanningCalendar(store: store,kind: "training") }
+                if selectedDate <= DayKey.string(Date(), zone: store.settings.timezone) {
+                    Section { DailyActivityRingsCard(date: store.calendarDate, timezone: store.settings.timezone, refreshToken: store.localHealthReadAt) }
+                }
                 if let active = store.activeWorkout,
                    selectedDate != DayKey.string(Date(), zone: store.settings.timezone) || store.associatedBlockID(for: active, on: selectedDate) == nil {
                     Section("正在训练") { NavigationLink("\(active.name) · 继续训练") { WorkoutView(store: store,workout: active) } }
