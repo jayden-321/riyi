@@ -24,6 +24,7 @@ import Observation
     @ObservationIgnored private var settingsRevision = 0
     var healthHistoryWindow: HealthHistoryWindow = .year
     var selectedTab = "today"
+    var showWaterEntryFromReminder = false
     var needsReauthentication = false
     var showReauthentication = false
     var reauthenticating = false
@@ -75,6 +76,12 @@ import Observation
     var healthAuthorizationNote = "实际读取范围以系统授权为准"
     var isDemo: Bool { scope == "local-demo" }
     var signedIn: Bool { !scope.isEmpty }
+    func openWaterEntryFromReminder() {
+        guard signedIn else { return }
+        calendarDate = Date()
+        selectedTab = "diet"
+        showWaterEntryFromReminder = true
+    }
     var plans: [Plan] { values("plan") }
     var workouts: [Workout] { values("workout").sorted { $0.startedAt > $1.startedAt } }
     var waters: [WaterLog] { values("water").sorted { $0.drankAt > $1.drankAt } }
@@ -163,7 +170,7 @@ import Observation
     }
     private func restoreSettings() {
         coachPollTask?.cancel(); coachPollTask = nil; coachPollOwner = ""; coachPollRunID = ""
-        coachState = nil; coachOwner = ""; coachError = nil; selectedTab = "today"
+        coachState = nil; coachOwner = ""; coachError = nil; selectedTab = "today"; showWaterEntryFromReminder = false
         sleepAuthReminderShown = false
         settings = CloudSettings()
         if let data = UserDefaults.standard.data(forKey: "settings.\(scope)"), let value: CloudSettings = try? Wire.read(data) { settings = value }
@@ -200,7 +207,7 @@ import Observation
         guard !syncing else { error = "同步进行中，请稍后退出"; return }
         Notifications.shared.cancel()
         coachPollTask?.cancel(); coachPollTask = nil; coachPollOwner = ""; coachPollRunID = ""
-        coachState = nil; coachOwner = ""; coachError = nil; selectedTab = "today"
+        coachState = nil; coachOwner = ""; coachError = nil; selectedTab = "today"; showWaterEntryFromReminder = false
         network.forget(); needsReauthentication = false; showReauthentication = false; UserDefaults.standard.set(false, forKey: "localDemo"); scope = ""; cloudSummary = nil; localSummary = nil; report = nil
         lastSync = nil; settings = CloudSettings(); healthReadingEnabled = false; localHealthReadAt = nil; localHealthSampleCount = 0; recentHealthSamples = []; reload()
     }

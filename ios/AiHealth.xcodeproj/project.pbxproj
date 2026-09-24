@@ -35,6 +35,7 @@
 		6B8B47B5AAFE0A12283D889A /* AiHealthApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5361C78C93164D03CFFB85 /* AiHealthApp.swift */; };
 		73F0149E936821717C968016 /* Planning.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBF2824D9B1582D007E9FCA6 /* Planning.swift */; };
 		7835511B8FDFF3739A6992BF /* HealthUploadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEE696821CE928BDDA713965 /* HealthUploadTests.swift */; };
+		7BF8A6D4562A23A7C6B67563 /* WaterNotificationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10EBFE861210284C0618249 /* WaterNotificationUITests.swift */; };
 		7FCF3D16249FFFE6CEA32BCC /* DeleteMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1369354AA1CA23722AF79C21 /* DeleteMigrationTests.swift */; };
 		80071F1B3F8FF30F8B5444C4 /* exercise_guides.json in Resources */ = {isa = PBXBuildFile; fileRef = 20744C85F59A9D56BE9D3145 /* exercise_guides.json */; };
 		8098D1355E8A56D316CF42EC /* CompanionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF8430B982E232AE4515119 /* CompanionTransport.swift */; };
@@ -69,6 +70,7 @@
 		D738BE1685A2EA8E400235AC /* WorkoutShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01FCCC78797EAE04738EF669 /* WorkoutShareCard.swift */; };
 		DBF98A6A1A17B6EB0FDD5F21 /* WorkoutSport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EA9B7A30F16A9845D6BE76 /* WorkoutSport.swift */; };
 		E4451F1BD19276A5751C123C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D5F3350DF5A906DE4EF153 /* Models.swift */; };
+		E500ADD3C4D0907E8E1686A5 /* DatabaseRecoveryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC10157B842DA6752AE5A413 /* DatabaseRecoveryUITests.swift */; };
 		EE354A7008E88A43DF481269 /* Network.swift in Sources */ = {isa = PBXBuildFile; fileRef = C624F46302C82B541804BF7A /* Network.swift */; };
 		F14AE43EA256A84025BAB3CE /* SleepHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64CB95C8BEF3F56CF69284F /* SleepHistory.swift */; };
 		F4A213A1ED3949E95006BE43 /* WorkoutHealthWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F636F76DA9E35701FEF48B98 /* WorkoutHealthWriter.swift */; };
@@ -157,6 +159,7 @@
 		8B5798D0570BFA1F64E3313C /* WatchWorkoutHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchWorkoutHealth.swift; sourceTree = "<group>"; };
 		91C732C1B3FA196A7631B3F9 /* TrainingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingViews.swift; sourceTree = "<group>"; };
 		94B33C9B2B8D2C9642EC71FF /* HealthSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSync.swift; sourceTree = "<group>"; };
+		A10EBFE861210284C0618249 /* WaterNotificationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaterNotificationUITests.swift; sourceTree = "<group>"; };
 		A14AF61781D5D4117D6D6494 /* AiHealthWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiHealthWatchApp.swift; sourceTree = "<group>"; };
 		A6C239408EF8FAD9922F44CA /* VitalViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitalViews.swift; sourceTree = "<group>"; };
 		AAF1252F16A15B2382C89110 /* PlanningViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningViews.swift; sourceTree = "<group>"; };
@@ -169,6 +172,7 @@
 		B3B48261EF467D8ADC253587 /* FoodEntryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodEntryUITests.swift; sourceTree = "<group>"; };
 		B9A1B18F5CF4205D6952E051 /* EnergySummaryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergySummaryUITests.swift; sourceTree = "<group>"; };
 		B9AE43CDFE004E98FC1CFBEC /* SleepUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepUITests.swift; sourceTree = "<group>"; };
+		BC10157B842DA6752AE5A413 /* DatabaseRecoveryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseRecoveryUITests.swift; sourceTree = "<group>"; };
 		C5464433470A7DCEEF427D12 /* SleepViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepViews.swift; sourceTree = "<group>"; };
 		C624F46302C82B541804BF7A /* Network.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Network.swift; sourceTree = "<group>"; };
 		C7809492D3E749B79AAC0357 /* VitalHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitalHistory.swift; sourceTree = "<group>"; };
@@ -272,6 +276,7 @@
 		9C3A8C7F709926F5B52BB78B /* AiHealthUITests */ = {
 			isa = PBXGroup;
 			children = (
+				BC10157B842DA6752AE5A413 /* DatabaseRecoveryUITests.swift */,
 				B9A1B18F5CF4205D6952E051 /* EnergySummaryUITests.swift */,
 				5B9974C55046DA72DB6486C1 /* ExerciseLibraryUITests.swift */,
 				8026F17243757F2553336799 /* FlowTests.swift */,
@@ -279,6 +284,7 @@
 				4C49BF4F39BC7466EE052104 /* PlanningUITests.swift */,
 				FB06FCA368D2B33E2A416DC3 /* SessionRecoveryUITests.swift */,
 				B9AE43CDFE004E98FC1CFBEC /* SleepUITests.swift */,
+				A10EBFE861210284C0618249 /* WaterNotificationUITests.swift */,
 				CBC5C6C9AB6062808E840FEA /* WeightUITests.swift */,
 			);
 			path = AiHealthUITests;
@@ -593,6 +599,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E500ADD3C4D0907E8E1686A5 /* DatabaseRecoveryUITests.swift in Sources */,
 				9278223C0E68CF642AEF0467 /* EnergySummaryUITests.swift in Sources */,
 				3D6FEEE35286110B99C42994 /* ExerciseLibraryUITests.swift in Sources */,
 				862AA4DE454CE1A5021C93DD /* FlowTests.swift in Sources */,
@@ -600,6 +607,7 @@
 				2BCF6F2E815681AE645A8FE9 /* PlanningUITests.swift in Sources */,
 				C2C3E61F589277D506E86EA5 /* SessionRecoveryUITests.swift in Sources */,
 				05E167C64733A929DD0D1B30 /* SleepUITests.swift in Sources */,
+				7BF8A6D4562A23A7C6B67563 /* WaterNotificationUITests.swift in Sources */,
 				1C7B8CDC7ECC891BD88D4DF0 /* WeightUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -636,7 +644,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 54;
+				CURRENT_PROJECT_VERSION = 55;
 				INFOPLIST_FILE = AiHealth/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -655,7 +663,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealth/AiHealth.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 54;
+				CURRENT_PROJECT_VERSION = 55;
 				INFOPLIST_FILE = AiHealth/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -741,7 +749,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
-				CURRENT_PROJECT_VERSION = 54;
+				CURRENT_PROJECT_VERSION = 55;
 				INFOPLIST_FILE = AiHealthWatch/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(RIYI_IOS_BUNDLE_ID).watchkitapp";
@@ -886,7 +894,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AiHealthWatch/AiHealthWatch.entitlements;
-				CURRENT_PROJECT_VERSION = 54;
+				CURRENT_PROJECT_VERSION = 55;
 				INFOPLIST_FILE = AiHealthWatch/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(RIYI_IOS_BUNDLE_ID).watchkitapp";

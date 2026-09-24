@@ -499,6 +499,7 @@ struct DietView: View {
                     } else { Text("还没有采用食谱。没有计划也可以记录实际吃喝。").foregroundStyle(.secondary) }
                 }
             }.navigationTitle("饮食").sheet(item: $editing) { log in MealLogEditor(store: store,log: log) }.sheet(isPresented: $planning) { PlanningRequestView(store: store,kind: "diet") }
+                .sheet(isPresented: $store.showWaterEntryFromReminder) { WaterView(store: store) }
                 .sheet(isPresented: $common) { FoodCommonView(store: store, date: store.calendarDate) }
                 .sheet(isPresented: $textEntry) { FoodTextEntryView(store: store, date: store.calendarDate) }
                 .sheet(isPresented: $photoEntry, onDismiss: { capturedImage = nil }) { FoodOutsidePhotoView(store: store, date: store.calendarDate, initialImage: capturedImage) }

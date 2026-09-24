@@ -70,6 +70,10 @@ struct ReminderSettings: Codable { var start = 8; var end = 22; var interval = 2
     private func handle(_ response: UNNotificationResponse) async {
         guard let store, let scope = response.notification.request.content.userInfo["scope"] as? String, scope == store.scope else { return }
         if response.notification.request.content.userInfo["coach"] as? Bool == true { store.selectedTab = "coach"; await store.loadCoach(); return }
+        if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
+            store.openWaterEntryFromReminder()
+            return
+        }
         if response.actionIdentifier == "snooze" {
             let content = response.notification.request.content.mutableCopy() as! UNMutableNotificationContent
             do { try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "water.snooze.\(newID())", content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 15 * 60, repeats: false))) }

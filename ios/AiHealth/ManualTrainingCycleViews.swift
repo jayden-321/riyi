@@ -130,11 +130,9 @@ private struct ManualCycleDaySection: View {
     var body: some View {
         Section(day.date) {
             Toggle("安排训练", isOn: Binding(get: { !day.rest }, set: { enabled in
-                day.rest = !enabled
-                if enabled {
-                    if day.sessions == nil { day.sessions = day.trainingBlocks }
-                    day.plan = nil; day.activity = nil
-                } else { day.sessions = nil; day.plan = nil; day.activity = nil }
+                var updated = day
+                updated.setTrainingEnabled(enabled)
+                day = updated
             })).accessibilityIdentifier("manual-day-toggle-\(day.date)")
             if !day.rest {
                 ForEach(Array(day.trainingBlocks.enumerated()), id: \.element.id) { index, block in
