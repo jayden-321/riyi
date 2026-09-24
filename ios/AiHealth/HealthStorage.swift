@@ -294,6 +294,31 @@ actor HealthStorage {
         }
         return visible.compactMap { found[DayKey.string($0, zone: zone)] }
     }
+    /// Narrow indexed body-mass read; opening the chart never scans other
+    /// HealthKit types or starts a fresh historical import.
+    func weightReadings(scope: String, since: Date, now: Date) throws -> [WeightReading] {
+        var query = FetchDescriptor<LocalHealthRecord>(predicate: #Predicate {
+            $0.scope == scope && !$0.tombstoned && $0.type == "body_mass" &&
+            $0.endAt != nil && $0.endAt! >= since && $0.endAt! <= now
+        }, sortBy: [SortDescriptor(\.endAt, order: .reverse)])
+        query.fetchLimit = 5000
+        let decoder = Wire.decoder()
+        return try Array(modelContext.fetch(query).compactMap { row in
+            WeightReading(sample: try decoder.decode(HealthSample.self, from: row.payload))
+        }.reversed())
+    }
+    func vitalReadings(scope: String, type: String, since: Date, now: Date) throws -> [VitalReading] {
+        guard ["resting_heart_rate", "hrv_sdnn"].contains(type) else { return [] }
+        var query = FetchDescriptor<LocalHealthRecord>(predicate: #Predicate {
+            $0.scope == scope && !$0.tombstoned && $0.type == type &&
+            $0.endAt != nil && $0.endAt! >= since && $0.endAt! <= now
+        }, sortBy: [SortDescriptor(\.endAt, order: .reverse)])
+        query.fetchLimit = 5000
+        let decoder = Wire.decoder()
+        return try Array(modelContext.fetch(query).compactMap { row in
+            VitalReading(sample: try decoder.decode(HealthSample.self, from: row.payload), type: type)
+        }.reversed())
+    }
     func overview(scope: String, zone: String, now: Date, water: Int, since: Date) throws -> HealthOverviewSnapshot {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: zone) ?? .current
         let today = calendar.startOfDay(for: now)

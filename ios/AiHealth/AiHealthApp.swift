@@ -69,6 +69,28 @@ import SwiftData
                     await state.refreshLocalHealth(markRead: true)
                 }
             }
+            if ProcessInfo.processInfo.arguments.contains("--weight-ui-test") {
+                state.startDemo(); state.selectedTab = "today"; state.settings.timezone = "Asia/Shanghai"
+                let end = Date().addingTimeInterval(-3600)
+                let calendar = DayKey.calendar("Asia/Shanghai")
+                let samples = (0..<21).flatMap { index -> [HealthSample] in
+                    let at = calendar.date(byAdding: .day, value: -index, to: end)!
+                    return [HealthSample(healthkitUuid: newID(), type: "body_mass", value: 76 + Double(index) * 0.1,
+                                        unit: "kg", startAt: at, endAt: at,
+                                        sourceName: "测试体重秤", sourceBundleId: "test.scale"),
+                            HealthSample(healthkitUuid: newID(), type: "resting_heart_rate", value: 58 + Double(index % 5),
+                                         unit: "bpm", startAt: at, endAt: at,
+                                         sourceName: "测试手表", sourceBundleId: "test.watch"),
+                            HealthSample(healthkitUuid: newID(), type: "hrv_sdnn", value: 42 + Double(index % 7),
+                                         unit: "ms", startAt: at, endAt: at,
+                                         sourceName: "测试手表", sourceBundleId: "test.watch")]
+                }
+                Task {
+                    try? await state.healthStorage.value.persist(samples: samples, anchor: nil,
+                                                                 cursorKey: "local-demo/synthetic-weight", scope: "local-demo", upload: false)
+                    await state.refreshLocalHealth(markRead: true)
+                }
+            }
             if ProcessInfo.processInfo.arguments.contains("--watch-start-pair-test") {
                 state.startDemo(); state.selectedTab = "training"
                 var plan = Plan.starter(); plan.scheduledDate = DayKey.string(Date(), zone: state.settings.timezone)
@@ -270,13 +292,22 @@ struct TodayView: View {
                     }
                     TodayTeamCard(store: store, refreshRevision: teamRefreshRevision)
                     LazyVGrid(columns: columns, spacing: 12) {
-                        metric("最近体重", key: "body_mass", unit: "kg", icon: "scalemass")
+                        NavigationLink {
+                            WeightDetailView(store: store, health: health)
+                        } label: { metric("最近体重", key: "body_mass", unit: "kg", icon: "scalemass") }
+                        .buttonStyle(.plain).accessibilityIdentifier("weight-summary")
                         NavigationLink {
                             SleepDetailView(store: store, health: health)
                         } label: { metric("昨晚睡眠", key: "sleep_total_minutes", unit: "分钟", icon: "moon") }
                         .buttonStyle(.plain).accessibilityIdentifier("sleep-summary")
-                        metric("昨日静息心率", key: "resting_heart_rate", unit: "bpm", icon: "heart")
-                        metric("昨日 HRV", key: "hrv_sdnn", unit: "ms", icon: "waveform.path.ecg")
+                        NavigationLink {
+                            VitalDetailView(store: store, health: health, type: "resting_heart_rate")
+                        } label: { metric("昨日静息心率", key: "resting_heart_rate", unit: "bpm", icon: "heart") }
+                        .buttonStyle(.plain).accessibilityIdentifier("resting-heart-summary")
+                        NavigationLink {
+                            VitalDetailView(store: store, health: health, type: "hrv_sdnn")
+                        } label: { metric("昨日 HRV", key: "hrv_sdnn", unit: "ms", icon: "waveform.path.ecg") }
+                        .buttonStyle(.plain).accessibilityIdentifier("hrv-summary")
                     }
                     if let date = store.localHealthReadAt { Text("最近本机健康读取：\(date.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary) }
                     if !store.healthReadingEnabled {

@@ -217,6 +217,59 @@ final class ModelsTests: XCTestCase {
         else { XCTFail("measured energy enrichment was lost") }
     }
 
+    func testWeightTrendKeepsOneSourceAndNeedsEnoughDays() throws {
+        let zone = "Asia/Shanghai"
+        let calendar = DayKey.calendar(zone)
+        let today = calendar.startOfDay(for: Date())
+        let readings: [WeightReading] = (0..<8).map { offset in
+            let at = calendar.date(byAdding: .day, value: -offset, to: today)!.addingTimeInterval(1)
+            return WeightReading(id: "scale-\(offset)", kg: 76 + Double(offset) * 0.1,
+                                 observedAt: at, sourceName: "体重秤", sourceBundleId: "scale")
+        } + [WeightReading(id: "manual", kg: 99, observedAt: today.addingTimeInterval(2),
+                           sourceName: "手动", sourceBundleId: "manual")]
+        XCTAssertEqual(WeightHistory.preferredSource(readings, zone: zone), "scale")
+        let selected = WeightHistory.dailyLatest(readings, source: "scale", zone: zone,
+                                                 from: calendar.date(byAdding: .day, value: -7, to: today)!, to: Date())
+        XCTAssertEqual(selected.count, 8)
+        XCTAssertTrue(selected.allSatisfy { $0.kg < 80 })
+        XCTAssertNil(WeightHistory.sevenDayMeanChange(readings, source: "scale", zone: zone, now: Date()))
+        let merged = WeightHistory.merge(local: [readings[0]], cloud: [readings[0], readings[1]])
+        XCTAssertEqual(merged.count, 2)
+    }
+
+    @MainActor func testWeightHistoryStorageFiltersScopeTypeAndDeletion() async throws {
+        let container = try ModelContainer(for: LocalRecord.self, PendingChange.self, HealthCursor.self, LocalHealthRecord.self, HealthUploadCheckpoint.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let worker = HealthStorage(modelContainer: container)
+        let at = Date().addingTimeInterval(-60)
+        let valid = HealthSample(healthkitUuid: newID(), type: "body_mass", value: 76.4, unit: "kg", startAt: at, endAt: at, sourceBundleId: "scale")
+        let heart = HealthSample(healthkitUuid: newID(), type: "heart_rate", value: 70, unit: "bpm", startAt: at, endAt: at, sourceBundleId: "watch")
+        var deleted = HealthSample(healthkitUuid: newID(), type: "body_mass", value: 88, unit: "kg", startAt: at, endAt: at, sourceBundleId: "scale")
+        try await worker.persist(samples: [valid, heart, deleted], anchor: nil, cursorKey: "owner/weight", scope: "owner", upload: false)
+        try await worker.persist(samples: [valid], anchor: nil, cursorKey: "other/weight", scope: "other", upload: false)
+        deleted.deleted = true
+        try await worker.persist(samples: [deleted], anchor: nil, cursorKey: "owner/delete", scope: "owner", upload: false)
+        let owner = try await worker.weightReadings(scope: "owner", since: at.addingTimeInterval(-1), now: Date())
+        XCTAssertEqual(owner.map(\.kg), [76.4])
+        let other = try await worker.weightReadings(scope: "other", since: at.addingTimeInterval(-1), now: Date())
+        XCTAssertEqual(other.count, 1)
+    }
+
+    func testHRVTrendUsesDailyMedianAndRestingHeartUsesLastReading() {
+        let zone = "Asia/Shanghai"
+        let day = DayKey.calendar(zone).startOfDay(for: Date())
+        let values = [30.0, 50.0, 100.0].enumerated().map { index, value in
+            VitalReading(id: "v\(index)", value: value, observedAt: day.addingTimeInterval(Double(index + 1)),
+                         sourceName: "手表", sourceBundleId: "watch")
+        }
+        let hrv = VitalHistory.dailyPoints(values, type: "hrv_sdnn", source: "watch", zone: zone, from: day, to: Date())
+        XCTAssertEqual(hrv.count, 1)
+        XCTAssertEqual(hrv.first?.value, 50)
+        XCTAssertEqual(hrv.first?.samples, 3)
+        let resting = VitalHistory.dailyPoints(values, type: "resting_heart_rate", source: "watch", zone: zone, from: day, to: Date())
+        XCTAssertEqual(resting.first?.value, 100)
+        XCTAssertEqual(VitalHistory.merge(local: [values[0]], cloud: values).count, 3)
+    }
+
     @MainActor func testLiveClientSyncContract() async throws {
         guard let endpoint = ProcessInfo.processInfo.environment["AICORE_TEST_API"], let url = URL(string: endpoint) else { throw XCTSkip("AICORE_TEST_API required for local HTTP integration") }
         let client = Network(baseURL: url)
