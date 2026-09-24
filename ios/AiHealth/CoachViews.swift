@@ -155,13 +155,17 @@ struct CoachRunCard: View {
                     Spacer()
                 }
                 if let result = run.result {
-                    #if DEBUG
-                    if run.kind == "chat", result.variantB != nil {
-                        Text("A · 日益当前方案").font(.subheadline.bold()).foregroundStyle(Theme.green)
+                    if run.kind == "chat", let previous = result.variantB {
+                        if previous.error != nil { Text("这条旧版对照回答未完成，可重新提问。") }
+                        else {
+                            Text(previous.message).lineSpacing(4)
+                            ForEach(Array(previous.questions.enumerated()), id: \.offset) { _, question in Text("· \(question)").fontWeight(.medium) }
+                        }
+                    } else {
+                        Text(result.message).lineSpacing(4)
+                        ForEach(Array(result.questions.enumerated()), id: \.offset) { _, question in Text("· \(question)").fontWeight(.medium) }
                     }
-                    #endif
-                    Text(result.message).lineSpacing(4)
-                    ForEach(Array(result.questions.enumerated()), id: \.offset) { _, question in Text("· \(question)").fontWeight(.medium) }
+                    if result.variantB == nil {
                     if let cycle = result.cycle {
                         Divider(); Text(cycle.name).font(.headline)
                         Text("\(cycle.startDate) — \(cycle.endDate) · \(cycle.days.count) 天").font(.subheadline)
@@ -201,18 +205,7 @@ struct CoachRunCard: View {
                         ForEach(Array(menu.notes.enumerated()), id: \.offset) { _, note in Text(note).font(.caption).foregroundStyle(.secondary) }
                         Button("采用到饮食日历") { preview = run.legacyCycle(kind: "diet") }.buttonStyle(.borderedProminent)
                     }
-                    #if DEBUG
-                    if run.kind == "chat", let answer = result.variantB {
-                        Divider()
-                        Text("B · 完整 Skill 参考").font(.subheadline.bold()).foregroundStyle(Theme.green)
-                        if let error = answer.error, !error.isEmpty {
-                            Text(error).foregroundStyle(.secondary)
-                        } else {
-                            Text(answer.message).lineSpacing(4)
-                            ForEach(Array(answer.questions.enumerated()), id: \.offset) { _, question in Text("· \(question)").fontWeight(.medium) }
-                        }
                     }
-                    #endif
                 } else { Text(run.status == "running" ? "AI 教练正在安排，完成后会自动显示。" : "本次分析未完成，可重新发送。") }
                 Text("\(run.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(run.timezone)").font(.caption2).foregroundStyle(.secondary)
             }
@@ -233,21 +226,21 @@ struct CoachSettingsView: View {
                 Picker("侧重点", selection: $settings.style) { Text("综合训练与恢复").tag("balanced"); Text("动作质量").tag("technique"); Text("量化进步").tag("measured"); Text("饮食与恢复").tag("nutrition") }
             }
             Section("你的训练条件") {
-                TextField("目标（如增肌、建立规律训练）", text: $settings.profile.goal, axis: .vertical)
-                TextField("训练经验", text: $settings.profile.experience)
+                LabeledContent("目标") { TextField("如增肌、建立规律训练", text: $settings.profile.goal, axis: .vertical).multilineTextAlignment(.trailing) }
+                HStack { Text("训练经验"); Spacer(); TextField("输入经验", text: $settings.profile.experience).multilineTextAlignment(.trailing) }
                 Stepper(settings.profile.daysPerWeek == 0 ? "每周天数 · 待补充" : "每周 \(settings.profile.daysPerWeek) 天", value: $settings.profile.daysPerWeek, in: 0...7)
                 Stepper(settings.profile.sessionMinutes == 0 ? "单次时长 · 待补充" : "单次 \(settings.profile.sessionMinutes) 分钟", value: $settings.profile.sessionMinutes, in: 0...240, step: 15)
                 Stepper(settings.profile.exercisesPerSession == 0 ? "每次动作数 · 由教练安排" : "每次 \(settings.profile.exercisesPerSession) 个动作", value: $settings.profile.exercisesPerSession, in: 0...8)
                 Stepper(settings.profile.setsPerExercise == 0 ? "每个动作组数 · 由教练安排" : "每个动作 \(settings.profile.setsPerExercise) 组", value: $settings.profile.setsPerExercise, in: 0...8)
                 Text("这两项保存在云端账号资料中；改为 3 个动作后，后续力量计划按新设置生成。0 表示不固定。")
                     .font(.caption).foregroundStyle(.secondary)
-                TextField("器械与训练场地", text: $settings.profile.equipment, axis: .vertical)
-                TextField("运动限制或伤痛（无也请说明）", text: $settings.profile.limitations, axis: .vertical)
+                LabeledContent("器械与场地") { TextField("填写可用条件", text: $settings.profile.equipment, axis: .vertical).multilineTextAlignment(.trailing) }
+                LabeledContent("运动限制或伤痛") { TextField("无也请说明", text: $settings.profile.limitations, axis: .vertical).multilineTextAlignment(.trailing) }
             }
             Section("食谱条件") {
-                TextField("食物过敏与特殊饮食限制（无也请说明）", text: $settings.profile.allergies, axis: .vertical)
-                TextField("口味、忌口与偏好", text: $settings.profile.foodPreferences, axis: .vertical)
-                TextField("做饭或外食条件、预算", text: $settings.profile.cookingConditions, axis: .vertical)
+                LabeledContent("过敏与饮食限制") { TextField("无也请说明", text: $settings.profile.allergies, axis: .vertical).multilineTextAlignment(.trailing) }
+                LabeledContent("口味与偏好") { TextField("可留空", text: $settings.profile.foodPreferences, axis: .vertical).multilineTextAlignment(.trailing) }
+                LabeledContent("做饭、外食与预算") { TextField("可留空", text: $settings.profile.cookingConditions, axis: .vertical).multilineTextAlignment(.trailing) }
             }
             Section("健身 · 晚上分析，早上提醒") {
                 Toggle("开启健身定时分析", isOn: $settings.fitnessEnabled)

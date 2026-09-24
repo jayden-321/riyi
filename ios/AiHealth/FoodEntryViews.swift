@@ -105,7 +105,7 @@ struct FoodPackageCaptureView: View {
                 }
                 Section("必需照片") {
                     FoodPhotoRow(title: "商品正面", hint: "品牌、名称、净含量与数量", image: $front) { cameraSlot = .front }
-                    FoodPhotoRow(title: "营养成分表", hint: "拍清每 100 克或毫升的能量", image: $nutrition) { cameraSlot = .nutrition }
+                    FoodPhotoRow(title: "营养成分表", hint: "拍清热量、蛋白质、脂肪和碳水化合物", image: $nutrition) { cameraSlot = .nutrition }
                 }
                 Section("可选") {
                     FoodPhotoRow(title: "补拍规格", hint: "正面看不清时再拍", image: $extra) { cameraSlot = .extra }
@@ -145,89 +145,113 @@ struct FoodPackageReviewView: View {
     @State private var loaded = false
     @State private var name = ""
     @State private var brand = ""
-    @State private var packageAmount = 0.0
+    @State private var packageAmount: Double?
     @State private var packageUnit = "g"
-    @State private var count = 0.0
+    @State private var count: Double?
     @State private var servingUnit = "只"
-    @State private var energy = 0.0
+    @State private var energy: Double?
     @State private var energyUnit = "kJ"
+    @State private var protein: Double?
+    @State private var fat: Double?
+    @State private var carbs: Double?
     @State private var recordNow = false
-    @State private var eaten = 0.0
+    @State private var eaten: Double?
     @State private var slot = "breakfast"
     @State private var error: String?
-    @State private var productToShare: FoodProduct?
+    @State private var saving = false
+    @State private var savedProduct: FoodProduct?
+    @State private var mealSaved = false
 
     private var preview: FoodProduct {
         FoodProduct(name: name.trimmingCharacters(in: .whitespacesAndNewlines), brand: brand,
-                    packageAmount: packageAmount, packageUnit: packageUnit,
-                    unitsPerPackage: count > 0 ? count : nil, servingUnit: count > 0 ? servingUnit : "",
-                    energyPer100: energy, energyUnit: energyUnit, basisUnit: packageUnit)
+                    packageAmount: packageAmount ?? 0, packageUnit: packageUnit,
+                    unitsPerPackage: (count ?? 0) > 0 ? count : nil, servingUnit: (count ?? 0) > 0 ? servingUnit : "",
+                    energyPer100: energy ?? 0, energyUnit: energyUnit, basisUnit: packageUnit,
+                    proteinPer100: protein, fatPer100: fat, carbPer100: carbs)
     }
     var body: some View {
         NavigationStack {
             Form {
                 Section("请核对包装") {
-                    TextField("商品名称", text: $name)
-                    TextField("品牌（识别后请核对）", text: $brand)
+                    HStack { Text("商品名称"); Spacer(); TextField("输入名称", text: $name).multilineTextAlignment(.trailing).accessibilityIdentifier("商品名称") }
+                    HStack { Text("品牌"); Spacer(); TextField("未识别到可补录", text: $brand).multilineTextAlignment(.trailing).accessibilityIdentifier("品牌（识别后请核对）") }
                     Text("AI 会把包装上清楚可见的品牌和商品名称分开填写；未读到品牌时可在这里补录。").font(.caption).foregroundStyle(.secondary)
                     HStack {
-                        TextField("整包净含量", value: $packageAmount, format: .number).keyboardType(.decimalPad)
+                        Text("整包净含量"); Spacer(); TextField("输入数值", value: $packageAmount, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing).accessibilityIdentifier("整包净含量")
                         Picker("单位", selection: $packageUnit) { Text("克").tag("g"); Text("毫升").tag("ml") }.labelsHidden()
                     }
                     HStack {
-                        TextField("数量", value: $count, format: .number).keyboardType(.decimalPad)
-                        TextField("数量单位", text: $servingUnit).frame(width: 60)
+                        Text("整包数量"); Spacer(); TextField("数量", value: $count, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing).accessibilityIdentifier("数量")
+                        TextField("单位", text: $servingUnit).frame(width: 60).accessibilityIdentifier("数量单位")
                     }
                     if extraction != nil && extraction?.unitsPerPackage == nil {
                         Text("照片未读出数量；按片、只等单位记录前，请从包装其他位置或购买信息核对。").font(.caption).foregroundStyle(.orange)
                     }
                     HStack {
-                        TextField("每 100 克/毫升能量", value: $energy, format: .number).keyboardType(.decimalPad)
+                        Text("每 100 克/毫升能量"); Spacer(); TextField("能量", value: $energy, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing).accessibilityIdentifier("每 100 克/毫升能量")
                         Picker("标签单位", selection: $energyUnit) { Text("千焦").tag("kJ"); Text("千卡").tag("kcal") }.labelsHidden()
                     }
+                    LabeledNumberField("蛋白质 / 100", unit: "克", value: $protein)
+                    LabeledNumberField("脂肪 / 100", unit: "克", value: $fat)
+                    LabeledNumberField("碳水化合物 / 100", unit: "克", value: $carbs)
                     if let each = preview.amountPerUnit { Text("平均每\(servingUnit)约 \(each.formatted(.number.precision(.fractionLength(0...1)))) \(packageUnit == "g" ? "克" : "毫升")").foregroundStyle(Theme.green) }
-                    Text("仅按包装平均值换算；营养表的千焦会除以 4.184 转为千卡。").font(.caption).foregroundStyle(.secondary)
+                    Text("只填写标签看清并核对的营养素；每份标示须先按明确份量换算为每 100 克或毫升。未知项留空，不记作 0。千焦 ÷ 4.184 = 千卡。").font(.caption).foregroundStyle(.secondary)
                 }
                 if let extraction, !extraction.warnings.isEmpty { Section("识别提示") { ForEach(extraction.warnings, id: \.self) { Text($0) } } }
                 Section("本次实际吃喝") {
                     Toggle("同时记录这次饮食", isOn: $recordNow)
                     if recordNow {
                         Picker("餐次", selection: $slot) { ForEach(mealSlots, id: \.0) { Text($0.1).tag($0.0) } }
-                        TextField("实际吃了多少\(servingUnit)", value: $eaten, format: .number).keyboardType(.decimalPad)
-                        if let result = preview.calculated(quantity: eaten, unit: servingUnit) { Text("约 \(result.kcal.formatted(.number.precision(.fractionLength(0)))) 千卡 · 按本品标签计算") }
+                        HStack { Text("实际吃了多少"); Spacer(); TextField("数量", value: $eaten, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing); Text(servingUnit) }
+                        if let result = eaten.flatMap({ preview.calculated(quantity: $0, unit: servingUnit) }) { Text("约 \(result.kcal.formatted(.number.precision(.fractionLength(0)))) 千卡 · 按本品标签计算") }
                     }
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }.navigationTitle("核对商品资料").toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button(store.isDemo ? "保存到常用" : "保存并共享") { save() }.disabled(!preview.valid) }
-            }.onAppear { load() }
-                .sheet(item: $productToShare, onDismiss: { onSaved(); dismiss() }) { product in
-                    FoodShareView(store: store, product: product, autoGenerate: true)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "正在保存…" : savedProduct != nil ? "重试分享" : store.isDemo ? "保存到常用" : "保存并共享") {
+                        Task { await save() }
+                    }.disabled(saving || savedProduct == nil && !preview.valid)
                 }
+            }.onAppear { load() }
         }
     }
     private func load() {
         guard !loaded else { return }; loaded = true
         name = extraction?.name ?? ""; brand = extraction?.brand ?? ""
-        packageAmount = extraction?.packageAmount ?? 0; packageUnit = extraction?.packageUnit ?? "g"
-        count = extraction?.unitsPerPackage ?? 0
+        packageAmount = extraction?.packageAmount; packageUnit = extraction?.packageUnit ?? "g"
+        count = extraction?.unitsPerPackage
         let recognized = extraction?.servingUnit?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         servingUnit = recognized.isEmpty ? "件" : recognized
-        energy = extraction?.energyPer100 ?? 0; energyUnit = extraction?.energyUnit ?? "kJ"
+        energy = extraction?.energyPer100; energyUnit = extraction?.energyUnit ?? "kJ"
+        protein = extraction?.proteinPer100; fat = extraction?.fatPer100; carbs = extraction?.carbPer100
     }
-    private func save() {
-        let product = preview
-        guard product.valid else { error = "请核对商品名称、净含量和每 100 克/毫升能量"; return }
-        if recordNow && product.calculated(quantity: eaten, unit: servingUnit) == nil { error = "请填写这次实际吃的数量；若只想存商品，关闭同时记录"; return }
-        guard store.save(product, kind: "food", id: product.id) else { error = store.error ?? "商品未保存"; return }
-        if recordNow {
-            guard let log = store.mealLog(from: product, quantity: eaten, unit: servingUnit, slot: slot, at: mealEntryTime(for: date, zone: store.settings.timezone)), store.save(log, kind: "meal", id: log.id) else {
+    private func save() async {
+        guard !saving else { return }
+        saving = true; defer { saving = false }
+        let product = savedProduct ?? preview
+        if savedProduct == nil {
+            guard product.valid else { error = "请核对商品名称、净含量和每 100 克/毫升能量"; return }
+            if recordNow && (eaten.flatMap { product.calculated(quantity: $0, unit: servingUnit) }) == nil { error = "请填写这次实际吃的数量；若只想存商品，关闭同时记录"; return }
+            guard store.save(product, kind: "food", id: product.id) else { error = store.error ?? "商品未保存"; return }
+            savedProduct = product
+        }
+        if recordNow && !mealSaved {
+            guard let eaten, let log = store.mealLog(from: product, quantity: eaten, unit: servingUnit, slot: slot, at: mealEntryTime(for: date, zone: store.settings.timezone)), store.save(log, kind: "meal", id: log.id) else {
                 error = "商品已存入常用，但这次饮食未保存；请从常用再记录一次。"; return
             }
+            mealSaved = true
         }
         if store.isDemo { onSaved(); dismiss() }
-        else { productToShare = product }
+        else {
+            do {
+                _ = try await store.shareFood(product, searchable: true)
+                onSaved(); dismiss()
+            } catch {
+                self.error = "商品已存入常用，但自动分享未完成：\(error.localizedDescription)。请重试分享。"
+            }
+        }
     }
 }
 
@@ -238,6 +262,7 @@ struct FoodCommonView: View {
     @State private var search = ""
     @State private var capturing = false
     @State private var importing = false
+    @State private var editingProduct: FoodProduct?
     private var visible: [FoodProduct] { store.foodProducts.filter { search.isEmpty || $0.name.localizedStandardContains(search) || $0.brand.localizedStandardContains(search) } }
     var body: some View {
         NavigationStack {
@@ -252,8 +277,10 @@ struct FoodCommonView: View {
                                 Text(product.brand.isEmpty ? product.name : "\(product.brand) · \(product.name)").font(.headline)
                                 Text("品牌：\(product.brand.isEmpty ? "未填写" : product.brand)").font(.caption).foregroundStyle(.secondary)
                                 Text(product.amountPerUnit.map { "每\(product.servingUnit)约 \($0.formatted(.number.precision(.fractionLength(0...1)))) \(product.basisUnit == "g" ? "克" : "毫升")" } ?? "按\(product.basisUnit == "g" ? "克" : "毫升")记录").font(.caption).foregroundStyle(.secondary)
+                                Text("每 100 \(product.basisUnit == "g" ? "克" : "毫升")：蛋白质 \(product.proteinPer100.map { "\($0.formatted()) 克" } ?? "未知") · 脂肪 \(product.fatPer100.map { "\($0.formatted()) 克" } ?? "未知") · 碳水 \(product.carbPer100.map { "\($0.formatted()) 克" } ?? "未知")")
+                                    .font(.caption).foregroundStyle(.secondary)
                             }
-                        }
+                        }.swipeActions { Button("编辑") { editingProduct = product } }
                     }
                 }
             }.navigationTitle("常用").toolbar {
@@ -262,6 +289,71 @@ struct FoodCommonView: View {
             }
         }.sheet(isPresented: $capturing) { FoodPackageCaptureView(store: store, date: date) }
          .sheet(isPresented: $importing) { FoodImportView(store: store) }
+         .sheet(item: $editingProduct) { FoodProductEditView(store: store, product: $0) }
+    }
+}
+
+struct FoodProductEditView: View {
+    @Bindable var store: AppStore
+    @State var product: FoodProduct
+    var onSaved: () -> Void = {}
+    @Environment(\.dismiss) private var dismiss
+    @State private var saving = false
+    @State private var locallySaved = false
+    @State private var error: String?
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("商品资料") {
+                    HStack { Text("商品名称"); Spacer(); TextField("输入名称", text: $product.name).multilineTextAlignment(.trailing) }
+                    HStack { Text("品牌"); Spacer(); TextField("可留空", text: $product.brand).multilineTextAlignment(.trailing) }
+                    HStack { Text("整包净含量"); Spacer(); TextField("数值", value: $product.packageAmount, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing) }
+                    Picker("单位", selection: $product.packageUnit) { Text("克").tag("g"); Text("毫升").tag("ml") }
+                    LabeledNumberField("整包数量", unit: product.servingUnit, value: $product.unitsPerPackage)
+                    if product.unitsPerPackage != nil { HStack { Text("数量单位"); Spacer(); TextField("单位", text: $product.servingUnit).multilineTextAlignment(.trailing) } }
+                }
+                Section("每 100 克/毫升营养表") {
+                    HStack { Text("能量"); Spacer(); TextField("数值", value: $product.energyPer100, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing) }
+                    Picker("能量单位", selection: $product.energyUnit) { Text("千焦").tag("kJ"); Text("千卡").tag("kcal") }
+                    LabeledNumberField("蛋白质", unit: "克", value: $product.proteinPer100)
+                    LabeledNumberField("脂肪", unit: "克", value: $product.fatPer100)
+                    LabeledNumberField("碳水化合物", unit: "克", value: $product.carbPer100)
+                    Text("请按包装标签核对；没看到的数值留空，不把它当 0。已吃记录保留当时的营养数值。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if product.source == "imported" {
+                    Section { Text("这是导入到你账号的独立副本。修改后只影响你的常用商品，不会改动原作者或其他人。")
+                        .font(.caption).foregroundStyle(.secondary) }
+                }
+                if let error { Section { Text(error).foregroundStyle(.red) } }
+            }.navigationTitle("编辑常用商品").toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button(saving ? "正在保存…" : locallySaved ? "重试更新共享" : "保存修改") { Task { await save() } }.disabled(saving) }
+            }
+        }
+    }
+    private func save() async {
+        guard !saving else { return }
+        saving = true; defer { saving = false }
+        error = nil
+        product.name = product.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        product.basisUnit = product.packageUnit
+        guard product.valid else { error = "请核对名称、规格、热量和营养素数值"; return }
+        let wasImported = product.source == "imported"
+        if wasImported { product.source = "manual"; product.originShareCode = nil }
+        product.verifiedAt = Date()
+        guard store.save(product, kind: "food", id: product.id) else { error = store.error ?? "商品未保存"; return }
+        locallySaved = true
+        onSaved()
+        guard !store.isDemo && !wasImported else { dismiss(); return }
+        do {
+            let state = try await store.foodShareStatus(product)
+            if !state.code.isEmpty {
+                guard state.moderationState == "visible" else { error = "已更新自己的常用商品；公开分享仍在审核，暂不能同步修改。"; return }
+                _ = try await store.shareFood(product, searchable: state.searchable)
+            }
+            dismiss()
+        } catch { self.error = "已更新自己的常用商品，但共享资料尚未更新：\(error.localizedDescription)。请重试。" }
     }
 }
 
@@ -270,44 +362,70 @@ struct FoodRecordView: View {
     let product: FoodProduct
     let date: Date
     @Environment(\.dismiss) private var dismiss
-    @State private var quantity = 1.0
+    @State private var quantity: Double?
     @State private var unit = "只"
     @State private var slot = "breakfast"
     @State private var sharing = false
+    @State private var editing = false
+    @State private var editSaved = false
+    @State private var checkingSource = false
     @State private var error: String?
-    private var result: (amount: Double, kcal: Double)? { product.calculated(quantity: quantity, unit: unit) }
+    private var result: (amount: Double, kcal: Double)? { quantity.flatMap { product.calculated(quantity: $0, unit: unit) } }
     var body: some View {
         Form {
             Section(product.brand.isEmpty ? product.name : "\(product.brand) · \(product.name)") {
                 Text("品牌：\(product.brand.isEmpty ? "未填写" : product.brand)").font(.footnote).foregroundStyle(.secondary)
                 Text("整包 \(product.packageAmount.formatted()) \(product.packageUnit == "g" ? "克" : "毫升") · 每 100 \(product.basisUnit == "g" ? "克" : "毫升") \(product.energyPer100.formatted()) \(product.energyUnit == "kJ" ? "千焦" : "千卡")").font(.footnote)
+                Text("每 100 \(product.basisUnit == "g" ? "克" : "毫升")：蛋白质 \(product.proteinPer100.map { "\($0.formatted()) 克" } ?? "未知") · 脂肪 \(product.fatPer100.map { "\($0.formatted()) 克" } ?? "未知") · 碳水 \(product.carbPer100.map { "\($0.formatted()) 克" } ?? "未知")")
+                    .font(.footnote).foregroundStyle(.secondary)
                 Picker("餐次", selection: $slot) { ForEach(mealSlots, id: \.0) { Text($0.1).tag($0.0) } }
                 Picker("数量单位", selection: $unit) {
                     if product.amountPerUnit != nil { Text(product.servingUnit).tag(product.servingUnit) }
                     Text(product.basisUnit == "g" ? "克" : "毫升").tag(product.basisUnit)
                 }
-                TextField("实际吃了多少\(unit)", value: $quantity, format: .number).keyboardType(.decimalPad)
+                HStack { Text("实际吃了多少"); Spacer(); TextField("数量", value: $quantity, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing).accessibilityIdentifier("实际吃了多少\(unit)"); Text(unit) }
                 if let result { Text("约 \(result.kcal.formatted(.number.precision(.fractionLength(0)))) 千卡 · 按保存的包装数据计算").foregroundStyle(Theme.green) }
+                if let result {
+                    Text("本次蛋白质 \(product.macroGrams(per100: product.proteinPer100, amount: result.amount).map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) 克" } ?? "未知") · 脂肪 \(product.macroGrams(per100: product.fatPer100, amount: result.amount).map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) 克" } ?? "未知") · 碳水 \(product.macroGrams(per100: product.carbPer100, amount: result.amount).map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) 克" } ?? "未知")")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Button("保存实际饮食") { save() }.disabled(result == nil)
             }
-            Section { Button("分享商品资料") { sharing = true }.disabled(store.isDemo); Text("只分享商品名称、品牌、规格和营养值，不分享你的饮食记录。").font(.caption).foregroundStyle(.secondary) }
+            Section {
+                Button("编辑常用商品") { editing = true }
+                if product.source == "imported", product.originShareCode != nil {
+                    Button(checkingSource ? "正在检查来源…" : "检查来源商品更新") { Task { await refreshImported() } }.disabled(checkingSource)
+                }
+                Button("分享商品资料") { sharing = true }.disabled(store.isDemo)
+                Text("只分享商品名称、品牌、规格和营养值，不分享你的饮食记录。").font(.caption).foregroundStyle(.secondary)
+            }
             if let error { Section { Text(error).foregroundStyle(.red) } }
         }.navigationTitle("常用商品").onAppear {
             unit = product.amountPerUnit == nil ? product.basisUnit : product.servingUnit
-            if let last = store.mealLogs.last(where: { $0.foodProductId == product.id }), let value = last.quantity, value > 0 { quantity = value; unit = last.quantityUnit ?? unit }
+            if let last = store.mealLogs.last(where: { $0.foodProductId == product.id }) { unit = last.quantityUnit ?? unit }
         }.sheet(isPresented: $sharing) { FoodShareView(store: store, product: product) }
+         .sheet(isPresented: $editing, onDismiss: { if editSaved { dismiss() } }) { FoodProductEditView(store: store, product: product) { editSaved = true } }
     }
     private func save() {
-        guard let log = store.mealLog(from: product, quantity: quantity, unit: unit, slot: slot, at: mealEntryTime(for: date, zone: store.settings.timezone)) else { error = "请核对本次实际数量"; return }
+        guard let quantity, let log = store.mealLog(from: product, quantity: quantity, unit: unit, slot: slot, at: mealEntryTime(for: date, zone: store.settings.timezone)) else { error = "请核对本次实际数量"; return }
         guard store.save(log, kind: "meal", id: log.id) else { error = store.error ?? "饮食未保存"; return }
         dismiss()
+    }
+    private func refreshImported() async {
+        guard let code = product.originShareCode else { return }
+        checkingSource = true; defer { checkingSource = false }
+        do {
+            let page = try await store.searchSharedFoods(code)
+            guard let item = page.items.first(where: { $0.code == code }) else { error = "来源商品已不可用，现有副本仍保留。"; return }
+            _ = try await store.importSharedFood(item)
+            dismiss()
+        } catch { self.error = error.localizedDescription }
     }
 }
 
 struct FoodShareView: View {
     @Bindable var store: AppStore
     let product: FoodProduct
-    var autoGenerate = false
     @Environment(\.dismiss) private var dismiss
     @State private var searchable = true
     @State private var code: String?
@@ -337,11 +455,7 @@ struct FoodShareView: View {
                  do {
                      let state = try await store.foodShareStatus(product)
                      if !state.code.isEmpty { code = state.code; searchable = state.searchable; moderationState = state.moderationState }
-                     else if autoGenerate { await share() }
-                 } catch {
-                     if autoGenerate { await share() }
-                     else { self.error = error.localizedDescription }
-                 }
+                 } catch { self.error = error.localizedDescription }
              }
         }
     }
@@ -483,7 +597,7 @@ private struct FoodReportView: View {
                         Text("涉嫌侵权").tag("copyright")
                         Text("其他").tag("other")
                     }
-                    TextField("补充说明（选填，最多 500 字）", text: $details, axis: .vertical)
+                    LabeledContent("补充说明") { TextField("选填，最多 500 字", text: $details, axis: .vertical).multilineTextAlignment(.trailing) }
                     Text("举报后该商品会先从搜索中隐藏，待人工复核。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -551,12 +665,15 @@ struct FoodTextEntryView: View {
                 Section("实际吃喝") {
                     TextField("例如：早餐吃了5只小笼包", text: $text, axis: .vertical).accessibilityIdentifier("meal-description")
                     Picker("餐次", selection: $slot) { ForEach(mealSlots, id: \.0) { Text($0.1).tag($0.0) } }
-                    Button(estimating ? "正在估算…" : "按文字请 AI 粗估热量") { Task { await estimateText() } }
+                    Button(estimating ? "正在估算…" : "按文字请 AI 粗估热量与营养素") { Task { await estimateText() } }
                         .disabled(estimating || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     if let estimate {
                         if let (low, high) = estimate.usableRange {
                             Text("AI 粗估约 \(low.formatted(.number.precision(.fractionLength(0))))–\(high.formatted(.number.precision(.fractionLength(0)))) 千卡").foregroundStyle(Theme.green)
                         } else { Text("信息不足，热量待估算；仍可保存这餐。") }
+                        if let range = foodMacroRange(estimate.proteinMinG, estimate.proteinMaxG) { Text("蛋白质约 \(range.0.formatted(.number.precision(.fractionLength(0...1))))–\(range.1.formatted(.number.precision(.fractionLength(0...1)))) 克") }
+                        if let range = foodMacroRange(estimate.fatMinG, estimate.fatMaxG) { Text("脂肪约 \(range.0.formatted(.number.precision(.fractionLength(0...1))))–\(range.1.formatted(.number.precision(.fractionLength(0...1)))) 克") }
+                        if let range = foodMacroRange(estimate.carbMinG, estimate.carbMaxG) { Text("碳水约 \(range.0.formatted(.number.precision(.fractionLength(0...1))))–\(range.1.formatted(.number.precision(.fractionLength(0...1)))) 克") }
                         Text(estimate.estimateBasis).font(.caption).foregroundStyle(.secondary)
                     }
                     Button("记录这餐") { save() }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("save-meal-log")
@@ -583,6 +700,9 @@ struct FoodTextEntryView: View {
             log.energyMethod = "estimated_range"; log.estimateMinKcal = low; log.estimateMaxKcal = high
             log.nutritionSource = "AI 文字粗估：" + String(estimate.estimateBasis.prefix(280))
         } else { log.energyMethod = "unknown" }
+        if let estimate {
+            applyEstimatedMacros(&log, protein: (estimate.proteinMinG, estimate.proteinMaxG), fat: (estimate.fatMinG, estimate.fatMaxG), carbs: (estimate.carbMinG, estimate.carbMaxG), source: "AI 文字粗估：" + String(estimate.estimateBasis.prefix(280)))
+        }
         if store.save(log, kind: "meal", id: log.id) { dismiss() }
         else { error = store.error ?? "饮食未保存" }
     }
@@ -628,6 +748,15 @@ struct FoodOutsidePhotoView: View {
         if unit == recognition.unit, let suggested = recognition.quantity, abs(amount - suggested) > 0.001 { return nil }
         return (low, high)
     }
+    private func acceptedMacroRange(_ low: Double?, _ high: Double?) -> (Double, Double)? {
+        guard let recognition, name.trimmingCharacters(in: .whitespacesAndNewlines) == recognition.name.trimmingCharacters(in: .whitespacesAndNewlines),
+              let suggested = recognition.quantity, amount > 0, unit == recognition.unit, abs(amount - suggested) < 0.001 else { return nil }
+        return foodMacroRange(low, high)
+    }
+    private func acceptedMacroPair(_ low: Double?, _ high: Double?) -> (Double?, Double?) {
+        guard let range = acceptedMacroRange(low, high) else { return (nil, nil) }
+        return range
+    }
     var body: some View {
         NavigationStack {
             Form {
@@ -638,10 +767,10 @@ struct FoodOutsidePhotoView: View {
                 }
                 if let recognition {
                     Section("核对结果") {
-                        TextField("食物或饮品名称", text: $name)
+                        HStack { Text("食物或饮品"); Spacer(); TextField("输入名称", text: $name).multilineTextAlignment(.trailing) }
                         Picker("餐次", selection: $slot) { ForEach(mealSlots, id: \.0) { Text($0.1).tag($0.0) } }
-                        TextField("这次的数量", value: $amount, format: .number).keyboardType(.decimalPad)
-                        Picker("单位", selection: $unit) { Text("毫升").tag("ml"); Text("碗").tag("碗"); Text("份").tag("份"); Text("个").tag("个") }
+                        HStack { Text("这次的数量"); Spacer(); TextField("数量", value: $amount, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing) }
+                        Picker("单位", selection: $unit) { Text("毫升").tag("ml"); Text("克").tag("g"); Text("碗").tag("碗"); Text("份").tag("份"); Text("个").tag("个"); Text("只").tag("只") }
                         if recognition.foodKey == "coffee_black" { Toggle("确认无奶、糖和糖浆", isOn: $noAdditions) }
                         if let kcal = estimate { Text("参考估算约 \(kcal.formatted(.number.precision(.fractionLength(0)))) 千卡").foregroundStyle(Theme.green) }
                         else if let range = estimateRange {
@@ -649,6 +778,9 @@ struct FoodOutsidePhotoView: View {
                             Text(recognition.estimateBasis).font(.caption).foregroundStyle(.secondary)
                         }
                         else { Text("热量待估算；不会按 0 千卡记录").foregroundStyle(.secondary) }
+                        if let range = acceptedMacroRange(recognition.proteinMinG, recognition.proteinMaxG) { Text("蛋白质约 \(range.0.formatted(.number.precision(.fractionLength(0...1))))–\(range.1.formatted(.number.precision(.fractionLength(0...1)))) 克") }
+                        if let range = acceptedMacroRange(recognition.fatMinG, recognition.fatMaxG) { Text("脂肪约 \(range.0.formatted(.number.precision(.fractionLength(0...1))))–\(range.1.formatted(.number.precision(.fractionLength(0...1)))) 克") }
+                        if let range = acceptedMacroRange(recognition.carbMinG, recognition.carbMaxG) { Text("碳水约 \(range.0.formatted(.number.precision(.fractionLength(0...1))))–\(range.1.formatted(.number.precision(.fractionLength(0...1)))) 克") }
                         ForEach(recognition.questions, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
                         Button("保存实际饮食") { save() }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
@@ -663,7 +795,7 @@ struct FoodOutsidePhotoView: View {
         do {
             let result = try await store.recognizeFoodPhoto(data)
             recognition = result; name = result.name
-            unit = result.unit == "ml" || result.unit == "碗" ? result.unit : result.foodKey == "rice_plain" ? "碗" : "ml"
+            unit = ["ml", "g", "碗", "份", "个", "只"].contains(result.unit) ? result.unit : result.foodKey == "rice_plain" ? "碗" : "份"
             amount = result.unit == unit ? (result.quantity ?? 0) : 0
             noAdditions = false
             slot = ["coffee_black", "milk"].contains(result.foodKey) ? "drink" : "snack"
@@ -686,6 +818,13 @@ struct FoodOutsidePhotoView: View {
         else { log.energyMethod = "unknown" }
         if amount > 0 { log.quantity = amount; log.quantityUnit = unit }
         else { log.quantity = nil; log.quantityUnit = nil }
+        if let recognition {
+            applyEstimatedMacros(&log,
+                protein: acceptedMacroPair(recognition.proteinMinG, recognition.proteinMaxG),
+                fat: acceptedMacroPair(recognition.fatMinG, recognition.fatMaxG),
+                carbs: acceptedMacroPair(recognition.carbMinG, recognition.carbMaxG),
+                source: "AI 外食照片粗估：" + String(recognition.estimateBasis.prefix(280)))
+        }
         log.calculateEnergy()
         if store.save(log, kind: "meal", id: log.id) { onSaved?(); dismiss() }
         else { error = store.error ?? "饮食未保存" }

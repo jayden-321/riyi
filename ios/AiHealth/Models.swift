@@ -199,8 +199,9 @@ struct WaterLog: Codable, Identifiable {
     var id = newID(); var amountMl: Int; var drankAt = Date(); var timezone = TimeZone.current.identifier; var source = "manual"
 }
 struct Profile: Codable, Identifiable {
-    var id = newID(); var heightCm: Double?; var waistCm: Double?; var measuredAt = Date(); var updatedAt = Date()
-    var goal = "建立规律训练"; var restrictions = ""; var waterGoalMl = 2000; var timezone = TimeZone.current.identifier
+    var id = newID(); var heightCm: Double?; var bodyMassKg: Double?; var waistCm: Double?; var measuredAt = Date(); var updatedAt = Date()
+    var goal = "建立规律训练"; var restrictions = ""; var waterGoalMl = 2000; var proteinFactor: Double?; var timezone = TimeZone.current.identifier
+    var energyGoalKcal: Double?; var proteinGoalG: Double?; var fatGoalG: Double?; var carbGoalG: Double?
 }
 struct Checkin: Codable, Identifiable {
     var id = newID(); var recordedAt = Date(); var timezone = TimeZone.current.identifier

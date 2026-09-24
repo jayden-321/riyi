@@ -16,20 +16,20 @@ struct PasswordResetView: View {
         NavigationStack {
             Form {
                 Section("注册邮箱") {
-                    TextField("邮箱", text: $email).textContentType(.emailAddress)
+                    LabeledContent("邮箱") { TextField("注册邮箱", text: $email).textContentType(.emailAddress)
                         .keyboardType(.emailAddress).textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                        .autocorrectionDisabled().multilineTextAlignment(.trailing) }
                     Button("发送找回验证码") { Task { await requestCode() } }
                         .disabled(busy || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 if codeRequested && !completed {
                     Section("设置新密码") {
-                        TextField("邮件中的 10 位验证码", text: $code)
-                            .textInputAutocapitalization(.characters).autocorrectionDisabled()
-                        AccountSecureField(placeholder: "新密码（12–72 字节）", text: $password,
-                                           contentType: .newPassword).frame(height: 36)
-                        AccountSecureField(placeholder: "再次输入新密码", text: $confirmation,
-                                           contentType: .newPassword).frame(height: 36)
+                        LabeledContent("验证码") { TextField("邮件中的 10 位", text: $code)
+                            .textInputAutocapitalization(.characters).autocorrectionDisabled().multilineTextAlignment(.trailing) }
+                        LabeledContent("新密码") { AccountSecureField(placeholder: "12–72 字节", text: $password,
+                                           contentType: .newPassword).frame(height: 36) }
+                        LabeledContent("确认密码") { AccountSecureField(placeholder: "再次输入", text: $confirmation,
+                                           contentType: .newPassword).frame(height: 36) }
                         Button("重置密码") { Task { await confirmReset() } }
                             .disabled(busy || code.trimmingCharacters(in: .whitespacesAndNewlines).count != 10
                                       || !(12...72).contains(password.utf8.count) || password != confirmation)
